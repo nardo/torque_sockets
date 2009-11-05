@@ -1,0 +1,11 @@
+Torque Network Platform
+
+The Torque Network Platform implements an unreliable connection-based datagram protocol atop UDP.
+
+Directory structure overview:
+
+license:
+	source code licensing information.  The Torque Network Platform
+	is released under the MIT license
+	See: http://www.opensource.org/licenses/mit-license.php
+
