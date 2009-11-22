@@ -1,0 +1,41 @@
+This is TeX, Version 3.14159 (Web2C 7.4.5) (format=latex 2005.1.19)  18 FEB 2005 16:15
+**tommatb
+(/usr/share/texmf/tex/latex/tools/.tex
+! Interruption.
+<to be read again> 
+                   \begingroup 
+l.1 
+    %%
+? 
+LaTeX2e <2001/06/01>
+Babel <v3.7h> and hyphenation patterns for american, french, german, ngerman, n
+ohyphenation, loaded.
+File ignored)
+*q
+
+! LaTeX Error: Missing \begin{document}.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+<*> q
+     
+? q
+OK, entering \batchmode...
+Missing character: There is no q in font nullfont!
+! Emergency stop.
+<*> q
+     
+*** (job aborted, no legal \end found)
+
+ 
+Here is how much of TeX's memory you used:
+ 5 strings out of 95847
+ 118 string characters out of 1195948
+ 44507 words of memory out of 1000001
+ 3034 multiletter control sequences out of 10000+50000
+ 3640 words of font info for 14 fonts, out of 500000 for 1000
+ 14 hyphenation exceptions out of 1000
+ 5i,0n,4p,87b,14s stack positions out of 1500i,500n,5000p,200000b,5000s
+No pages of output.
