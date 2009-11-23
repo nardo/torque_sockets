@@ -206,6 +206,17 @@ struct address
 					}
 				}
 			}
+		#elif defined (PLATFORM_MAC_OSX)
+			struct ifaddrs *addrs;
+			getifaddrs(&addrs);
+			for(struct ifaddrs *walk = addrs; walk; walk = walk->ifa_next)
+			{
+				address the_address;
+				the_address.from_sockaddr(walk->ifa_addr);
+				if(the_address._host != INADDR_ANY && the_address._host != 0x7F000001)
+					address_array.push_back(the_address);
+			}
+			freeifaddrs(addrs);
 		#endif
 	}
 	static bool dns_resolve(const char *public_name, array<address> &addresses)

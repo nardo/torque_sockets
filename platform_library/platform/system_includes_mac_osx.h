@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <errno.h>
+#include <ifaddrs.h>
 
 #include <sys/ioctl.h>   /* ioctl() */
 #define NO_IPX_SUPPORT
