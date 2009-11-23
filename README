@@ -9,3 +9,13 @@ license:
 	is released under the MIT license
 	See: http://www.opensource.org/licenses/mit-license.php
 
+lib:
+	External libraries used by TNP (libtomcrypt for now)
+
+platform_library:
+	The Torque Network Platform source files, arranged by module
+
+test:
+	Unit tests for the network platform
+
+
