@@ -16,9 +16,6 @@ static bool sockets_init()
 	return success;
 }
 
-#include "sockets/address.h"
-#include "sockets/udp_socket.h"
-
 static void sockets_unit_test()
 {
 	address_unit_test();

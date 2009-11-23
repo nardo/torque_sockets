@@ -8,11 +8,6 @@
 
 #define UNIX_TIME_TO_INT64(t) ((int64(t) + int64(62135683200)) * ONE_SECOND)
 
-static int8  _DaysInMonth[13]    = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-static int8  _DaysInMonthLeap[13]= {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-static int32 _DayNumber[13]      = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365};
-static int32 _DayNumberLeap[13]  = {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366};
-
 /// Time, broken out into time/date
 struct date_and_time {
    int32 year;         ///< current year
@@ -27,6 +22,11 @@ struct date_and_time {
 /// time values are defined as a 64-bit number of milliseconds since 12:00 AM, January 1, 0000
 class time
 {
+	static int8 *_DaysInMonth() { static int8 _DaysInMonth[13] =  {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}; return _DaysInMonth; }
+	static int8 *_DaysInMonthLeap() { static int8 _DaysInMonthLeap[13] =  {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}; return _DaysInMonthLeap; }
+	static int32 *_DayNumber() { static int32 _DayNumber[13] =  {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365}; return _DayNumber; }
+	static int32 *_DayNumberLeap() { static int32 _DayNumberLeap[13] = {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366}; return _DayNumberLeap; }
+	
 	int64 _time;
 
 	bool _is_leap_year(int32 year) const
@@ -37,9 +37,9 @@ class time
 	int32 _days_in_month(int32 month, int32 year) const
 	{
 		if (_is_leap_year(year))
-			return _DaysInMonthLeap[month];
+			return _DaysInMonthLeap()[month];
 		else
-			return _DaysInMonth[month];
+			return _DaysInMonth()[month];
 	}
 public:
 	/// Empty constructor.
@@ -144,9 +144,9 @@ public:
 
 		int32 *day_number;
 		if (_is_leap_year(year))
-			day_number = _DayNumberLeap;
+			day_number = _DayNumberLeap();
 		else
-			day_number = _DayNumber;
+			day_number = _DayNumber();
 
 		// find month and day in month given computed year and day number,
 		month = 0;

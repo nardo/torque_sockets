@@ -2,12 +2,14 @@
 
 #include "tomcrypt.h"
 #include "platform/platform.h"
-
-namespace nat_discovery
-{
 #include "core/core.h"
-#include "sockets/sockets.h"
+
+struct net {
+#include "net/net.h"
 #include "crypto/crypto.h"
+};
+
+struct nat_discovery {
 #include "nat_discovery.h"
 };
 

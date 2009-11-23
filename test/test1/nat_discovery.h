@@ -15,7 +15,7 @@ struct nat_discovery_packet
 
 	uint32 protocol_id;
 	uint32 code;
-	address reference_address;
+	net::address reference_address;
 	uint32 magic_number;
 
 	enum code_types
@@ -80,10 +80,10 @@ struct client_harness
 
 	// state for tracking a discovery request
 	bool _is_requesting_discovery;
-	address _server1, _server2, _public_address1, _public_address2;
+	net::address _server1, _server2, _public_address1, _public_address2;
 	uint32 _discovery_request_count;
 	bool _discovery1_received, _discovery2_received;
-	time _last_discovery_request_time;
+	net::time _last_discovery_request_time;
 	uint32 _magic_number;
 
 	enum {
@@ -99,26 +99,26 @@ struct client_harness
 		_connection_list = 0;
 	}
 
-	void begin_discovery(udp_socket &the_socket, address server1, address server2)
+	void begin_discovery(net::udp_socket &the_socket, net::address server1, net::address server2)
 	{
 		_server1 = server1;
 		_server2 = server2;
 		_discovery1_received = _discovery2_received = false;
 		_discovery_request_count = 0;
-		_last_discovery_request_time = time::get_current();
+		_last_discovery_request_time = net::time::get_current();
 
 		_magic_number = uint32(_last_discovery_request_time.get_milliseconds());
 		_is_requesting_discovery = true;
 		_send_discovery_packet(the_socket);
 	}
 
-	void _send_discovery_packet(udp_socket &the_socket)
+	void _send_discovery_packet(net::udp_socket &the_socket)
 	{
 		nat_discovery_packet p;
 		p.code = nat_discovery_packet::request_public_ip;
 		p.magic_number = _magic_number;
 		_discovery_request_count++;			
-		byte buffer[udp_socket::max_datagram_size];
+		byte buffer[net::udp_socket::max_datagram_size];
 		uint32 size = p.write_packet(buffer, sizeof(buffer));
 
 		if(!_discovery1_received)
@@ -133,9 +133,9 @@ struct client_harness
 		}
 	}
 		
-	void process_harness(udp_socket &the_socket)
+	void process_harness(net::udp_socket &the_socket)
 	{
-		time current_time = time::get_current();
+		net::time current_time = net::time::get_current();
 		if(_is_requesting_discovery)
 		{
 			if(current_time - _last_discovery_request_time > discovery_timeout)
@@ -143,8 +143,8 @@ struct client_harness
 				if(_discovery_request_count > discovery_try_count)
 				{
 					_is_requesting_discovery = false;
-					array<address> if_addrs;
-					address::get_interface_addresses(if_addrs);
+					array<net::address> if_addrs;
+					net::address::get_interface_addresses(if_addrs);
 					printf("discovery timed out.\n");
 					discovery_result(nat_type_internal_games_only_timeout, if_addrs);
 				}
@@ -166,7 +166,7 @@ struct client_harness
 					if(c->is_initiator)
 					{
 						printf("pending connection request timed out.\n");
-						remote_connection_result(c->connection_sequence, remote_connection_timed_out, address());
+						remote_connection_result(c->connection_sequence, remote_connection_timed_out, net::address());
 					}
 					*walk = c->next_pending;
 					delete c;
@@ -181,7 +181,7 @@ struct client_harness
 		}
 	}
 	
-	bool filter_incoming_packet(udp_socket &the_socket, address sender_address, byte *packet_buffer, uint32 packet_size)
+	bool filter_incoming_packet(net::udp_socket &the_socket, net::address sender_address, byte *packet_buffer, uint32 packet_size)
 	{
 		nat_discovery_packet the_packet;
 		if(!the_packet.read_packet(packet_buffer, packet_size))
@@ -207,8 +207,8 @@ struct client_harness
 			{
 				discovery_result_code result;
 				_is_requesting_discovery = false;
-				array<address> address_list;
-				address::get_interface_addresses(address_list);
+				array<net::address> address_list;
+				net::address::get_interface_addresses(address_list);
 
 				if(_public_address1 == _public_address2)
 				{
@@ -252,7 +252,7 @@ struct client_harness
 
 					// bounce back a connection_response packet if this is a connection request
 					if(!c->is_initiator && the_packet.code == nat_discovery_packet::initiate_connection_request)
-						_send_connection_packet(the_socket, time::get_current(), nat_discovery_packet::initiate_connection_response, c);
+						_send_connection_packet(the_socket, net::time::get_current(), nat_discovery_packet::initiate_connection_response, c);
 				}
 			}
 			walk = &c->next_pending;
@@ -263,9 +263,9 @@ struct client_harness
 	struct pending_connection
 	{
 		bool is_initiator;
-		time last_send_time;
+		net::time last_send_time;
 		uint32 send_count;
-		array<address> possible_addresses;
+		array<net::address> possible_addresses;
 		uint32 connection_sequence;
 		pending_connection *next_pending;
 	};
@@ -273,9 +273,9 @@ struct client_harness
 
 	// the remote connection is a two-phase send/ack process - first both sides (initiator and not)
 	// send out code 2 packets to all the possible addresses the other side might be at.
-	// if no packet is received, time out
+	// if no packet is received, net::time out
 	// when the initiator receives a code 2, it sends a code 3 to that host.  When a host 
-	void begin_remote_connection(udp_socket &the_socket, bool is_initiator, uint32 connection_sequence, array<address> &possible_address_list)
+	void begin_remote_connection(net::udp_socket &the_socket, bool is_initiator, uint32 connection_sequence, array<net::address> &possible_address_list)
 	{
 		pending_connection *pending = new pending_connection;
 		pending->is_initiator = is_initiator;
@@ -286,16 +286,16 @@ struct client_harness
 		_connection_list = pending;
 		uint32 code = is_initiator ? nat_discovery_packet::initiate_connection_request : nat_discovery_packet::initiate_connection_punch;
 
-		_send_connection_packet(the_socket, time::get_current(), code, pending);
+		_send_connection_packet(the_socket, net::time::get_current(), code, pending);
 	}
 	
-	void _send_connection_packet(udp_socket &the_socket, time current_time, uint32 code, pending_connection *conn)
+	void _send_connection_packet(net::udp_socket &the_socket, net::time current_time, uint32 code, pending_connection *conn)
 	{
 		conn->last_send_time = current_time;
 		nat_discovery_packet p;
 		p.code = code;
 		p.magic_number = _magic_number;
-		byte buffer[udp_socket::max_datagram_size];
+		byte buffer[net::udp_socket::max_datagram_size];
 		for(uint32 i = 0; i < conn->possible_addresses.size(); i++)
 		{
 			p.reference_address = conn->possible_addresses[i];
@@ -313,7 +313,7 @@ struct client_harness
 		nat_type_internal_games_only,
 		nat_type_internal_games_only_timeout,
 	};
-	virtual void discovery_result(discovery_result_code code, array<address> &address_list) = 0;
+	virtual void discovery_result(discovery_result_code code, array<net::address> &address_list) = 0;
 
 	enum remote_connection_result_code
 	{
@@ -321,7 +321,7 @@ struct client_harness
 		remote_connection_success
 	};
 
-	virtual void remote_connection_result(uint32 connection_sequence, remote_connection_result_code code, address remote_address) = 0;
+	virtual void remote_connection_result(uint32 connection_sequence, remote_connection_result_code code, net::address remote_address) = 0;
 };
 
 struct application
@@ -331,21 +331,21 @@ struct application
 
 struct server : application
 {
-	udp_socket _socket;
-	server(address interface_address)
+	net::udp_socket _socket;
+	server(net::address interface_address)
 	{
 		_socket.bind(interface_address, false);
 	}
 
 	void process()
 	{
-		address sender_address;
+		net::address sender_address;
 		uint32 packet_size;
-		byte buffer[udp_socket::max_datagram_size];
-		while(_socket.recv_from(&sender_address, buffer, sizeof(buffer), &packet_size) != udp_socket::no_incoming_packets_available)
+		byte buffer[net::udp_socket::max_datagram_size];
+		while(_socket.recv_from(&sender_address, buffer, sizeof(buffer), &packet_size) != net::udp_socket::no_incoming_packets_available)
 		{
 			nat_discovery_packet p;
-			address send_to_address;
+			net::address send_to_address;
 			string addr_string;
 
 			if(!p.read_packet(buffer, packet_size) || p.code != nat_discovery_packet::request_public_ip)
@@ -374,24 +374,24 @@ struct test_client : application
 			_client = the_client;
 		}
 
-		virtual void discovery_result(discovery_result_code code, array<address> &address_list)
+		virtual void discovery_result(discovery_result_code code, array<net::address> &address_list)
 		{
 
 		}
 
-		virtual void remote_connection_result(uint32 connection_sequence, remote_connection_result_code code, address remote_address)
+		virtual void remote_connection_result(uint32 connection_sequence, remote_connection_result_code code, net::address remote_address)
 		{
 
 		}
 	};
 
-	udp_socket _socket;
-	address _server1, _server2;
+	net::udp_socket _socket;
+	net::address _server1, _server2;
 	test_harness _harness;
 
-	test_client(address server1, address server2) : _harness(this)
+	test_client(net::address server1, net::address server2) : _harness(this)
 	{
-		_socket.bind(address(), false);
+		_socket.bind(net::address(), false);
 		_server1 = server1;
 		_server2 = server2;
 	}
@@ -402,10 +402,10 @@ struct test_client : application
 		_harness.process_harness(_socket);
 
 		// then process incoming packets on the socket:
-		address sender_address;
+		net::address sender_address;
 		uint32 packet_size;
-		byte buffer[udp_socket::max_datagram_size];
-		while(_socket.recv_from(&sender_address, buffer, sizeof(buffer), &packet_size) != udp_socket::no_incoming_packets_available)
+		byte buffer[net::udp_socket::max_datagram_size];
+		while(_socket.recv_from(&sender_address, buffer, sizeof(buffer), &packet_size) != net::udp_socket::no_incoming_packets_available)
 		{
 			if(!_harness.filter_incoming_packet(_socket, sender_address, buffer, packet_size))
 			{
@@ -415,7 +415,7 @@ struct test_client : application
 	}
 };
 
-int run(int argc, const char **argv)
+static int run(int argc, const char **argv)
 {
 	array<application *> applications;
 
@@ -425,7 +425,7 @@ int run(int argc, const char **argv)
 		{
 			if(i + 1 < argc)
 			{
-				address if_addr(argv[i+1]);
+				net::address if_addr(argv[i+1]);
 				application *s = new server(if_addr);
 				applications.push_back(s);
 			}
@@ -435,15 +435,15 @@ int run(int argc, const char **argv)
 		{
 			if(i + 2 < argc)
 			{
-				address server1(argv[i+1]);
-				address server2(argv[i+2]);
+				net::address server1(argv[i+1]);
+				net::address server2(argv[i+2]);
 				applications.push_back(new test_client(server1, server2));
 			}
 			i += 3;
 		}
 	}
 
-	sockets_unit_test();
+	net::sockets_unit_test();
 
 	for(;;)
 	{
