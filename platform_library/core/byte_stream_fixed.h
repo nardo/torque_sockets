@@ -19,11 +19,26 @@ public:
 			_position = _buffer_size;
 	}
 
-	uint32 get_position()
+	const uint32 get_position() const
 	{
 		return _position;
 	}
-
+	
+	const uint32 get_buffer_size() const
+	{
+		return _buffer_size;
+	}
+	
+	byte *get_buffer()
+	{
+		return _buffer;
+	}
+	
+	const byte *get_buffer() const
+	{
+		return _buffer;
+	}
+	
 	void set_buffer(byte *buffer, uint32 buffer_size)
 	{
 		_buffer = buffer;

@@ -443,7 +443,7 @@ static int run(int argc, const char **argv)
 		}
 	}
 
-	net::sockets_unit_test();
+	net::internal::sockets_unit_test();
 
 	for(;;)
 	{
