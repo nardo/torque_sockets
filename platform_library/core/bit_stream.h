@@ -73,7 +73,7 @@ class bit_stream
 				*dest_ptr++ = buffer;
 				buffer = *source_ptr++;
 			}
-			mask = byte((1 << ((last_write_bit & 7) + 1)) - 1);
+			mask = uint8((1 << ((last_write_bit & 7) + 1)) - 1);
 			*dest_ptr = (buffer & mask) | (*dest_ptr & ~mask);
 		}
 		else
@@ -86,7 +86,7 @@ class bit_stream
 				if(dest_bit + bit_count <= 8)
 				{
 					byte mask = ((1 << bit_count) - 1) << dest_bit;
-					 *dest_ptr = (*dest_ptr & ~mask) | (byte(slider << up_shift) & mask);
+					 *dest_ptr = (*dest_ptr & ~mask) | (uint8(slider << up_shift) & mask);
 					return;
 				}
 				// otherwise, lets spit out the first dest byte:
@@ -105,14 +105,14 @@ class bit_stream
 			while(dest_ptr != last_write_byte)
 			{
 				slider |= uint32(*source_ptr++) << up_shift;
-				*dest_ptr++ = byte(slider);
+				*dest_ptr++ = uint8(slider);
 				slider >>= 8;
 			}
 			uint32 last_write_bit_in_byte = last_write_bit & 7;
 			// see if we need to read one more source byte:
 			if(last_write_bit_in_byte >= up_shift)
 				slider |= uint32(*source_ptr) << up_shift;
-			byte mask = byte((1 << (last_write_bit_in_byte + 1)) - 1);
+			byte mask = uint8((1 << (last_write_bit_in_byte + 1)) - 1);
 			*dest_ptr = (slider & mask) | (*dest_ptr & ~mask);
 		}
 	}
@@ -238,8 +238,8 @@ static void stream_test()
 			printf("0123456701234567012345670123456701234567012345670123456701234567\n");
 			for(uint32 i = 0;i < 17; i++)
 			{
-				stream::copy_bits(buf, 0, bits, 0, bits_size * 8);
-				stream::copy_bits(buf, i, bits, start, count);
+				bit_stream::copy_bits(buf, 0, bits, 0, bits_size * 8);
+				bit_stream::copy_bits(buf, i, bits, start, count);
 				internal::print_bits(buf, 0, bits_size * 8);
 			}			
 		}

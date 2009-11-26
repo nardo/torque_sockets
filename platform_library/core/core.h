@@ -11,3 +11,6 @@
 #include "core/byte_stream_fixed.h"
 #include "core/base_type_io.h"
 #include "core/utils.h"
+#include "core/ref_object.h"
+#include "core/byte_buffer.h"
+#include "core/bit_stream.h"

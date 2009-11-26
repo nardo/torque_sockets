@@ -5,7 +5,7 @@ class random_generator
 {
 	prng_state _random_state;
 	uint32 _entropy_added;
-	
+public:
 	random_generator()
 	{
 		yarrow_start(&_random_state);

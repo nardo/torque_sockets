@@ -1,84 +1,84 @@
 /// Encode the buffer to base 64, returning the encoded buffer.
-RefPtr<ByteBuffer> BufferEncodeBase64(const U8 *buffer, U32 bufferSize)
+static ref_ptr<byte_buffer> buffer_encode_base_64(const uint8 *buffer, uint32 buffer_size)
 {
-   unsigned long outLen = ((bufferSize / 3) + 1) * 4 + 4 + 1;
-   ByteBuffer *ret = new ByteBuffer(outLen);
-   base64_encode(buffer, bufferSize, ret->getBuffer(), &outLen);
-   ret->resize(outLen+1);
-   ret->getBuffer()[outLen] = 0;
+   unsigned long out_len = ((buffer_size / 3) + 1) * 4 + 4 + 1;
+   byte_buffer *ret = new byte_buffer(out_len);
+   base64_encode(buffer, buffer_size, ret->get_buffer(), &out_len);
+   ret->resize(out_len+1);
+   ret->get_buffer()[out_len] = 0;
    return ret;
 }
 
 /// Encode the buffer to base 64, returning the encoded buffer.
-inline RefPtr<ByteBuffer> BufferEncodeBase64(const ByteBuffer &buffer)
+static inline ref_ptr<byte_buffer> buffer_encode_base_64(const byte_buffer &buffer)
 {
-   return BufferEncodeBase64(buffer.getBuffer(), buffer.getBufferSize());
+   return buffer_encode_base_64(buffer.get_buffer(), buffer.get_buffer_size());
 }
 
 /// Decode the buffer from base 64, returning the decoded buffer.
-RefPtr<ByteBuffer> BufferDecodeBase64(const U8 *buffer, U32 bufferSize)
+static ref_ptr<byte_buffer> buffer_decode_base_64(const uint8 *buffer, uint32 buffer_size)
 {
-   unsigned long outLen = bufferSize;
-   ByteBuffer *ret = new ByteBuffer(outLen);
-   base64_decode(buffer, bufferSize, ret->getBuffer(), &outLen);
-   ret->resize(outLen);
+   unsigned long out_len = buffer_size;
+   byte_buffer *ret = new byte_buffer(out_len);
+   base64_decode(buffer, buffer_size, ret->get_buffer(), &out_len);
+   ret->resize(out_len);
    return ret;
 }
 
 
 /// Decode the buffer from base 64, returning the decoded buffer.
-inline RefPtr<ByteBuffer> BufferDecodeBase64(const ByteBuffer &buffer)
+static inline ref_ptr<byte_buffer> buffer_decode_base_64(const byte_buffer &buffer)
 {
-   return BufferDecodeBase64(buffer.getBuffer(), buffer.getBufferSize());
+   return buffer_decode_base_64(buffer.get_buffer(), buffer.get_buffer_size());
 }
 
-/// Computes an MD5 hash and returns it in a ByteBuffer
-RefPtr<ByteBuffer> BufferComputeMD5Hash(const U8 *buffer, U32 len)
+/// Computes an MD5 hash and returns it in a byte_buffer
+static ref_ptr<byte_buffer> buffer_compute_md5_hash(const uint8 *buffer, uint32 len)
 {
-   ByteBuffer *ret = new ByteBuffer(16);
+   byte_buffer *ret = new byte_buffer(16);
    hash_state md;
    md5_init(&md);
    md5_process(&md, (unsigned char *) buffer, len);
-   md5_done(&md, ret->getBuffer());
+   md5_done(&md, ret->get_buffer());
    return ret;
 }
 
 /// Converts to ascii-hex, returning the encoded buffer.
-RefPtr<ByteBuffer> BufferEncodeBase16(const U8 *buffer, U32 len)
+static ref_ptr<byte_buffer> buffer_encode_base_16(const uint8 *buffer, uint32 len)
 {
-   U32 outLen = len * 2 + 1;
-   ByteBuffer *ret = new ByteBuffer(outLen);
-   U8 *outBuffer = ret->getBuffer();
+   uint32 out_len = len * 2 + 1;
+   byte_buffer *ret = new byte_buffer(out_len);
+   uint8 *out_buffer = ret->get_buffer();
 
-   for(U32 i = 0; i < len; i++)
+   for(uint32 i = 0; i < len; i++)
    {
-      U8 b = *buffer++;
-      U32 nib1 = b >> 4;
-      U32 nib2 = b & 0xF;
+      uint8 b = *buffer++;
+      uint32 nib1 = b >> 4;
+      uint32 nib2 = b & 0xF;
       if(nib1 > 9)
-         *outBuffer++ = 'a' + nib1 - 10;
+         *out_buffer++ = 'a' + nib1 - 10;
       else
-         *outBuffer++ = '0' + nib1;
+         *out_buffer++ = '0' + nib1;
       if(nib2 > 9)
-         *outBuffer++ = 'a' + nib2 - 10;
+         *out_buffer++ = 'a' + nib2 - 10;
       else
-         *outBuffer++ = '0' + nib2;
+         *out_buffer++ = '0' + nib2;
    }
-   *outBuffer = 0;
+   *out_buffer = 0;
    return ret;
 }
 
 /// Decodes the buffer from base 16, returning the decoded buffer.
-RefPtr<ByteBuffer> BufferDecodeBase16(const U8 *buffer, U32 len)
+static ref_ptr<byte_buffer> buffer_decode_base_16(const uint8 *buffer, uint32 len)
 {
-   U32 outLen = len >> 1;
-   ByteBuffer *ret = new ByteBuffer(outLen);
-   U8 *dst = ret->getBuffer();
-   for(U32 i = 0; i < outLen; i++)
+   uint32 out_len = len >> 1;
+   byte_buffer *ret = new byte_buffer(out_len);
+   uint8 *dst = ret->get_buffer();
+   for(uint32 i = 0; i < out_len; i++)
    {
-      U8 out = 0;
-      U8 nib1 = *buffer++;
-      U8 nib2 = *buffer++;
+      uint8 out = 0;
+      uint8 nib1 = *buffer++;
+      uint8 nib2 = *buffer++;
       if(nib1 >= '0' && nib1 <= '9')
          out = (nib1 - '0') << 4;
       else if(nib1 >= 'a' && nib1 <= 'f')
@@ -98,32 +98,62 @@ RefPtr<ByteBuffer> BufferDecodeBase16(const U8 *buffer, U32 len)
 
 
 /// Returns a 32 bit CRC for the buffer.
-U32 BufferCalculateCRC(const U8 *buffer, U32 len, U32 crcVal = 0xFFFFFFFF)
+static uint32 buffer_calculate_crc(const uint8 *buffer, uint32 len, uint32 crcVal = 0xFFFFFFFF)
 {
-   static U32 crcTable[256];
-   static bool crcTableValid = false;
+   static uint32 crc_table[256];
+   static bool crc_table_valid = false;
 
-   if(!crcTableValid)
+   if(!crc_table_valid)
    {
-      U32 val;
+      uint32 val;
 
-      for(S32 i = 0; i < 256; i++)
+      for(int32 i = 0; i < 256; i++)
       {
          val = i;
-         for(S32 j = 0; j < 8; j++)
+         for(int32 j = 0; j < 8; j++)
          {
             if(val & 0x01)
                val = 0xedb88320 ^ (val >> 1);
             else
                val = val >> 1;
          }
-         crcTable[i] = val;
+         crc_table[i] = val;
       }
-      crcTableValid = true;
+      crc_table_valid = true;
    }
 
    // now calculate the crc
-   for(U32 i = 0; i < len; i++)
-      crcVal = crcTable[(crcVal ^ buffer[i]) & 0xff] ^ (crcVal >> 8);
+   for(uint32 i = 0; i < len; i++)
+      crcVal = crc_table[(crcVal ^ buffer[i]) & 0xff] ^ (crcVal >> 8);
    return(crcVal);
 }
+
+static void write_uint32_to_buffer(uint32 value, uint8 *buffer)
+{
+	buffer[0] = value >> 24;
+	buffer[1] = value >> 16;
+	buffer[2] = value >> 8;
+	buffer[3] = value;
+}
+
+static uint32 read_uint32_from_buffer(const uint8 *buf)
+{
+	return (uint32(buf[0]) << 24) |
+	(uint32(buf[1]) << 16) |
+	(uint32(buf[2]) << 8 ) |
+	uint32(buf[3]);
+}
+
+static void write_uint16_to_buffer(uint16 value, uint8 *buffer)
+{
+	buffer[0] = value >> 8;
+	buffer[1] = (uint8) value;
+}
+
+static uint16 read_uint16_from_buffer(const uint8 *buffer)
+{
+	return (uint16(buffer[0]) << 8) |
+	uint16(buffer[1]);
+}
+
+

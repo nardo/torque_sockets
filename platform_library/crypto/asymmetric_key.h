@@ -5,10 +5,10 @@
 #define crypto_export         ecc_export
 #define crypto_shared_secret  ecc_shared_secret
 
-class AsymmetricKey : public Object
+class asymmetric_key : public ref_object
 {
 enum {
-   StaticCryptoBufferSize = 2048,
+   static_crypto_buffer_size = 2048,
 };
 
    /// Raw key data.
@@ -16,230 +16,230 @@ enum {
    /// The specific format of this buffer varies by cryptosystem, so look
    /// at the subclass to see how it's laid out. In general this is an
    /// opaque buffer.
-   void *mKeyData;
+   void *_key_data;
 
    /// Size of the key at construct time.
-   U32 mKeySize;
+   uint32 _key_size;
 
    /// Do we have the private key for this?
    ///
    /// We may only have access to the public key (for instance, when validating
    /// a message signed by someone else).
-   bool mHasPrivateKey;
+   bool _has_private_key;
 
    /// Buffer containing the public half of this keypair.
-   ByteBufferPtr mPublicKey;
+   byte_buffer_ptr _public_key;
 
    /// Buffer containing the private half of this keypair.
-   ByteBufferPtr mPrivateKey;
-   bool mIsValid;
+   byte_buffer_ptr _private_key;
+   bool _is_valid;
 
    /// Load keypair from a buffer.
-   void load(const U8 *bufferPtr, U32 bufferSize)
+   void load(const uint8 *buffer_ptr, uint32 buffer_size)
 	{
-		U8 staticCryptoBuffer[StaticCryptoBufferSize];
-	   mIsValid = false;
+		uint8 static_crypto_buffer[static_crypto_buffer_size];
+	   _is_valid = false;
 
-	   crypto_key *theKey = (crypto_key *) MemoryAllocate(sizeof(crypto_key));
-	   mHasPrivateKey = bufferPtr[0] == KeyTypePrivate;
+	   crypto_key *theKey = (crypto_key *) memory_allocate(sizeof(crypto_key));
+	   _has_private_key = buffer_ptr[0] == key_type_private;
 
-	   if(bufferSize < sizeof(U32) + 1)
+	   if(buffer_size < sizeof(uint32) + 1)
 		  return;
 
-	   mKeySize = readU32FromBuffer(bufferPtr + 1);
+	   _key_size = read_uint32_from_buffer(buffer_ptr + 1);
 
-	   if( crypto_import(bufferPtr + sizeof(U32) + 1, bufferSize - sizeof(U32) - 1, theKey)
+	   if( crypto_import(buffer_ptr + sizeof(uint32) + 1, buffer_size - sizeof(uint32) - 1, theKey)
 			 != CRYPT_OK)
 		  return;
 
-	   mKeyData = theKey;
+	   _key_data = theKey;
 
-	   if(mHasPrivateKey)
+	   if(_has_private_key)
 	   {
-		  unsigned long bufferLen = sizeof(staticCryptoBuffer) - sizeof(U32) - 1;
-		  staticCryptoBuffer[0] = KeyTypePublic;
+		  unsigned long bufferLen = sizeof(static_crypto_buffer) - sizeof(uint32) - 1;
+		  static_crypto_buffer[0] = key_type_public;
 
-		  writeU32ToBuffer(mKeySize, staticCryptoBuffer);
+		  write_uint32_to_buffer(_key_size, static_crypto_buffer);
 
-		  if( crypto_export(staticCryptoBuffer + sizeof(U32) + 1, &bufferLen, PK_PUBLIC, theKey)
+		  if( crypto_export(static_crypto_buffer + sizeof(uint32) + 1, &bufferLen, PK_PUBLIC, theKey)
 				!= CRYPT_OK )
 			 return;
 
-		  bufferLen += sizeof(U32) + 1;
+		  bufferLen += sizeof(uint32) + 1;
 
-		  mPublicKey = new ByteBuffer(staticCryptoBuffer, bufferLen);
-		  mPrivateKey = new ByteBuffer((U8 *) bufferPtr, bufferSize);
+		  _public_key = new byte_buffer(static_crypto_buffer, bufferLen);
+		  _private_key = new byte_buffer((uint8 *) buffer_ptr, buffer_size);
 	   }
 	   else
 	   {
-		  mPublicKey = new ByteBuffer((U8 *) bufferPtr, bufferSize);
+		  _public_key = new byte_buffer((uint8 *) buffer_ptr, buffer_size);
 	   }
-	   mIsValid = true;
+	   _is_valid = true;
 	}
 
 
 
    /// Enum used to indicate the portion of the key we are working with.
-   enum KeyType {
-      KeyTypePrivate,
-      KeyTypePublic,
+   enum key_type {
+      key_type_private,
+      key_type_public,
    };
 public:
 
-   /// Constructs an AsymmetricKey from the specified data pointer.
-   AsymmetricKey(U8 *dataPtr, U32 bufferSize) : mKeyData(NULL)
+   /// Constructs an asymmetric_key from the specified data pointer.
+   asymmetric_key(uint8 *data_ptr, uint32 buffer_size) : _key_data(NULL)
    {
-      load(dataPtr, bufferSize);
+      load(data_ptr, buffer_size);
    }
 
-   /// Constructs an AsymmetricKey from a ByteBuffer.
-   AsymmetricKey(const ByteBuffer &theBuffer) : mKeyData(NULL)
+   /// Constructs an asymmetric_key from a byte_buffer.
+   asymmetric_key(const byte_buffer &the_buffer) : _key_data(NULL)
    {
-      load(theBuffer.getBuffer(), theBuffer.getBufferSize());
+      load(the_buffer.get_buffer(), the_buffer.get_buffer_size());
    }
 
-   /// Constructs an AsymmetricKey by reading it from a BitStream.
-   AsymmetricKey(BitStream *theStream)
+   /// Constructs an asymmetric_key by reading it from a bit_stream.
+   asymmetric_key(bit_stream &the_stream)
    {
-      ByteBufferPtr theBuffer;
-      read(*theStream, &theBuffer);
-      load(theBuffer->getBuffer(), theBuffer->getBufferSize());
+      byte_buffer_ptr the_buffer;
+	   core::read(the_stream, the_buffer);
+      load(the_buffer->get_buffer(), the_buffer->get_buffer_size());
    }
 
-   /// Generates a new asymmetric key of keySize bytes
-   AsymmetricKey(U32 keySize)
+   /// Generates a new asymmetric key of key_size bytes
+   asymmetric_key(uint32 key_size, random_generator &the_random_generator)
 	{
-		U8 staticCryptoBuffer[StaticCryptoBufferSize];
-	   mIsValid = false;
+		uint8 static_crypto_buffer[static_crypto_buffer_size];
+	   _is_valid = false;
 
 	   int descriptorIndex = register_prng ( &yarrow_desc );
-	   crypto_key *theKey = (crypto_key *) MemoryAllocate(sizeof(crypto_key));
+	   crypto_key *theKey = (crypto_key *) memory_allocate(sizeof(crypto_key));
 
-	   if( crypto_make_key((prng_state *) Random::getState(), descriptorIndex,
-		  keySize, theKey) != CRYPT_OK )
+	   if( crypto_make_key(the_random_generator.get_state(), descriptorIndex,
+		  key_size, theKey) != CRYPT_OK )
 		  return;
 
-	   mKeyData = theKey;
-	   mKeySize = keySize;
+	   _key_data = theKey;
+	   _key_size = key_size;
 
-	   unsigned long bufferLen = sizeof(staticCryptoBuffer) - sizeof(U32) - 1;
+	   unsigned long bufferLen = sizeof(static_crypto_buffer) - sizeof(uint32) - 1;
 
-	   staticCryptoBuffer[0] = KeyTypePrivate;
-	   writeU32ToBuffer(mKeySize, staticCryptoBuffer + 1);
+	   static_crypto_buffer[0] = key_type_private;
+	   write_uint32_to_buffer(_key_size, static_crypto_buffer + 1);
 
-	   crypto_export(staticCryptoBuffer + sizeof(U32) + 1, &bufferLen, PK_PRIVATE, theKey);
-	   bufferLen += sizeof(U32) + 1;
+	   crypto_export(static_crypto_buffer + sizeof(uint32) + 1, &bufferLen, PK_PRIVATE, theKey);
+	   bufferLen += sizeof(uint32) + 1;
 
-	   mPrivateKey = new ByteBuffer(staticCryptoBuffer, bufferLen);
+	   _private_key = new byte_buffer(static_crypto_buffer, bufferLen);
 
-	   bufferLen = sizeof(staticCryptoBuffer) - sizeof(U32) - 1;
+	   bufferLen = sizeof(static_crypto_buffer) - sizeof(uint32) - 1;
 
-	   staticCryptoBuffer[0] = KeyTypePublic;
-	   writeU32ToBuffer(mKeySize, staticCryptoBuffer + 1);
+	   static_crypto_buffer[0] = key_type_public;
+	   write_uint32_to_buffer(_key_size, static_crypto_buffer + 1);
 
-	   crypto_export(staticCryptoBuffer + sizeof(U32) + 1, &bufferLen, PK_PUBLIC, theKey);
-	   bufferLen += sizeof(U32) + 1;
+	   crypto_export(static_crypto_buffer + sizeof(uint32) + 1, &bufferLen, PK_PUBLIC, theKey);
+	   bufferLen += sizeof(uint32) + 1;
 
-	   mPublicKey = new ByteBuffer(staticCryptoBuffer, bufferLen);
+	   _public_key = new byte_buffer(static_crypto_buffer, bufferLen);
 
-	   mHasPrivateKey = true;
-	   mIsValid = true;
+	   _has_private_key = true;
+	   _is_valid = true;
 	}
 
 
    
-   /// Destructor for the AsymmetricKey.
-   ~AsymmetricKey()
+   /// Destructor for the asymmetric_key.
+   ~asymmetric_key()
 	{
-	   if(mKeyData)
+	   if(_key_data)
 	   {
-		  crypto_free((crypto_key *) mKeyData);
-		  MemoryDeallocate(mKeyData);
+		  crypto_free((crypto_key *) _key_data);
+		  memory_deallocate(_key_data);
 	   }
 	}
 
 
 
-   /// Returns a ByteBuffer containing an encoding of the public key.
-   ByteBufferPtr getPublicKey() { return mPublicKey; }
+   /// Returns a byte_buffer containing an encoding of the public key.
+   byte_buffer_ptr getPublicKey() { return _public_key; }
 
-   /// Returns a ByteBuffer containing an encoding of the private key.
-   ByteBufferPtr getPrivateKey() { return mPrivateKey; }
+   /// Returns a byte_buffer containing an encoding of the private key.
+   byte_buffer_ptr getPrivateKey() { return _private_key; }
 
-   /// Returns true if this AsymmetricKey is a key pair.
-   bool hasPrivateKey() { return mHasPrivateKey; }
+   /// Returns true if this asymmetric_key is a key pair.
+   bool hasPrivateKey() { return _has_private_key; }
 
    /// Returns true if this is a valid key.
-   bool isValid() { return mIsValid; }
-   /// Compute a key we can share with the specified AsymmetricKey
+   bool isValid() { return _is_valid; }
+   /// Compute a key we can share with the specified asymmetric_key
    /// for a symmetric crypto.
-   ByteBufferPtr computeSharedSecretKey(AsymmetricKey *publicKey)
+   byte_buffer_ptr computeSharedSecretKey(asymmetric_key *publicKey)
 	{
-	   if(publicKey->getKeySize() != getKeySize() || !mHasPrivateKey)
+	   if(publicKey->getKeySize() != getKeySize() || !_has_private_key)
 		  return NULL;
 
-	   U8 hash[32];
-	   unsigned long outLen = sizeof(staticCryptoBuffer);
-		U8 staticCryptoBuffer[StaticCryptoBufferSize];
+	   uint8 hash[32];
+		uint8 static_crypto_buffer[static_crypto_buffer_size];
+	   unsigned long outLen = sizeof(static_crypto_buffer);
 
-	   crypto_shared_secret((crypto_key *) mKeyData, (crypto_key *) publicKey->mKeyData,
-		  staticCryptoBuffer, &outLen);
+	   crypto_shared_secret((crypto_key *) _key_data, (crypto_key *) publicKey->_key_data,
+		  static_crypto_buffer, &outLen);
 
 	   hash_state hashState;
 	   sha256_init(&hashState);
-	   sha256_process(&hashState, staticCryptoBuffer, outLen);
+	   sha256_process(&hashState, static_crypto_buffer, outLen);
 	   sha256_done(&hashState, hash);
 
-	   return new ByteBuffer(hash, 32);
+	   return new byte_buffer(hash, 32);
 	}
 
-   /// Returns the strength of the AsymmetricKey in byte size.
-   U32 getKeySize() { return mKeySize; }
+   /// Returns the strength of the asymmetric_key in byte size.
+   uint32 getKeySize() { return _key_size; }
 
    /// Constructs a digital signature for the specified buffer of bits.  This
    /// method only works for private keys.  A public key only Asymmetric key
    /// will generate a signature of 0 bytes in length.
-   ByteBufferPtr hashAndSign(const U8 *buffer, U32 bufferSize)
+   byte_buffer_ptr hashAndSign(random_generator &the_random_generator, const uint8 *buffer, uint32 buffer_size)
 	{
 	   int descriptorIndex = register_prng ( &yarrow_desc );
 
-	   U8 hash[32];
+	   uint8 hash[32];
 	   hash_state hashState;
-		U8 staticCryptoBuffer[StaticCryptoBufferSize];
+		uint8 static_crypto_buffer[static_crypto_buffer_size];
 
 	   sha256_init(&hashState);
-	   sha256_process(&hashState, buffer, bufferSize);
+	   sha256_process(&hashState, buffer, buffer_size);
 	   sha256_done(&hashState, hash);
 
-	   unsigned long outlen = sizeof(staticCryptoBuffer);
+	   unsigned long outlen = sizeof(static_crypto_buffer);
 
 	   ecc_sign_hash(hash, 32,
-		  staticCryptoBuffer, &outlen,
-		  (prng_state *) Random::getState(), descriptorIndex, (crypto_key *) mKeyData);
+		  static_crypto_buffer, &outlen,
+		  the_random_generator.get_state(), descriptorIndex, (crypto_key *) _key_data);
 
-	   return new ByteBuffer(staticCryptoBuffer, (U32) outlen);
+	   return new byte_buffer(static_crypto_buffer, (uint32) outlen);
 	}
 
 
-   /// Returns true if the private key associated with this AsymmetricKey 
+   /// Returns true if the private key associated with this asymmetric_key 
    /// signed theByteBuffer with theSignature.
-   bool verifySignature(const U8 *signedBytes, U32 signedByteSize, const ByteBuffer &theSignature)
+   bool verifySignature(const uint8 *signedBytes, uint32 signed_bytes_size, const byte_buffer &theSignature)
 	{
-	   U8 hash[32];
+	   uint8 hash[32];
 	   hash_state hashState;
 
 	   sha256_init(&hashState);
-	   sha256_process(&hashState, signedBytes, signedBytesSize);
+	   sha256_process(&hashState, signedBytes, signed_bytes_size);
 	   sha256_done(&hashState, hash);
 
 	   int stat;
 
-	   ecc_verify_hash(theSignature.getBuffer(), theSignature.getBufferSize(), hash, 32, &stat, (crypto_key *) mKeyData);
+	   ecc_verify_hash(theSignature.get_buffer(), theSignature.get_buffer_size(), hash, 32, &stat, (crypto_key *) _key_data);
 	   return stat != 0;
 	}
 
 
 };
 
-typedef RefPtr<AsymmetricKey> AsymmetricKeyPtr;
+typedef ref_ptr<asymmetric_key> asymmetric_key_ptr;
 
