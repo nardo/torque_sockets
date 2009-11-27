@@ -12,7 +12,7 @@ private:
    class NonceTable {
     private:
       struct Entry {
-         Nonce mNonce;
+         nonce mNonce;
          Entry *mHashNext;
       };
       enum {
@@ -21,7 +21,7 @@ private:
       };
 
       Entry **mHashTable;
-      U32 mHashTableSize;
+      uint32 mHashTableSize;
       PageAllocator<> mChunker;
 
     public:
@@ -34,21 +34,21 @@ private:
 		   mChunker.releasePages();
 		   mHashTableSize = Random::readI(MinHashTableSize, MaxHashTableSize) * 2 + 1;
 		   mHashTable = (Entry **) mChunker.allocate(sizeof(Entry *) * mHashTableSize);
-		   for(U32 i = 0; i < mHashTableSize; i++)
+		   for(uint32 i = 0; i < mHashTableSize; i++)
 			  mHashTable[i] = NULL;
 		}
 
       /// checks if the given nonce is already in the table and adds it
       /// if it is not.  Returns true if the nonce was not in the table
       /// when the function was called.
-      bool checkAdd(Nonce &theNonce)
+      bool checkAdd(nonce &theNonce)
 		{
-		   U32 nonce1 = readU32FromBuffer(theNonce.data);
-		   U32 nonce2 = readU32FromBuffer(theNonce.data + 4);
+		   uint32 nonce1 = readU32FromBuffer(theNonce.data);
+		   uint32 nonce2 = readU32FromBuffer(theNonce.data + 4);
 
 		   U64 fullNonce = (U64(nonce1) << 32) | nonce2;
 
-		   U32 hashIndex = U32(fullNonce % mHashTableSize);
+		   uint32 hashIndex = uint32(fullNonce % mHashTableSize);
 		   for(Entry *walk = mHashTable[hashIndex]; walk; walk = walk->mHashNext)
 			  if(walk->mNonce == theNonce)
 				 return false;
@@ -61,31 +61,31 @@ private:
 
    };
 
-   U32 mCurrentDifficulty;
+   uint32 mCurrentDifficulty;
    Time mLastUpdateTime;
    Time mLastTickTime;
 
-   Nonce mCurrentNonce;
-   Nonce mLastNonce;
+   nonce mCurrentNonce;
+   nonce mLastNonce;
 
    NonceTable *mCurrentNonceTable;
    NonceTable *mLastNonceTable;
-   static bool checkOneSolution(U32 solution, Nonce &clientNonce, Nonce &serverNonce, U32 puzzleDifficulty, U32 clientIdentity)
+   static bool checkOneSolution(uint32 solution, nonce &clientNonce, nonce &serverNonce, uint32 puzzleDifficulty, uint32 clientIdentity)
 	{
-	   U8 buffer[8];
+	   uint8 buffer[8];
 	   writeU32ToBuffer(solution, buffer);
 	   writeU32ToBuffer(clientIdentity, buffer + 4);
 
 	   hash_state hashState;
-	   U8 hash[32];
+	   uint8 hash[32];
 
 	   sha256_init(&hashState);
 	   sha256_process(&hashState, buffer, sizeof(buffer));
-	   sha256_process(&hashState, clientNonce.data, Nonce::NonceSize);
-	   sha256_process(&hashState, serverNonce.data, Nonce::NonceSize);
+	   sha256_process(&hashState, clientNonce.data, nonce::NonceSize);
+	   sha256_process(&hashState, serverNonce.data, nonce::NonceSize);
 	   sha256_done(&hashState, hash);
 
-	   U32 index = 0;
+	   uint32 index = 0;
 	   while(puzzleDifficulty > 8)
 	   {
 		  if(hash[index])
@@ -93,7 +93,7 @@ private:
 		  index++;
 		  puzzleDifficulty -= 8;
 	   }
-	   U8 mask = 0xFF << (8 - puzzleDifficulty);
+	   uint8 mask = 0xFF << (8 - puzzleDifficulty);
 	   return (mask & hash[index]) == 0;
 	}
 
@@ -102,8 +102,8 @@ public:
    ClientPuzzleManager()
 	{
 	   mCurrentDifficulty = InitialPuzzleDifficulty;
-	   Random::read(mCurrentNonce.data, Nonce::NonceSize);
-	   Random::read(mLastNonce.data, Nonce::NonceSize);
+	   Random::read(mCurrentNonce.data, nonce::NonceSize);
+	   Random::read(mLastNonce.data, nonce::NonceSize);
 
 	   mCurrentNonceTable = new NonceTable;
 	   mLastNonceTable = new NonceTable;
@@ -140,7 +140,7 @@ public:
 
 		  mLastNonce = mCurrentNonce;
 		  mCurrentNonceTable->reset();
-		  Random::read(mCurrentNonce.data, Nonce::NonceSize);
+		  Random::read(mCurrentNonce.data, nonce::NonceSize);
 	   }
 	}
 
@@ -166,7 +166,7 @@ public:
    };
 
    /// Checks a puzzle solution submitted by a client to see if it is a valid solution for the current or previous puzzle nonces
-   ErrorCode checkSolution(U32 solution, Nonce &clientNonce, Nonce &serverNonce, U32 puzzleDifficulty, U32 clientIdentity)
+   ErrorCode checkSolution(uint32 solution, nonce &clientNonce, nonce &serverNonce, uint32 puzzleDifficulty, uint32 clientIdentity)
 	{
 	   if(puzzleDifficulty != mCurrentDifficulty)
 		  return InvalidPuzzleDifficulty;
@@ -196,15 +196,15 @@ public:
    ///       seconds of lag) so reducing the timeout or iterations should be done only if you know what
    ///       you're doing.
    ///
-   static bool solvePuzzle(U32 *solution, Nonce &clientNonce, Nonce &serverNonce, U32 puzzleDifficulty, U32 clientIdentity)
+   static bool solvePuzzle(uint32 *solution, nonce &clientNonce, nonce &serverNonce, uint32 puzzleDifficulty, uint32 clientIdentity)
 	{
 	   Time startTime = GetTime();
-	   U32 startValue = *solution;
+	   uint32 startValue = *solution;
 
 	   // Until we're done...
 	   for(;;)
 	   {
-		  U32 nextValue = startValue + SolutionFragmentIterations;
+		  uint32 nextValue = startValue + SolutionFragmentIterations;
 		  for(;startValue < nextValue; startValue++)
 		  {
 			 if(checkOneSolution(startValue, clientNonce, serverNonce, puzzleDifficulty, clientIdentity))
@@ -225,8 +225,8 @@ public:
 
 
    /// Returns the current server nonce
-   Nonce getCurrentNonce() { return mCurrentNonce; }
+   nonce getCurrentNonce() { return mCurrentNonce; }
 
    /// Returns the current client puzzle difficulty
-   U32 getCurrentDifficulty() { return mCurrentDifficulty; }
+   uint32 getCurrentDifficulty() { return mCurrentDifficulty; }
 };

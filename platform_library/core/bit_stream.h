@@ -9,7 +9,7 @@ class bit_stream
 	bit_stream(byte *buffer = 0, uint32 buffer_size = 0) { _init(buffer, 0, buffer_size * 8); }
 	
 	void set_buffer(byte *buffer, uint32 bit_start, uint32 bit_end) { _init(buffer, bit_start, bit_end); }
-	
+	byte *get_buffer() { return _base_ptr; }	
 	bool is_dirty() {return _is_dirty;}
 	void raise_error() { _error_detected = true; }
 	bool was_error_detected() { return _error_detected; }
@@ -21,6 +21,7 @@ class bit_stream
 	virtual uint32 get_byte_position() { return _bit_num >> 3; }
 	virtual void set_byte_position(uint32 byte_pos) { _bit_num = byte_pos << 3; }
 	virtual uint32 get_stream_byte_size() { return (_bit_end + 7) >> 3; }
+	void set_stream_byte_size(uint32 byte_size) { _bit_end = byte_size * 8; }
 	
 	static void copy_bits(byte *dest_ptr, uint32 dest_bit, const byte *source_ptr, uint32 source_bit, uint32 bit_count) { _copy_bits(dest_ptr, dest_bit, source_ptr, source_bit, bit_count); }
 

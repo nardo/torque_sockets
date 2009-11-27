@@ -28,7 +28,7 @@
 /// The client, upon receipt of the ConnectChallengeResponse, validates the packet
 /// sent by the server and computes a solution to the puzzle the server sent.  If
 /// the connection is to be authenticated, the client can also validate the server's
-/// certificate (if it's been signed by a Certificate Authority), and then generates
+/// certificate (if it's been signed by a certificate Authority), and then generates
 /// a shared secret from the client's key pair and the server's public key.  The client
 /// response to the server consists of:
 /// C->S: ConnectRequest, Nc, Ns, X, Cc, sharedSecret(key1, sequence1, NetConnectionClass, class-specific sendData)
@@ -116,14 +116,14 @@ public:
    };
 
 protected:
-   Array<RefPtr<NetConnection> > mConnectionList;      ///< List of all the connections that are in a connected state on this NetInterface.
+   Array<ref_ptr<NetConnection> > mConnectionList;      ///< List of all the connections that are in a connected state on this NetInterface.
    Array<NetConnection *> mConnectionHashTable; ///< A resizable hash table for all connected connections.  This is a flat hash table (no buckets).
 
-   Array<RefPtr<NetConnection> > mPendingConnections; ///< List of connections that are in the startup state, where the remote host has not fully
+   Array<ref_ptr<NetConnection> > mPendingConnections; ///< List of connections that are in the startup state, where the remote host has not fully
                                                 ///  validated the connection.
 
-   RefPtr<AsymmetricKey> mPrivateKey;  ///< The private key used by this NetInterface for secure key exchange.
-   RefPtr<Certificate> mCertificate;   ///< A certificate, signed by some Certificate Authority, to authenticate this host.
+   ref_ptr<asymmetric_key> mPrivateKey;  ///< The private key used by this NetInterface for secure key exchange.
+   ref_ptr<certificate> mCertificate;   ///< A certificate, signed by some certificate Authority, to authenticate this host.
    ClientPuzzleManager mPuzzleManager; ///< The object that tracks the current client puzzle difficulty, current puzzle and solutions for this NetInterface.
 
    /// @name NetInterfaceSocket Socket
@@ -140,7 +140,7 @@ protected:
    Time mProcessStartTime;      ///< Current time tracked by this NetInterface.
    bool mRequiresKeyExchange;   ///< True if all connections outgoing and incoming require key exchange.
    Time mLastTimeoutCheckTime;  ///< Last time all the active connections were checked for timeouts.
-   U8  mRandomHashData[12];    ///< Data that gets hashed with connect challenge requests to prevent connection spoofing.
+   uint8  mRandomHashData[12];    ///< Data that gets hashed with connect challenge requests to prevent connection spoofing.
    bool mAllowConnections;      ///< Set if this NetInterface allows connections from remote instances.
 
    /// Structure used to track packets that are delayed in sending for simulating a high-latency connection.
@@ -151,8 +151,8 @@ protected:
       DelaySendPacket *nextPacket; ///< The next packet in the list of delayed packets.
       NetAddress remoteAddress;    ///< The address to send this packet to.
       Time sendTime;                ///< Time when we should send the packet.
-      U32 packetSize;              ///< Size, in bytes, of the packet data.
-      U8 packetData[1];            ///< Packet data.
+      uint32 packetSize;              ///< Size, in bytes, of the packet data.
+      uint8 packetData[1];            ///< Packet data.
    };
    DelaySendPacket *mSendPacketList; ///< List of delayed packets pending to send.
 
@@ -173,16 +173,16 @@ protected:
 
    /// Computes an identity token for the connecting client based on the address of the client and the
    /// client's unique nonce value.
-   U32 computeClientIdentityToken(const NetAddress &theAddress, const Nonce &theNonce)
+   uint32 computeClientIdentityToken(const NetAddress &theAddress, const nonce &theNonce)
 	{
 	   hash_state hashState;
-	   U32 hash[8];
+	   uint32 hash[8];
 
 	   sha256_init(&hashState);
-	   sha256_process(&hashState, (const U8 *) &address, sizeof(NetAddress));
-	   sha256_process(&hashState, theNonce.data, Nonce::NonceSize);
+	   sha256_process(&hashState, (const uint8 *) &address, sizeof(NetAddress));
+	   sha256_process(&hashState, theNonce.data, nonce::NonceSize);
 	   sha256_process(&hashState, mRandomHashData, sizeof(mRandomHashData));
-	   sha256_done(&hashState, (U8 *) hash);
+	   sha256_done(&hashState, (uint8 *) hash);
 
 	   return hash[0];
 	}
@@ -192,7 +192,7 @@ protected:
    NetConnection *findPendingConnection(const NetAddress &address)
 	{
 	   // Loop through all the pending connections and compare the NetAddresses
-	   for(U32 i = 0; i < mPendingConnections.size(); i++)
+	   for(uint32 i = 0; i < mPendingConnections.size(); i++)
 		  if(address == mPendingConnections[i]->getNetAddress())
 			 return mPendingConnections[i];
 	   return NULL;
@@ -217,7 +217,7 @@ protected:
 	{
 	   // search the pending connection list for the specified connection
 	   // and remove it.
-	   for(U32 i = 0; i < mPendingConnections.size(); i++)
+	   for(uint32 i = 0; i < mPendingConnections.size(); i++)
 		  if(mPendingConnections[i] == connection)
 		  {
 			 mPendingConnections.erase(i);
@@ -231,7 +231,7 @@ protected:
 	{
 	   // Search through the list by NetAddress and remove any connection
 	   // that matches.
-	   for(U32 i = 0; i < mPendingConnections.size(); i++)
+	   for(uint32 i = 0; i < mPendingConnections.size(); i++)
 		  if(address == mPendingConnections[i]->getNetAddress())
 		  {
 			 mPendingConnections.erase(i);
@@ -243,19 +243,19 @@ protected:
    void addConnection(NetConnection *connection)
 	{
 	   mConnectionList.pushBack(conn);
-	   U32 numConnections = mConnectionList.size();
+	   uint32 numConnections = mConnectionList.size();
 	   if(numConnections > mConnectionHashTable.size() / 2)
 	   {
 		  mConnectionHashTable.resize(numConnections * 4 - 1);
-		  for(U32 i = 0; i < mConnectionHashTable.size(); i++)
+		  for(uint32 i = 0; i < mConnectionHashTable.size(); i++)
 			 mConnectionHashTable[i] = NULL;
-		  for(U32 i = 0; i < numConnections; i++)
+		  for(uint32 i = 0; i < numConnections; i++)
 		  {
-			 U32 index = mConnectionList[i]->getNetAddress().hash() % mConnectionHashTable.size();
+			 uint32 index = mConnectionList[i]->getNetAddress().hash() % mConnectionHashTable.size();
 			 while(mConnectionHashTable[index] != NULL)
 			 {
 				index++;
-				if(index >= (U32) mConnectionHashTable.size())
+				if(index >= (uint32) mConnectionHashTable.size())
 				   index = 0;
 			 }
 			 mConnectionHashTable[index] = mConnectionList[i];
@@ -263,11 +263,11 @@ protected:
 	   }
 	   else
 	   {
-		  U32 index = mConnectionList[numConnections - 1]->getNetAddress().hash() % mConnectionHashTable.size();
+		  uint32 index = mConnectionList[numConnections - 1]->getNetAddress().hash() % mConnectionHashTable.size();
 		  while(mConnectionHashTable[index] != NULL)
 		  {
 			 index++;
-			 if(index >= (U32) mConnectionHashTable.size())
+			 if(index >= (uint32) mConnectionHashTable.size())
 				index = 0;
 		  }
 		  mConnectionHashTable[index] = mConnectionList[numConnections - 1];
@@ -279,8 +279,8 @@ protected:
    void removeConnection(NetConnection *connection)
 	{
 	   // hold the reference to the object until the function exits.
-	   RefPtr<NetConnection> hold = conn;
-	   for(U32 i = 0; i < mConnectionList.size(); i++)
+	   ref_ptr<NetConnection> hold = conn;
+	   for(uint32 i = 0; i < mConnectionList.size(); i++)
 	   {
 		  if(mConnectionList[i] == conn)
 		  {
@@ -288,13 +288,13 @@ protected:
 			 break;
 		  }
 	   }
-	   U32 index = conn->getNetAddress().hash() % mConnectionHashTable.size();
-	   U32 startIndex = index;
+	   uint32 index = conn->getNetAddress().hash() % mConnectionHashTable.size();
+	   uint32 startIndex = index;
 
 	   while(mConnectionHashTable[index] != conn)
 	   {
 		  index++;
-		  if(index >= (U32) mConnectionHashTable.size())
+		  if(index >= (uint32) mConnectionHashTable.size())
 			 index = 0;
 		  Assert(index != startIndex, "Attempting to remove a connection that is not in the table."); // not in the table
 		  if(index == startIndex)
@@ -306,17 +306,17 @@ protected:
 	   for(;;)
 	   {
 		  index++;
-		  if(index >= (U32) mConnectionHashTable.size())
+		  if(index >= (uint32) mConnectionHashTable.size())
 			 index = 0;
 		  if(!mConnectionHashTable[index])
 			 break;
 		  NetConnection *rehashConn = mConnectionHashTable[index];
 		  mConnectionHashTable[index] = NULL;
-		  U32 realIndex = rehashConn->getNetAddress().hash() % mConnectionHashTable.size();
+		  uint32 realIndex = rehashConn->getNetAddress().hash() % mConnectionHashTable.size();
 		  while(mConnectionHashTable[realIndex] != NULL)
 		  {
 			 realIndex++;
-			 if(realIndex >= (U32) mConnectionHashTable.size())
+			 if(realIndex >= (uint32) mConnectionHashTable.size())
 				realIndex = 0;
 		  }
 		  mConnectionHashTable[realIndex] = rehashConn;
@@ -340,8 +340,8 @@ protected:
    void sendConnectChallengeRequest(NetConnection *conn)
 	{
 	   TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Challenge Request to %s", conn->getNetAddress().toString()));
-	   PacketStream out;
-	   write(out, U8(ConnectChallengeRequest));
+	   packet_stream out;
+	   write(out, uint8(ConnectChallengeRequest));
 	   ConnectionParameters &params = conn->getConnectionParameters();
 	   write(out, params.mNonce);
 	   out.writeFlag(params.mRequestKeyExchange);
@@ -356,13 +356,13 @@ protected:
    /// Handles a connect challenge request by replying to the requestor of a connection with a
    /// unique token for that connection, as well as (possibly) a client puzzle (for DoS prevention),
    /// or this NetInterface's public key.
-   void handleConnectChallengeRequest(const NetAddress &addr, BitStream *stream)
+   void handleConnectChallengeRequest(const NetAddress &addr, bit_stream *stream)
 	{
 	   TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Challenge Request from %s", addr.toString()));
 
 	   if(!mAllowConnections)
 		  return;
-	   Nonce clientNonce;
+	   nonce clientNonce;
 	   read(*stream, &clientNonce);
 	   bool wantsKeyExchange = stream->readFlag();
 	   bool wantsCertificate = stream->readFlag();
@@ -374,18 +374,18 @@ protected:
    /// Sends a connect challenge request to the specified address.  This can happen as a result
    /// of receiving a connect challenge request, or during an "arranged" connection for the non-initiator
    /// of the connection.
-   void sendConnectChallengeResponse(const NetAddress &addr, Nonce &clientNonce, bool wantsKeyExchange, bool wantsCertificate)
+   void sendConnectChallengeResponse(const NetAddress &addr, nonce &clientNonce, bool wantsKeyExchange, bool wantsCertificate)
 	{
-	   PacketStream out;
-	   write(out, U8(ConnectChallengeResponse));
+	   packet_stream out;
+	   write(out, uint8(ConnectChallengeResponse));
 	   write(out, clientNonce);
 	   
-	   U32 identityToken = computeClientIdentityToken(addr, clientNonce);
+	   uint32 identityToken = computeClientIdentityToken(addr, clientNonce);
 	   write(out, identityToken);
 
 	   // write out a client puzzle
-	   Nonce serverNonce = mPuzzleManager.getCurrentNonce();
-	   U32 difficulty = mPuzzleManager.getCurrentDifficulty();
+	   nonce serverNonce = mPuzzleManager.getCurrentNonce();
+	   uint32 difficulty = mPuzzleManager.getCurrentDifficulty();
 	   write(out, serverNonce);
 	   write(out, difficulty);
 
@@ -394,7 +394,7 @@ protected:
 		  if(out.writeFlag(wantsCertificate && !mCertificate.isNull()))
 			 write(out, mCertificate);
 		  else
-			 write(out, mPrivateKey->getPublicKey());
+			 write(out, mPrivateKey->get_public_key());
 	   }
 	   TorqueLogMessageFormatted(LogNetInterface, ("Sending Challenge Response: %8x", identityToken));
 
@@ -404,13 +404,13 @@ protected:
 
    /// Processes a ConnectChallengeResponse, by issueing a connect request if it was for
    /// a connection this NetInterface has pending.
-   void handleConnectChallengeResponse(const NetAddress &address, BitStream *stream)
+   void handleConnectChallengeResponse(const NetAddress &address, bit_stream *stream)
 	{
 	   NetConnection *conn = findPendingConnection(address);
 	   if(!conn || conn->getConnectionState() != NetConnection::AwaitingChallengeResponse)
 		  return;
 	   
-	   Nonce theNonce;
+	   nonce theNonce;
 	   read(*stream, &theNonce);
 
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
@@ -431,27 +431,27 @@ protected:
 	   {
 		  if(stream->readFlag())
 		  {
-			 theParams.mCertificate = new Certificate(stream);
-			 if(!theParams.mCertificate->isValid() || !conn->validateCertficate(theParams.mCertificate, true))
+			 theParams.mCertificate = new certificate(stream);
+			 if(!theParams.mCertificate->is_valid() || !conn->validateCertficate(theParams.mCertificate, true))
 				return;         
-			 theParams.mPublicKey = theParams.mCertificate->getPublicKey();
+			 theParams.mPublicKey = theParams.mCertificate->get_public_key();
 		  }
 		  else
 		  {
-			 theParams.mPublicKey = new AsymmetricKey(stream);
-			 if(!theParams.mPublicKey->isValid() || !conn->validatePublicKey(theParams.mPublicKey, true))
+			 theParams.mPublicKey = new asymmetric_key(stream);
+			 if(!theParams.mPublicKey->is_valid() || !conn->validatePublicKey(theParams.mPublicKey, true))
 				return;
 		  }
 		  if(mPrivateKey.isNull() || mPrivateKey->getKeySize() != theParams.mPublicKey->getKeySize())
 		  {
 			 // we don't have a private key, so generate one for this connection
-			 theParams.mPrivateKey = new AsymmetricKey(theParams.mPublicKey->getKeySize());
+			 theParams.mPrivateKey = new asymmetric_key(theParams.mPublicKey->getKeySize());
 		  }
 		  else
 			 theParams.mPrivateKey = mPrivateKey;
 		  theParams.mSharedSecret = theParams.mPrivateKey->computeSharedSecretKey(theParams.mPublicKey);
-		  //logprintf("shared secret (client) %s", theParams.mSharedSecret->encodeBase64()->getBuffer());
-		  Random::read(theParams.mSymmetricKey, SymmetricCipher::KeySize);
+		  //logprintf("shared secret (client) %s", theParams.mSharedSecret->encodeBase64()->get_buffer());
+		  Random::read(theParams.mSymmetricKey, symmetric_cipher::KeySize);
 		  theParams.mUsingCrypto = true;
 	   }
 
@@ -485,24 +485,24 @@ protected:
    void sendConnectRequest(NetConnection *conn)
 	{
 	   TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Request"));
-	   PacketStream out;
+	   packet_stream out;
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
 
-	   write(out, U8(ConnectRequest));
+	   write(out, uint8(ConnectRequest));
 	   write(out, theParams.mNonce);
 	   write(out, theParams.mServerNonce);
 	   write(out, theParams.mClientIdentity);
 	   write(out, theParams.mPuzzleDifficulty);
 	   write(out, theParams.mPuzzleSolution);
 
-	   U32 encryptPos = 0;
+	   uint32 encryptPos = 0;
 
 	   if(out.writeFlag(theParams.mUsingCrypto))
 	   {
-		  write(out, theParams.mPrivateKey->getPublicKey());
-		  encryptPos = out.getBytePosition();
-		  out.setBytePosition(encryptPos);
-		  out.writeBuffer(SymmetricCipher::KeySize, theParams.mSymmetricKey);
+		  write(out, theParams.mPrivateKey->get_public_key());
+		  encryptPos = out.get_byte_position();
+		  out.set_byte_position(encryptPos);
+		  out.write_buffer(symmetric_cipher::KeySize, theParams.mSymmetricKey);
 	   }
 	   out.writeFlag(theParams.mDebugObjectSizes);
 	   write(out, conn->getInitialSendSequence());
@@ -516,8 +516,8 @@ protected:
 		  // key.  Then we'll symmetrically encrypt the packet from
 		  // the end of the public key to the end of the signature.
 
-		  SymmetricCipher theCipher(theParams.mSharedSecret);
-		  BitStreamHashAndEncrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);      
+		  symmetric_cipher theCipher(theParams.mSharedSecret);
+		  bit_stream_hash_and_encrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);      
 	   }
 
 	   conn->mConnectSendCount++;
@@ -533,7 +533,7 @@ protected:
    /// to a client puzzle this NetInterface sent to the remote host.  If those tests
    /// pass, it will construct a local connection instance to handle the rest of the
    /// connection negotiation.
-   void handleConnectRequest(const NetAddress &address, BitStream *stream)
+   void handleConnectRequest(const NetAddress &address, bit_stream *stream)
 	{
 	   if(!mAllowConnections)
 		  return;
@@ -582,26 +582,26 @@ protected:
 			 return;
 
 		  theParams.mUsingCrypto = true;
-		  theParams.mPublicKey = new AsymmetricKey(stream);
+		  theParams.mPublicKey = new asymmetric_key(stream);
 		  theParams.mPrivateKey = mPrivateKey;
 
-		  U32 decryptPos = stream->getBytePosition();
+		  uint32 decryptPos = stream->get_byte_position();
 
-		  stream->setBytePosition(decryptPos);
+		  stream->set_byte_position(decryptPos);
 		  theParams.mSharedSecret = theParams.mPrivateKey->computeSharedSecretKey(theParams.mPublicKey);
-		  //logprintf("shared secret (server) %s", theParams.mSharedSecret->encodeBase64()->getBuffer());
+		  //logprintf("shared secret (server) %s", theParams.mSharedSecret->encodeBase64()->get_buffer());
 
-		  SymmetricCipher theCipher(theParams.mSharedSecret);
+		  symmetric_cipher theCipher(theParams.mSharedSecret);
 
-		  if(!BitStreamDecryptAndCheckHash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
+		  if(!bit_stream_decrypt_and_check_hash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
 			 return;
 
 		  // now read the first part of the connection's symmetric key
-		  stream->readBuffer(SymmetricCipher::KeySize, theParams.mSymmetricKey);
-		  Random::read(theParams.mInitVector, SymmetricCipher::KeySize);
+		  stream->readBuffer(symmetric_cipher::KeySize, theParams.mSymmetricKey);
+		  Random::read(theParams.mInitVector, symmetric_cipher::KeySize);
 	   }
 
-	   U32 connectSequence;
+	   uint32 connectSequence;
 	   theParams.mDebugObjectSizes = stream->readFlag();
 	   read(*stream, &connectSequence);
 	   TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Request %8x", theParams.mClientIdentity));
@@ -617,7 +617,7 @@ protected:
 	   if(!conn)
 		  return;
 
-	   RefPtr<NetConnection> theConnection = conn;
+	   ref_ptr<NetConnection> theConnection = conn;
 	   conn->getConnectionParameters() = theParams;
 
 	   conn->setNetAddress(address);
@@ -625,7 +625,7 @@ protected:
 	   conn->setInterface(this);
 
 	   if(theParams.mUsingCrypto)
-		  conn->setSymmetricCipher(new SymmetricCipher(theParams.mSymmetricKey, theParams.mInitVector));
+		  conn->setSymmetricCipher(new symmetric_cipher(theParams.mSymmetricKey, theParams.mInitVector));
 
 	   const char *errorString = NULL;
 	   if(!conn->readConnectRequest(stream, &errorString))
@@ -645,37 +645,37 @@ protected:
 	{
 	   TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Accept - connection established."));
 
-	   PacketStream out;
-	   write(out, U8(ConnectAccept));
+	   packet_stream out;
+	   write(out, uint8(ConnectAccept));
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
 
 	   write(out, theParams.mNonce);
 	   write(out, theParams.mServerNonce);
-	   U32 encryptPos = out.getBytePosition();
-	   out.setBytePosition(encryptPos);
+	   uint32 encryptPos = out.get_byte_position();
+	   out.set_byte_position(encryptPos);
 
 	   write(out, conn->getInitialSendSequence());
 	   conn->writeConnectAccept(&out);
 
 	   if(theParams.mUsingCrypto)
 	   {
-		  out.writeBuffer(SymmetricCipher::KeySize, theParams.mInitVector);
-		  SymmetricCipher theCipher(theParams.mSharedSecret);
-		  BitStreamHashAndEncrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
+		  out.write_buffer(symmetric_cipher::KeySize, theParams.mInitVector);
+		  symmetric_cipher theCipher(theParams.mSharedSecret);
+		  bit_stream_hash_and_encrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
 	   }
 	   out.sendto(mSocket, conn->getNetAddress());
 	}
 
    /// Handles a connect accept packet, putting the connection associated with the
    /// remote host (if there is one) into an active state.
-   void handleConnectAccept(const NetAddress &address, BitStream *stream)
+   void handleConnectAccept(const NetAddress &address, bit_stream *stream)
 	{
-	   Nonce nonce, serverNonce;
+	   nonce nonce, serverNonce;
 
 	   read(*stream, &nonce);
 	   read(*stream, &serverNonce);
-	   U32 decryptPos = stream->getBytePosition();
-	   stream->setBytePosition(decryptPos);
+	   uint32 decryptPos = stream->get_byte_position();
+	   stream->set_byte_position(decryptPos);
 
 	   NetConnection *conn = findPendingConnection(address);
 	   if(!conn || conn->getConnectionState() != NetConnection::AwaitingConnectResponse)
@@ -688,11 +688,11 @@ protected:
 
 	   if(theParams.mUsingCrypto)
 	   {
-		  SymmetricCipher theCipher(theParams.mSharedSecret);
-		  if(!BitStreamDecryptAndCheckHash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
+		  symmetric_cipher theCipher(theParams.mSharedSecret);
+		  if(!bit_stream_decrypt_and_check_hash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
 			 return;
 	   }
-	   U32 recvSequence;
+	   uint32 recvSequence;
 	   read(*stream, &recvSequence);
 	   conn->setInitialRecvSequence(recvSequence);
 
@@ -704,8 +704,8 @@ protected:
 	   }
 	   if(theParams.mUsingCrypto)
 	   {
-		  stream->readBuffer(SymmetricCipher::KeySize, theParams.mInitVector);
-		  conn->setSymmetricCipher(new SymmetricCipher(theParams.mSymmetricKey, theParams.mInitVector));
+		  stream->readBuffer(symmetric_cipher::KeySize, theParams.mInitVector);
+		  conn->setSymmetricCipher(new symmetric_cipher(theParams.mSymmetricKey, theParams.mInitVector));
 	   }
 
 	   addConnection(conn); // first, add it as a regular connection
@@ -724,8 +724,8 @@ protected:
 	   if(reason.isEmpty())
 		  return; // if the reason is "", we reject silently
 
-	   PacketStream out;
-	   write(out, U8(ConnectReject));
+	   packet_stream out;
+	   write(out, uint8(ConnectReject));
 	   write(out, conn->mNonce);
 	   write(out, conn->mServerNonce);
 	   out.writeString(reason.c_str());
@@ -735,10 +735,10 @@ protected:
 
    /// Handles a connect rejection packet by notifying the connection object
    /// that the connection was rejected.
-   void handleConnectReject(const NetAddress &address, BitStream *stream)
+   void handleConnectReject(const NetAddress &address, bit_stream *stream)
 	{
-	   Nonce nonce;
-	   Nonce serverNonce;
+	   nonce nonce;
+	   nonce serverNonce;
 
 	   read(*stream, &nonce);
 	   read(*stream, &serverNonce);
@@ -788,16 +788,16 @@ protected:
    void sendPunchPackets(NetConnection *conn)
 	{
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
-	   PacketStream out;
-	   write(out, U8(Punch));
+	   packet_stream out;
+	   write(out, uint8(Punch));
 
 	   if(theParams.mIsInitiator)
 		  write(out, theParams.mNonce);
 	   else
 		  write(out, theParams.mServerNonce);
 
-	   U32 encryptPos = out.getBytePosition();
-	   out.setBytePosition(encryptPos);
+	   uint32 encryptPos = out.get_byte_position();
+	   out.set_byte_position(encryptPos);
 
 	   if(theParams.mIsInitiator)
 		  write(out, theParams.mServerNonce);
@@ -809,19 +809,19 @@ protected:
 			 if(out.writeFlag(theParams.mRequestCertificate && !mCertificate.isNull()))
 				write(out, mCertificate);
 			 else
-				write(out, mPrivateKey->getPublicKey());
+				write(out, mPrivateKey->get_public_key());
 		  }
 	   }
-	   SymmetricCipher theCipher(theParams.mArrangedSecret);
-	   BitStreamHashAndEncrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
+	   symmetric_cipher theCipher(theParams.mArrangedSecret);
+	   bit_stream_hash_and_encrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
 
-	   for(U32 i = 0; i < theParams.mPossibleAddresses.size(); i++)
+	   for(uint32 i = 0; i < theParams.mPossibleAddresses.size(); i++)
 	   {
 		  out.sendto(mSocket, theParams.mPossibleAddresses[i]);
 
 		  TorqueLogMessageFormatted(LogNetInterface, ("Sending punch packet (%s, %s) to %s",
-			 BufferEncodeBase64(ByteBuffer(theParams.mNonce.data, Nonce::NonceSize))->getBuffer(),
-			 BufferEncodeBase64(ByteBuffer(theParams.mServerNonce.data, Nonce::NonceSize))->getBuffer(),
+			 BufferEncodeBase64(byte_buffer(theParams.mNonce.data, nonce::NonceSize))->get_buffer(),
+			 BufferEncodeBase64(byte_buffer(theParams.mServerNonce.data, nonce::NonceSize))->get_buffer(),
 			 theParams.mPossibleAddresses[i].toString()));
 	   }
 	   conn->mConnectSendCount++;
@@ -830,17 +830,17 @@ protected:
 
 
    /// Handles an incoming Punch packet from a remote host.
-   void handlePunch(const NetAddress &theAddress, BitStream *stream)
+   void handlePunch(const NetAddress &theAddress, bit_stream *stream)
 	{
-	   U32 i, j;
+	   uint32 i, j;
 	   NetConnection *conn;
 
-	   Nonce firstNonce;
+	   nonce firstNonce;
 	   read(*stream, &firstNonce);
 
-	   ByteBuffer b(firstNonce.data, Nonce::NonceSize);
+	   byte_buffer b(firstNonce.data, nonce::NonceSize);
 
-	   TorqueLogMessageFormatted(LogNetInterface, ("Received punch packet from %s - %s", theAddress.toString(), BufferEncodeBase64(b)->getBuffer()));
+	   TorqueLogMessageFormatted(LogNetInterface, ("Received punch packet from %s - %s", theAddress.toString(), BufferEncodeBase64(b)->get_buffer()));
 
 	   for(i = 0; i < mPendingConnections.size(); i++)
 	   {
@@ -897,11 +897,11 @@ protected:
 		  return;
 
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
-	   SymmetricCipher theCipher(theParams.mArrangedSecret);
-	   if(!BitStreamDecryptAndCheckHash(stream, NetConnection::MessageSignatureBytes, stream->getBytePosition(), &theCipher))
+	   symmetric_cipher theCipher(theParams.mArrangedSecret);
+	   if(!bit_stream_decrypt_and_check_hash(stream, NetConnection::MessageSignatureBytes, stream->get_byte_position(), &theCipher))
 		  return;
 
-	   Nonce nextNonce;
+	   nonce nextNonce;
 	   read(*stream, &nextNonce);
 
 	   if(nextNonce != theParams.mNonce)
@@ -912,27 +912,27 @@ protected:
 	   {
 		  if(stream->readFlag())
 		  {
-			 theParams.mCertificate = new Certificate(stream);
-			 if(!theParams.mCertificate->isValid() || !conn->validateCertficate(theParams.mCertificate, true))
+			 theParams.mCertificate = new certificate(stream);
+			 if(!theParams.mCertificate->is_valid() || !conn->validateCertficate(theParams.mCertificate, true))
 				return;         
-			 theParams.mPublicKey = theParams.mCertificate->getPublicKey();
+			 theParams.mPublicKey = theParams.mCertificate->get_public_key();
 		  }
 		  else
 		  {
-			 theParams.mPublicKey = new AsymmetricKey(stream);
-			 if(!theParams.mPublicKey->isValid() || !conn->validatePublicKey(theParams.mPublicKey, true))
+			 theParams.mPublicKey = new asymmetric_key(stream);
+			 if(!theParams.mPublicKey->is_valid() || !conn->validatePublicKey(theParams.mPublicKey, true))
 				return;
 		  }
 		  if(mPrivateKey.isNull() || mPrivateKey->getKeySize() != theParams.mPublicKey->getKeySize())
 		  {
 			 // we don't have a private key, so generate one for this connection
-			 theParams.mPrivateKey = new AsymmetricKey(theParams.mPublicKey->getKeySize());
+			 theParams.mPrivateKey = new asymmetric_key(theParams.mPublicKey->getKeySize());
 		  }
 		  else
 			 theParams.mPrivateKey = mPrivateKey;
 		  theParams.mSharedSecret = theParams.mPrivateKey->computeSharedSecretKey(theParams.mPublicKey);
-		  //logprintf("shared secret (client) %s", theParams.mSharedSecret->encodeBase64()->getBuffer());
-		  Random::read(theParams.mSymmetricKey, SymmetricCipher::KeySize);
+		  //logprintf("shared secret (client) %s", theParams.mSharedSecret->encodeBase64()->get_buffer());
+		  Random::read(theParams.mSymmetricKey, symmetric_cipher::KeySize);
 		  theParams.mUsingCrypto = true;
 	   }
 	   conn->setNetAddress(theAddress);
@@ -949,24 +949,24 @@ protected:
    void sendArrangedConnectRequest(NetConnection *conn)
 	{
 	   TorqueLogMessageFormatted(LogNetInterface, ("Sending Arranged Connect Request"));
-	   PacketStream out;
+	   packet_stream out;
 
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
 
-	   write(out, U8(ArrangedConnectRequest));
+	   write(out, uint8(ArrangedConnectRequest));
 	   write(out, theParams.mNonce);
-	   U32 encryptPos = out.getBytePosition();
-	   U32 innerEncryptPos = 0;
+	   uint32 encryptPos = out.get_byte_position();
+	   uint32 innerEncryptPos = 0;
 
-	   out.setBytePosition(encryptPos);
+	   out.set_byte_position(encryptPos);
 
 	   write(out, theParams.mServerNonce);
 	   if(out.writeFlag(theParams.mUsingCrypto))
 	   {
-		  write(out, theParams.mPrivateKey->getPublicKey());
-		  innerEncryptPos = out.getBytePosition();
-		  out.setBytePosition(innerEncryptPos);
-		  out.writeBuffer(SymmetricCipher::KeySize, theParams.mSymmetricKey);
+		  write(out, theParams.mPrivateKey->get_public_key());
+		  innerEncryptPos = out.get_byte_position();
+		  out.set_byte_position(innerEncryptPos);
+		  out.write_buffer(symmetric_cipher::KeySize, theParams.mSymmetricKey);
 	   }
 	   out.writeFlag(theParams.mDebugObjectSizes);
 	   write(out, conn->getInitialSendSequence());
@@ -974,11 +974,11 @@ protected:
 
 	   if(innerEncryptPos)
 	   {
-		  SymmetricCipher theCipher(theParams.mSharedSecret);
-		  BitStreamHashAndEncrypt(&out, NetConnection::MessageSignatureBytes, innerEncryptPos, &theCipher);
+		  symmetric_cipher theCipher(theParams.mSharedSecret);
+		  bit_stream_hash_and_encrypt(&out, NetConnection::MessageSignatureBytes, innerEncryptPos, &theCipher);
 	   }
-	   SymmetricCipher theCipher(theParams.mArrangedSecret);
-	   BitStreamHashAndEncrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
+	   symmetric_cipher theCipher(theParams.mArrangedSecret);
+	   bit_stream_hash_and_encrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
 
 	   conn->mConnectSendCount++;
 	   conn->mConnectLastSendTime = getProcessStartTime();
@@ -987,11 +987,11 @@ protected:
 	}
 
    /// Handles an incoming connect request from an arranged connection.
-   void handleArrangedConnectRequest(const NetAddress &theAddress, BitStream *stream)
+   void handleArrangedConnectRequest(const NetAddress &theAddress, bit_stream *stream)
 	{
-	   U32 i, j;
+	   uint32 i, j;
 	   NetConnection *conn;
-	   Nonce nonce, serverNonce;
+	   nonce nonce, serverNonce;
 	   read(*stream, &nonce);
 
 	   // see if the connection is in the main connection table.
@@ -1031,11 +1031,11 @@ protected:
 		  return;
 	   
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
-	   SymmetricCipher theCipher(theParams.mArrangedSecret);
-	   if(!BitStreamDecryptAndCheckHash(stream, NetConnection::MessageSignatureBytes, stream->getBytePosition(), &theCipher))
+	   symmetric_cipher theCipher(theParams.mArrangedSecret);
+	   if(!bit_stream_decrypt_and_check_hash(stream, NetConnection::MessageSignatureBytes, stream->get_byte_position(), &theCipher))
 		  return;
 
-	   stream->setBytePosition(stream->getBytePosition());
+	   stream->set_byte_position(stream->get_byte_position());
 
 	   read(*stream, &serverNonce);
 	   if(serverNonce != theParams.mServerNonce)
@@ -1046,23 +1046,23 @@ protected:
 		  if(mPrivateKey.isNull())
 			 return;
 		  theParams.mUsingCrypto = true;
-		  theParams.mPublicKey = new AsymmetricKey(stream);
+		  theParams.mPublicKey = new asymmetric_key(stream);
 		  theParams.mPrivateKey = mPrivateKey;
 
-		  U32 decryptPos = stream->getBytePosition();
-		  stream->setBytePosition(decryptPos);
+		  uint32 decryptPos = stream->get_byte_position();
+		  stream->set_byte_position(decryptPos);
 		  theParams.mSharedSecret = theParams.mPrivateKey->computeSharedSecretKey(theParams.mPublicKey);
-		  SymmetricCipher theCipher(theParams.mSharedSecret);
+		  symmetric_cipher theCipher(theParams.mSharedSecret);
 		  
-		  if(!BitStreamDecryptAndCheckHash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
+		  if(!bit_stream_decrypt_and_check_hash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
 			 return;
 
 		  // now read the first part of the connection's session (symmetric) key
-		  stream->readBuffer(SymmetricCipher::KeySize, theParams.mSymmetricKey);
-		  Random::read(theParams.mInitVector, SymmetricCipher::KeySize);
+		  stream->readBuffer(symmetric_cipher::KeySize, theParams.mSymmetricKey);
+		  Random::read(theParams.mInitVector, symmetric_cipher::KeySize);
 	   }
 
-	   U32 connectSequence;
+	   uint32 connectSequence;
 	   theParams.mDebugObjectSizes = stream->readFlag();
 	   read(*stream, &connectSequence);
 	   TorqueLogMessageFormatted(LogNetInterface, ("Received Arranged Connect Request"));
@@ -1073,7 +1073,7 @@ protected:
 	   conn->setNetAddress(theAddress);
 	   conn->setInitialRecvSequence(connectSequence);
 	   if(theParams.mUsingCrypto)
-		  conn->setSymmetricCipher(new SymmetricCipher(theParams.mSymmetricKey, theParams.mInitVector));
+		  conn->setSymmetricCipher(new symmetric_cipher(theParams.mSymmetricKey, theParams.mInitVector));
 
 	   const char *errorString = NULL;
 	   if(!conn->readConnectRequest(stream, &errorString))
@@ -1091,7 +1091,7 @@ protected:
 
    
    /// Dispatches a disconnect packet for a specified connection.
-   void handleDisconnect(const NetAddress &address, BitStream *stream)
+   void handleDisconnect(const NetAddress &address, bit_stream *stream)
 	{
 	   NetConnection *conn = findConnection(address);
 	   if(!conn)
@@ -1099,7 +1099,7 @@ protected:
 
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
 
-	   Nonce nonce, serverNonce;
+	   nonce nonce, serverNonce;
 	   char reason[256];
 
 	   read(*stream, &nonce);
@@ -1108,13 +1108,13 @@ protected:
 	   if(nonce != theParams.mNonce || serverNonce != theParams.mServerNonce)
 		  return;
 
-	   U32 decryptPos = stream->getBytePosition();
-	   stream->setBytePosition(decryptPos);
+	   uint32 decryptPos = stream->get_byte_position();
+	   stream->set_byte_position(decryptPos);
 
 	   if(theParams.mUsingCrypto)
 	   {
-		  SymmetricCipher theCipher(theParams.mSharedSecret);
-		  if(!BitStreamDecryptAndCheckHash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
+		  symmetric_cipher theCipher(theParams.mSharedSecret);
+		  if(!bit_stream_decrypt_and_check_hash(stream, NetConnection::MessageSignatureBytes, decryptPos, &theCipher))
 			 return;
 	   }
 	   stream->readString(reason);
@@ -1146,19 +1146,19 @@ protected:
 		  if(conn->isNetworkConnection())
 		  {
 			 // send a disconnect packet...
-			 PacketStream out;
-			 write(out, U8(Disconnect));
+			 packet_stream out;
+			 write(out, uint8(Disconnect));
 			 ConnectionParameters &theParams = conn->getConnectionParameters();
 			 write(out, theParams.mNonce);
 			 write(out, theParams.mServerNonce);
-			 U32 encryptPos = out.getBytePosition();
-			 out.setBytePosition(encryptPos);
+			 uint32 encryptPos = out.get_byte_position();
+			 out.set_byte_position(encryptPos);
 			 out.writeString(reasonString.c_str());
 
 			 if(theParams.mUsingCrypto)
 			 {
-				SymmetricCipher theCipher(theParams.mSharedSecret);
-				BitStreamHashAndEncrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
+				symmetric_cipher theCipher(theParams.mSharedSecret);
+				bit_stream_hash_and_encrypt(&out, NetConnection::MessageSignatureBytes, encryptPos, &theCipher);
 			 }
 			 out.sendto(mSocket, conn->getNetAddress());
 		  }
@@ -1180,7 +1180,7 @@ public:
 	   Random::read(mRandomHashData, sizeof(mRandomHashData));
 
 	   mConnectionHashTable.resize(129);
-	   for(U32 i = 0; i < mConnectionHashTable.size(); i++)
+	   for(uint32 i = 0; i < mConnectionHashTable.size(); i++)
 		  mConnectionHashTable[i] = NULL;
 	   mSendPacketList = NULL;
 	   mProcessStartTime = GetTime();
@@ -1206,7 +1206,7 @@ public:
 	   {
 		  Array<NetAddress> interfaceAddresses;
 		  NetSocket::getInterfaceAddresses(interfaceAddresses);
-		  U16 savePort = theAddress.port;
+		  uint16 savePort = theAddress.port;
 		  if(interfaceAddresses.size())
 		  {
 			 theAddress = interfaceAddresses[0];
@@ -1218,7 +1218,7 @@ public:
 
 
 	/// Sets the private key this NetInterface will use for authentication and key exchange
-	void setPrivateKey(AsymmetricKey *theKey)
+	void setPrivateKey(asymmetric_key *theKey)
 	{
 	   mPrivateKey = theKey;
 	}
@@ -1231,7 +1231,7 @@ public:
    /// still initiate and accept encrypted connections, but they will be vulnerable to
    /// man in the middle attacks, unless the remote host can validate the public key
    /// in another way.
-   void setCertificate(Certificate *theCertificate);
+   void setCertificate(certificate *theCertificate);
 
    /// Returns whether or not this NetInterface allows connections from remote hosts.
    bool doesAllowConnections() { return mAllowConnections; }
@@ -1243,25 +1243,25 @@ public:
    NetSocket &getSocket() { return mSocket; }
 
 	/// Sends a packet to the remote address over this interface's socket.
-	NetSocket::Status sendto(const NetAddress &address, BitStream *stream)
+	NetSocket::Status sendto(const NetAddress &address, bit_stream *stream)
 	{
-		return mSocket.sendto(address, stream->getBuffer(), stream->getBytePosition());
+		return mSocket.sendto(address, stream->get_buffer(), stream->get_byte_position());
 	}
 
 
    /// Sends a packet to the remote address after millisecondDelay time has elapsed.
    ///
    /// This is used to simulate network latency on a LAN or single computer.
-   void sendtoDelayed(const NetAddress &address, BitStream *stream, U32 millisecondDelay)
+   void sendtoDelayed(const NetAddress &address, bit_stream *stream, uint32 millisecondDelay)
 	{
-	   U32 dataSize = stream->getBytePosition();
+	   uint32 dataSize = stream->get_byte_position();
 
 	   // allocate the send packet, with the data size added on
 	   DelaySendPacket *thePacket = (DelaySendPacket *) MemoryAllocate(sizeof(DelaySendPacket) + dataSize);
 	   thePacket->remoteAddress = address;
 	   thePacket->sendTime = getProcessStartTime() + millisecondsToTime(millisecondDelay);
 	   thePacket->packetSize = dataSize;
-	   memcpy(thePacket->packetData, stream->getBuffer(), dataSize);
+	   memcpy(thePacket->packetData, stream->get_buffer(), dataSize);
 
 	   // insert it into the DelaySendPacket list, sorted by time
 	   DelaySendPacket **list;
@@ -1274,7 +1274,7 @@ public:
    /// Dispatch function for processing all network packets through this NetInterface.
    void checkIncomingPackets()
 	{
-	   PacketStream stream;
+	   packet_stream stream;
 	   NetSocket::Status error;
 	   NetAddress sourceAddress;
 
@@ -1287,19 +1287,19 @@ public:
 
    /// Processes a single packet, and dispatches either to handleInfoPacket or to
    /// the NetConnection associated with the remote address.
-   virtual void processPacket(const NetAddress &address, BitStream *packetStream)
+   virtual void processPacket(const NetAddress &address, bit_stream *packet_stream)
 	{
 
 	   // Determine what to do with this packet:
 
-	   if(pStream->getBuffer()[0] & 0x80) // it's a protocol packet...
+	   if(pStream->get_buffer()[0] & 0x80) // it's a protocol packet...
 	   {
 		  // if the LSB of the first byte is set, it's a game data packet
 		  // so pass it to the appropriate connection.
 
 		  // lookup the connection in the addressTable
 		  // if this packet causes a disconnection, keep the conn around until this function exits
-		  RefPtr<NetConnection> conn = findConnection(sourceAddress);
+		  ref_ptr<NetConnection> conn = findConnection(sourceAddress);
 		  if(conn)
 			 conn->readRawPacket(pStream);
 	   }
@@ -1308,7 +1308,7 @@ public:
 		  // Otherwise, it's either a game info packet or a
 		  // connection handshake packet.
 
-		  U8 packetType;
+		  uint8 packetType;
 		  read(*pStream, &packetType);
 
 		  if(packetType >= FirstValidInfoPacketId)
@@ -1349,7 +1349,7 @@ public:
 
 
    /// Handles all packets that don't fall into the category of connection handshake or game data.
-   virtual void handleInfoPacket(const NetAddress &address, U8 packetType, BitStream *stream)
+   virtual void handleInfoPacket(const NetAddress &address, uint8 packetType, bit_stream *stream)
    {}
 
    /// Checks all connections on this interface for packet sends, and for timeouts and all valid
@@ -1370,12 +1370,12 @@ public:
 	   }
 
 	   NetObject::collapseDirtyList(); // collapse all the mask bits...
-	   for(U32 i = 0; i < mConnectionList.size(); i++)
+	   for(uint32 i = 0; i < mConnectionList.size(); i++)
 		  mConnectionList[i]->checkPacketSend(false, getProcessStartTime());
 
 	   if(getProcessStartTime() > mLastTimeoutCheckTime + millisecondsToTime(TimeoutCheckInterval))
 	   {
-		  for(U32 i = 0; i < mPendingConnections.size();)
+		  for(uint32 i = 0; i < mPendingConnections.size();)
 		  {
 			 NetConnection *pending = mPendingConnections[i];
 
@@ -1437,7 +1437,7 @@ public:
 		  }
 		  mLastTimeoutCheckTime = getProcessStartTime();
 
-		  for(U32 i = 0; i < mConnectionList.size();)
+		  for(uint32 i = 0; i < mConnectionList.size();)
 		  {
 			 if(mConnectionList[i]->checkTimeout(getProcessStartTime()))
 			 {
@@ -1451,7 +1451,7 @@ public:
 	   }
 
 	   // check if we're trying to solve any client connection puzzles
-	   for(U32 i = 0; i < mPendingConnections.size(); i++)
+	   for(uint32 i = 0; i < mPendingConnections.size(); i++)
 	   {
 		  if(mPendingConnections[i]->getConnectionState() == NetConnection::ComputingPuzzleSolution)
 		  {
@@ -1463,7 +1463,7 @@ public:
 
 
    /// Returns the list of connections on this NetInterface.
-   Array<RefPtr<NetConnection> > &getConnectionList() { return mConnectionList; }
+   Array<ref_ptr<NetConnection> > &getConnectionList() { return mConnectionList; }
 
    /// looks up a connected connection on this NetInterface
    NetConnection *findConnection(const NetAddress &remoteAddress)
@@ -1472,7 +1472,7 @@ public:
 	   // resolved to the next open space in the table.
 
 	   // Compute the hash index based on the network address
-	   U32 hashIndex = addr.hash() % mConnectionHashTable.size();
+	   uint32 hashIndex = addr.hash() % mConnectionHashTable.size();
 
 	   // Search through the table for an address that matches the source
 	   // address.  If the connection pointer is NULL, we've found an
@@ -1482,7 +1482,7 @@ public:
 		  if(addr == mConnectionHashTable[hashIndex]->getNetAddress())
 			 return mConnectionHashTable[hashIndex];
 		  hashIndex++;
-		  if(hashIndex >= (U32) mConnectionHashTable.size())
+		  if(hashIndex >= (uint32) mConnectionHashTable.size())
 			 hashIndex = 0;
 	   }
 	   return NULL;

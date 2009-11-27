@@ -1,75 +1,27 @@
-/// Hashes the BitStream, writing the hash digest into the end of the buffer, and then encrypts with the given cipher
-void BitStreamHashAndEncrypt(BitStream *theStream, U32 hashDigestSize, U32 encryptStartOffset, SymmetricCipher *theCipher)
+
+
+/// packet_stream provides a network interface to the bit_stream for easy construction of data packets.
+class packet_stream : public bit_stream
 {
-   U32 digestStart = theStream->getBytePosition();
-   theStream->setBytePosition(digestStart);
-   hash_state hashState;
-
-   U8 hash[32];
-
-   // do a sha256 hash of the BitStream:
-   sha256_init(&hashState);
-   sha256_process(&hashState, theStream->getBuffer(), digestStart);
-   sha256_done(&hashState, hash);
-
-   // write the hash into the BitStream:
-   theStream->writeBuffer(hashDigestSize, hash);
-
-   theCipher->encrypt(theStream->getBuffer() + encryptStartOffset,
-      theStream->getBuffer() + encryptStartOffset,
-      theStream->getBytePosition() - encryptStartOffset);   
-}
-
-
-/// Decrypts the BitStream, then checks the hash digest at the end of the buffer to validate the contents
-bool BitStreamDecryptAndCheckHash(BitStream *theStream, U32 hashDigestSize, U32 decryptStartOffset, SymmetricCipher *theCipher)
-{
-   U32 bufferSize = theStream->getStreamSize();
-   U8 *buffer = theStream->getBuffer();
-
-   if(bufferSize < decryptStartOffset + hashDigestSize)
-      return false;
-
-   theCipher->decrypt(buffer + decryptStartOffset,
-      buffer + decryptStartOffset,
-      bufferSize - decryptStartOffset);
-
-   hash_state hashState;
-   U8 hash[32];
-
-   sha256_init(&hashState);
-   sha256_process(&hashState, buffer, bufferSize - hashDigestSize);
-   sha256_done(&hashState, hash);
-
-   bool ret = !memcmp(buffer + bufferSize - hashDigestSize, hash, hashDigestSize);
-   if(ret)
-      theStream->setMaxSizes(bufferSize - hashDigestSize, 0);
-   return ret;
-}
-
-/// PacketStream provides a network interface to the BitStream for easy construction of data packets.
-class PacketStream : public BitStream
-{
-   typedef BitStream Parent;
-   U8 buffer[NetSocket::MaxPacketDataSize]; ///< internal buffer for packet data, sized to the maximum UDP packet size.
+   typedef bit_stream Parent;
+   uint8 buffer[udp_socket::max_datagram_size]; ///< internal buffer for packet data, sized to the maximum UDP packet size.
 public:
-   /// Constructor assigns the internal buffer to the BitStream.
-   PacketStream(U32 targetPacketSize = NetSocket::MaxPacketDataSize) : BitStream(buffer, targetPacketSize, NetSocket::MaxPacketDataSize) {}
+   /// Constructor assigns the internal buffer to the bit_stream.
+   packet_stream(uint32 target_packet_size = udp_socket::max_datagram_size) : bit_stream(buffer, udp_socket::max_datagram_size) {}
    /// Sends this packet to the specified address through the specified socket.
-   NetSocket::Status sendto(NetSocket &outgoingSocket, const NetAddress &theAddress)
+   udp_socket::send_to_result send_to(udp_socket &outgoing_socket, const address &the_address)
 	{
-	   return outgoingSocket.sendto(addr, buffer, getBytePosition());
+	   return outgoing_socket.send_to(the_address, buffer, get_byte_position());
 	}
 
    /// Reads a packet into the stream from the specified socket.
-   NetSocket::Status recvfrom(NetSocket &incomingSocket, NetAddress *recvAddress)
+   udp_socket::recv_from_result recv_from(udp_socket &incomingSocket, address *recvAddress)
 	{
-	   NetSocket::Status error;
-	   S32 dataSize;
-	   error = incomingSocket.recvfrom(recvAddress, buffer, sizeof(buffer), &dataSize);
-	   setMaxSizes(dataSize, 0);
-	   reset();
-	   return error;
+	   udp_socket::recv_from_result the_result;
+	   uint32 data_size;
+	   the_result = incomingSocket.recv_from(recvAddress, buffer, sizeof(buffer), &data_size);
+	   set_buffer(buffer, 0, data_size * 8);
+	   return the_result;
 	}
 
 };

@@ -161,7 +161,7 @@ public:
 
 
    /// Returns a byte_buffer containing an encoding of the public key.
-   byte_buffer_ptr getPublicKey() { return _public_key; }
+   byte_buffer_ptr get_public_key() { return _public_key; }
 
    /// Returns a byte_buffer containing an encoding of the private key.
    byte_buffer_ptr getPrivateKey() { return _private_key; }
@@ -170,12 +170,12 @@ public:
    bool hasPrivateKey() { return _has_private_key; }
 
    /// Returns true if this is a valid key.
-   bool isValid() { return _is_valid; }
+   bool is_valid() { return _is_valid; }
    /// Compute a key we can share with the specified asymmetric_key
    /// for a symmetric crypto.
-   byte_buffer_ptr computeSharedSecretKey(asymmetric_key *publicKey)
+   byte_buffer_ptr compute_shared_secret_key(asymmetric_key *publicKey)
 	{
-	   if(publicKey->getKeySize() != getKeySize() || !_has_private_key)
+	   if(publicKey->get_key_size() != get_key_size() || !_has_private_key)
 		  return NULL;
 
 	   uint8 hash[32];
@@ -194,12 +194,12 @@ public:
 	}
 
    /// Returns the strength of the asymmetric_key in byte size.
-   uint32 getKeySize() { return _key_size; }
+   uint32 get_key_size() { return _key_size; }
 
    /// Constructs a digital signature for the specified buffer of bits.  This
    /// method only works for private keys.  A public key only Asymmetric key
    /// will generate a signature of 0 bytes in length.
-   byte_buffer_ptr hashAndSign(random_generator &the_random_generator, const uint8 *buffer, uint32 buffer_size)
+   byte_buffer_ptr hash_and_sign(random_generator &the_random_generator, const uint8 *buffer, uint32 buffer_size)
 	{
 	   int descriptorIndex = register_prng ( &yarrow_desc );
 

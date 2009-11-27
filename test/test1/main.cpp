@@ -13,8 +13,8 @@ namespace net
 {
 	using namespace core;
 	struct internal {
-		#include "net/net.h"
 		#include "crypto/crypto.h"
+		#include "net/net.h"
 	};
 	typedef internal::address address;
 	typedef internal::udp_socket udp_socket;

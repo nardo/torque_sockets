@@ -1,3 +1,52 @@
+/// Hashes the bit_stream, writing the hash digest into the end of the buffer, and then encrypts with the given cipher
+static void bit_stream_hash_and_encrypt(bit_stream *the_stream, uint32 hash_digest_size, uint32 encrypt_start_offset, symmetric_cipher *the_cipher)
+{
+	uint32 digest_start = the_stream->get_byte_position();
+	the_stream->set_byte_position(digest_start);
+	hash_state hash_state;
+	
+	uint8 hash[32];
+	
+	// do a sha256 hash of the bit_stream:
+	sha256_init(&hash_state);
+	sha256_process(&hash_state, the_stream->get_buffer(), digest_start);
+	sha256_done(&hash_state, hash);
+	
+	// write the hash into the bit_stream:
+	the_stream->write_bytes(hash, hash_digest_size);
+	
+	the_cipher->encrypt(the_stream->get_buffer() + encrypt_start_offset,
+					   the_stream->get_buffer() + encrypt_start_offset,
+					   the_stream->get_byte_position() - encrypt_start_offset);   
+}
+
+
+/// Decrypts the bit_stream, then checks the hash digest at the end of the buffer to validate the contents
+static bool bit_stream_decrypt_and_check_hash(bit_stream *the_stream, uint32 hash_digest_size, uint32 decrypt_start_offset, symmetric_cipher *the_cipher)
+{
+	uint32 buffer_size = the_stream->get_stream_byte_size();
+	uint8 *buffer = the_stream->get_buffer();
+	
+	if(buffer_size < decrypt_start_offset + hash_digest_size)
+		return false;
+	
+	the_cipher->decrypt(buffer + decrypt_start_offset,
+					   buffer + decrypt_start_offset,
+					   buffer_size - decrypt_start_offset);
+	
+	hash_state hash_state;
+	uint8 hash[32];
+	
+	sha256_init(&hash_state);
+	sha256_process(&hash_state, buffer, buffer_size - hash_digest_size);
+	sha256_done(&hash_state, hash);
+	
+	bool ret = !memcmp(buffer + buffer_size - hash_digest_size, hash, hash_digest_size);
+	if(ret)
+		the_stream->set_stream_byte_size(buffer_size - hash_digest_size);
+	return ret;
+}
+
 /// Encode the buffer to base 64, returning the encoded buffer.
 static ref_ptr<byte_buffer> buffer_encode_base_64(const uint8 *buffer, uint32 buffer_size)
 {
