@@ -112,29 +112,29 @@ public:
 		return _is_valid;
 	}
 	/// returns true if this certificate was signed by the private key corresponding to the passed public key.
-	bool validate(ref_ptr<asymmetric_key> signatoryPublicKey)
+	bool validate(ref_ptr<asymmetric_key> signatory_public_key)
 	{
 		if(!_is_valid)
 			return false;
 
-		return signatoryPublicKey->verify_signature(_certificate_data->get_buffer(), _signature_byte_size, *_signature);
+		return signatory_public_key->verify_signature(_certificate_data->get_buffer(), _signature_byte_size, *_signature);
 	}
 
 	/// Returns the public key from the certificate
 	ref_ptr<asymmetric_key> get_public_key() { return _public_key; }
 
 	/// Returns the certificate payload
-	byte_buffer_ptr getPayload() { return _payload; }
+	byte_buffer_ptr get_payload() { return _payload; }
 };
 
-inline void read(bit_stream &str, ref_ptr<certificate> &theCertificate)
+inline void read(bit_stream &str, ref_ptr<certificate> &the_certificate)
 {
 	byte_buffer_ptr theBuffer;
 	core::read(str, theBuffer);
-	theCertificate = new certificate(theBuffer);
+	the_certificate = new certificate(theBuffer);
 }
 
-inline void write(bit_stream &str, const ref_ptr<certificate> &theCertificate)
+inline void write(bit_stream &str, const ref_ptr<certificate> &the_certificate)
 {
-	core::write(str, theCertificate->get_certificate_data());
+	core::write(str, the_certificate->get_certificate_data());
 }
