@@ -24,7 +24,7 @@ protected:
 	uint32 _signature_byte_size;                ///< Number of bytes of the byte_buffer signed by the CA
 public:
 	enum {
-	MaxPayloadSize = 512,
+	max_payload_size = 512,
 	};
 	/// certificate constructor
 	certificate(uint8 *data_ptr, uint32 data_size)
@@ -49,7 +49,7 @@ public:
 		_is_valid = false;
 		_signature_byte_size = 0;
 
-		if(payload->get_buffer_size() > MaxPayloadSize || !public_key->is_valid())
+		if(payload->get_buffer_size() > max_payload_size || !public_key->is_valid())
 			return;
 
 		byte_buffer_ptr the_public_key = public_key->get_public_key();
@@ -117,7 +117,7 @@ public:
 		if(!_is_valid)
 			return false;
 
-		return signatoryPublicKey->verifySignature(_certificate_data->get_buffer(), _signature_byte_size, *_signature);
+		return signatoryPublicKey->verify_signature(_certificate_data->get_buffer(), _signature_byte_size, *_signature);
 	}
 
 	/// Returns the public key from the certificate
