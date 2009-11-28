@@ -14,3 +14,5 @@
 #include "core/ref_object.h"
 #include "core/byte_buffer.h"
 #include "core/bit_stream.h"
+#include "core/zone_allocator.h"
+#include "core/page_allocator.h"

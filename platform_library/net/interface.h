@@ -124,7 +124,7 @@ protected:
 
    ref_ptr<asymmetric_key> mPrivateKey;  ///< The private key used by this NetInterface for secure key exchange.
    ref_ptr<certificate> mCertificate;   ///< A certificate, signed by some certificate Authority, to authenticate this host.
-   ClientPuzzleManager mPuzzleManager; ///< The object that tracks the current client puzzle difficulty, current puzzle and solutions for this NetInterface.
+   client_puzzle_manager mPuzzleManager; ///< The object that tracks the current client puzzle difficulty, current puzzle and solutions for this NetInterface.
 
    /// @name NetInterfaceSocket Socket
    ///
@@ -423,7 +423,7 @@ protected:
 	   read(*stream, &theParams.mServerNonce);
 	   read(*stream, &theParams.mPuzzleDifficulty);
 
-	   if(theParams.mPuzzleDifficulty > ClientPuzzleManager::MaxPuzzleDifficulty)
+	   if(theParams.mPuzzleDifficulty > client_puzzle_manager::MaxPuzzleDifficulty)
 		  return;
 
 	   // see if the connection needs to be authenticated or uses key exchange
@@ -471,7 +471,7 @@ protected:
    void continuePuzzleSolution(NetConnection *conn)
 	{
 	   ConnectionParameters &theParams = conn->getConnectionParameters();
-	   bool solved = ClientPuzzleManager::solvePuzzle(&theParams.mPuzzleSolution, theParams.mNonce, theParams.mServerNonce, theParams.mPuzzleDifficulty, theParams.mClientIdentity);
+	   bool solved = client_puzzle_manager::solvePuzzle(&theParams.mPuzzleSolution, theParams.mNonce, theParams.mServerNonce, theParams.mPuzzleDifficulty, theParams.mClientIdentity);
 
 	   if(solved)
 	   {
@@ -566,11 +566,11 @@ protected:
 	   }
 
 	   // check the puzzle solution
-	   ClientPuzzleManager::ErrorCode result = mPuzzleManager.checkSolution(
+	   client_puzzle_manager::ErrorCode result = mPuzzleManager.checkSolution(
 		  theParams.mPuzzleSolution, theParams.mNonce, theParams.mServerNonce,
 		  theParams.mPuzzleDifficulty, theParams.mClientIdentity);
 
-	   if(result != ClientPuzzleManager::Success)
+	   if(result != client_puzzle_manager::Success)
 	   {
 		  sendConnectReject(&theParams, address, "Puzzle");
 		  return;

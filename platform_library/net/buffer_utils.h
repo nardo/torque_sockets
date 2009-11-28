@@ -185,12 +185,27 @@ static void write_uint32_to_buffer(uint32 value, uint8 *buffer)
 	buffer[3] = value;
 }
 
+static void write_uint64_to_buffer(uint64 value, uint8 *buffer)
+{
+	uint32 top = uint32(value >> 32);
+	uint32 bottom = uint32(value);
+	write_uint32_to_buffer(top, buffer);
+	write_uint32_to_buffer(bottom, buffer);
+}
+
 static uint32 read_uint32_from_buffer(const uint8 *buf)
 {
 	return (uint32(buf[0]) << 24) |
 	(uint32(buf[1]) << 16) |
 	(uint32(buf[2]) << 8 ) |
 	uint32(buf[3]);
+}
+
+static uint64 read_uint64_from_buffer(const uint8 *buf)
+{
+	uint32 top = read_uint32_from_buffer(buf);
+	uint32 bottom = read_uint32_from_buffer(buf);
+	return (uint64(top) << 32) | bottom;
 }
 
 static void write_uint16_to_buffer(uint16 value, uint8 *buffer)

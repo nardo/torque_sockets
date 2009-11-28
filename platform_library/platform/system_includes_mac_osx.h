@@ -10,6 +10,9 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#include <mach/mach_vm.h>
+#include <mach/vm_map.h>
+#include <mach/mach_init.h>
 
 #include <sys/ioctl.h>   /* ioctl() */
 #define NO_IPX_SUPPORT

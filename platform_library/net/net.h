@@ -6,3 +6,5 @@
 #include "net/udp_socket.h"
 #include "net/sockets.h"
 #include "net/packet_stream.h"
+#include "net/nonce.h"
+#include "net/client_puzzle.h"
