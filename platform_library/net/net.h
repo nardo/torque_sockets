@@ -8,3 +8,5 @@
 #include "net/packet_stream.h"
 #include "net/nonce.h"
 #include "net/client_puzzle.h"
+#include "net/interface.h"
+#include "net/connection.h"
