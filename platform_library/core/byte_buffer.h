@@ -12,8 +12,15 @@ public:
 		default_buffer_size = 1500,
 	};
 	
+	byte_buffer(const char *string)
+	{
+		_buf_size = strlen(string) + 1;
+		_data_ptr = (uint8 *) memory_allocate(_buf_size);
+		memcpy(_data_ptr, (const uint8 *) string, _buf_size);
+	}
+	
 	/// Create a byte_buffer from a chunk of memory.
-	byte_buffer(uint8 *data_ptr, uint32 buffer_size)
+	byte_buffer(const uint8 *data_ptr, uint32 buffer_size)
 	{
 		_buf_size = buffer_size;
 		_data_ptr = (uint8 *) memory_allocate(buffer_size);
@@ -66,6 +73,13 @@ public:
 	void append_buffer(const byte_buffer &the_buffer)
 	{
 		return append_buffer(the_buffer.get_buffer(), the_buffer.get_buffer_size());
+	}
+	
+	bool is_equal(const byte_buffer &the_buffer)
+	{
+		if(the_buffer._buf_size != _buf_size)
+			return false;
+		return !memcmp(the_buffer._data_ptr, _data_ptr, _buf_size);
 	}
 	
 	uint32 get_buffer_size() const

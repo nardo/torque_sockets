@@ -31,9 +31,47 @@ class bit_stream
 	uint32 write_bytes(const byte *source_ptr, uint32 write_byte_count) { return _write_bits(source_ptr, 0, write_byte_count << 3) >> 3; }
 	uint32 read_bytes(byte *dest_ptr, uint32 read_byte_count) { return _read_bits(dest_ptr, 0, read_byte_count << 3) >> 3; }
 	
+	bool write_bool(bool value)
+	{
+		uint8 bool_val = value;
+		_write_bits(&bool_val, 0, 1);
+		return value;
+	}
+	
+	bool read_bool()
+	{
+		uint8 dest = 0;
+		_read_bits(&dest, 0, 1);
+		return bool(dest);
+	}
+	
 	uint32 read_integer(uint32 bit_width) { return _read_integer(bit_width); }
 	void write_integer(uint32 value, uint32 bit_width) { _write_integer(value, bit_width); }
 
+	/// Writes an unsigned integer value in the range range_start to range_end inclusive.
+	void write_ranged_uint32(uint32 value, uint32 range_start, uint32 range_end)
+	{
+		assert(value >= range_start && value <= range_end);
+		assert(range_end >= range_start);
+		
+		uint32 range_size = range_end - range_start + 1;
+		uint32 range_bits = get_next_binary_log(range_size);
+		
+		write_integer(value - range_start, range_bits);
+	}
+
+	/// Reads an unsigned integer value in the range range_start to range_end inclusive.
+	uint32  read_ranged_uint32(uint32 range_start, uint32 range_end)
+	{
+		assert(range_end >= range_start);
+		
+		uint32 range_size = range_end - range_start + 1;
+		uint32 range_bits = get_next_binary_log(range_size);
+		
+		uint32 val = read_integer(range_bits);
+		return val + range_start;
+	}
+	
 	virtual bool more(uint32 bits_requested) { return false; }
 	
 	private:

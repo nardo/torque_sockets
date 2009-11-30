@@ -133,7 +133,7 @@ private:
 
 
 	/// Error codes that can be returned by check_solution
-	enum error_code {
+	enum result_code {
 		success,
 		invalid_solution,
 		invalid_server_nonce,
@@ -153,7 +153,7 @@ private:
 	};
 
 	/// Checks a puzzle solution submitted by a client to see if it is a valid solution for the current or previous puzzle nonces
-	error_code check_solution(uint32 solution, nonce &client_nonce, nonce &server_nonce, uint32 puzzle_difficulty, uint32 client_identity)
+	result_code check_solution(uint32 solution, nonce &client_nonce, nonce &server_nonce, uint32 puzzle_difficulty, uint32 client_identity)
 	{
 		if(puzzle_difficulty != _current_difficulty)
 			return invalid_puzzle_difficulty;

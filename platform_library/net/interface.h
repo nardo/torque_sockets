@@ -87,11 +87,17 @@
 /// of the receiver.
 
 class connection;
+struct connection_parameters;
 
 class interface : public ref_object
 {
 	friend class connection;
 public:
+	random_generator _random_generator;
+	random_generator &random() {
+		return _random_generator;
+	}
+	
 	/// packet_type is encoded as the first byte of each packet.
 	///
 	/// Subclasses of interface can add custom, non-connected data
@@ -105,14 +111,14 @@ public:
 	
 	enum packet_type
 	{
-		connect_challenge_request       = 0, ///< Initial packet of the two-phase connect process
-		connect_challenge_response      = 1, ///< Response packet to the ChallengeRequest containing client identity, a client puzzle, and possibly the server's public key.
-		connect_request                = 2, ///< A connect request packet, including all puzzle solution data and connection initiation data.
-		connect_reject                 = 3, ///< A packet sent to notify a host that a connect_request was rejected.
-		connect_accept                 = 4, ///< A packet sent to notify a host that a connection was accepted.
-		disconnect                    = 5, ///< A packet sent to notify a host that the specified connection has terminated.
-		punch                         = 6, ///< A packet sent in order to create a hole in a firewall or NAT so packets from the remote host can be received.
-		arranged_connect_request        = 7, ///< A connection request for an "arranged" connection.
+		connect_challenge_request_packet = 0, ///< Initial packet of the two-phase connect process
+		connect_challenge_response_packet = 1, ///< Response packet to the ChallengeRequest containing client identity, a client puzzle, and possibly the server's public key.
+		connect_request_packet = 2, ///< A connect request packet, including all puzzle solution data and connection initiation data.
+		connect_reject_packet = 3, ///< A packet sent to notify a host that a connect_request was rejected.
+		connect_accept_packet = 4, ///< A packet sent to notify a host that a connection was accepted.
+		disconnect_packet = 5, ///< A packet sent to notify a host that the specified connection has terminated.
+		punch_packet = 6, ///< A packet sent in order to create a hole in a firewall or NAT so packets from the remote host can be received.
+		arranged_connect_request_packet = 7, ///< A connection request for an "arranged" connection.
 		first_valid_info_packet_id        = 8, ///< The first valid ID for a interface subclass's info packets.
 	};
 	
@@ -172,6 +178,16 @@ protected:
 		puzzle_solution_timeout = 30000, ///< If the server gives us a puzzle that takes more than 30 seconds, time out.
 	};
 	
+	enum termination_reason {
+		reason_timed_out,
+		reason_failed_connect_handshake,
+		reason_remote_host_rejected_connection,
+		reason_remote_disconnect_packet,
+		reason_duplicate_connection_attempt,
+		reason_self_disconnect,
+		reason_error,
+	};
+	
 	/// Computes an identity token for the connecting client based on the address of the client and the
 	/// client's unique nonce value.
 	uint32 compute_client_identity_token(const address &the_address, const nonce &the_nonce)
@@ -180,8 +196,8 @@ protected:
 		uint32 hash[8];
 		
 		sha256_init(&state);
-		sha256_process(&state, (const uint8 *) &address, sizeof(address));
-		sha256_process(&state, &the_nonce, sizeof(the_nonce));
+		sha256_process(&state, (uint8 *) &the_address, sizeof(address));
+		sha256_process(&state, (uint8 *) &the_nonce, sizeof(the_nonce));
 		sha256_process(&state, _random_hash_data, sizeof(_random_hash_data));
 		sha256_done(&state, (uint8 *) hash);
 		
@@ -190,36 +206,36 @@ protected:
 	
 	
 	/// Finds a connection instance that this interface has initiated.
-	connection *find_pending_connection(const address &address)
+	connection *find_pending_connection(const address &the_address)
 	{
 		// Loop through all the pending connections and compare the NetAddresses
 		for(uint32 i = 0; i < _pending_connections.size(); i++)
-			if(address == _pending_connections[i]->get_address())
+			if(the_address == _pending_connections[i]->get_address())
 				return _pending_connections[i];
 		return NULL;
 	}
 	
 	/// Adds a connection the list of pending connections.
-	void add_pending_connection(connection *conn)
+	void add_pending_connection(connection *the_connection)
 	{
 		// make sure we're not already connected to the host at the
 		// connection's address
-		find_and_remove_pending_connection(connection->get_address());
-		connection *temp = find_connection(connection->get_address());
+		find_and_remove_pending_connection(the_connection->get_address());
+		connection *temp = find_connection(the_connection->get_address());
 		if(temp)
-			disconnect(temp, connection::reason_self_disconnect, "Reconnecting");
+			disconnect(temp, reason_self_disconnect, _reconnecting_reason_buffer);
 		
 		// hang on to the connection and add it to the pending connection list
-		_pending_connections.push_back(connection);
+		_pending_connections.push_back(the_connection);
 	}
 	
 	/// Removes a connection from the list of pending connections.
-	void remove_pending_connection(connection *conn)
+	void remove_pending_connection(connection *the_connection)
 	{
 		// search the pending connection list for the specified connection
 		// and remove it.
 		for(uint32 i = 0; i < _pending_connections.size(); i++)
-			if(_pending_connections[i] == connection)
+			if(_pending_connections[i] == the_connection)
 			{
 				_pending_connections.erase(i);
 				return;
@@ -228,12 +244,12 @@ protected:
 	
 	
 	/// Finds a connection by address from the pending list and removes it.
-	void find_and_remove_pending_connection(const address &address)
+	void find_and_remove_pending_connection(const address &the_address)
 	{
 		// Search through the list by address and remove any connection
 		// that matches.
 		for(uint32 i = 0; i < _pending_connections.size(); i++)
-			if(address == _pending_connections[i]->get_address())
+			if(the_address == _pending_connections[i]->get_address())
 			{
 				_pending_connections.erase(i);
 				return;
@@ -241,9 +257,9 @@ protected:
 	}
 	
 	/// Adds a connection to the internal connection list.
-	void add_connection(connection *connection)
+	void add_connection(connection *the_connection)
 	{
-		_connection_list.push_back(conn);
+		_connection_list.push_back(the_connection);
 		uint32 num_connections = _connection_list.size();
 		if(num_connections > _connection_hash_table.size() / 2)
 		{
@@ -277,28 +293,28 @@ protected:
 	
 	
 	/// Remove a connection from the list.
-	void remove_connection(connection *connection)
+	void remove_connection(connection *the_connection)
 	{
 		// hold the reference to the ref_object until the function exits.
-		ref_ptr<connection> hold = conn;
+		ref_ptr<connection> hold = the_connection;
 		for(uint32 i = 0; i < _connection_list.size(); i++)
 		{
-			if(_connection_list[i] == conn)
+			if(_connection_list[i] == the_connection)
 			{
-				_connection_list.eraseUnstable(i);
+				_connection_list.erase_unstable(i);
 				break;
 			}
 		}
-		uint32 index = conn->get_address().hash() % _connection_hash_table.size();
-		uint32 startIndex = index;
+		uint32 index = the_connection->get_address().hash() % _connection_hash_table.size();
+		uint32 start_index = index;
 		
-		while(_connection_hash_table[index] != conn)
+		while(_connection_hash_table[index] != the_connection)
 		{
 			index++;
 			if(index >= (uint32) _connection_hash_table.size())
 				index = 0;
-			Assert(index != startIndex, "Attempting to remove a connection that is not in the table."); // not in the table
-			if(index == startIndex)
+			assert(index != start_index); // Attempting to remove a connection that is not in the table.
+			if(index == start_index)
 				return;
 		}
 		_connection_hash_table[index] = NULL;
@@ -326,31 +342,30 @@ protected:
 	
 	
 	/// Begins the connection handshaking process for a connection.  Called from connection::connect()
-	void start_connection(connection *conn)
+	void start_connection(connection *the_connection)
 	{
-		Assert(conn->get_connection_state() == connection::not_connected,
-			   "Cannot start unless it is in the not_connected state.");
+		assert(the_connection->get_connection_state() == connection::not_connected); // Cannot start unless it is in the not_connected state.
 		
-		add_pending_connection(conn);
-		conn->_connect_send_count = 0;
-		conn->set_connection_state(connection::awaiting_challenge_response);
-		send_connect_challenge_request(conn);
+		add_pending_connection(the_connection);
+		the_connection->_connect_send_count = 0;
+		the_connection->set_connection_state(connection::awaiting_challenge_response);
+		send_connect_challenge_request(the_connection);
 	}
 	
 	/// Sends a connect challenge request on behalf of the connection to the remote host.
-	void send_connect_challenge_request(connection *conn)
+	void send_connect_challenge_request(connection *the_connection)
 	{
 		TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Challenge Request to %s", conn->get_address().toString()));
 		packet_stream out;
-		write(out, uint8(connect_challenge_request));
-		connection_parameters &params = conn->get_connection_parameters();
-		write(out, params._nonce);
-		out.writeFlag(params._request_key_exchange);
-		out.writeFlag(params._request_certificate);
+		core::write(out, uint8(connect_challenge_request_packet));
+		connection_parameters &params = the_connection->get_connection_parameters();
+		core::write(out, params._nonce);
+		out.write_bool(params._request_key_exchange);
+		out.write_bool(params._request_certificate);
 		
-		conn->_connect_send_count++;
-		conn->_connect_last_send_time = get_process_start_time();
-		out.sendto(_socket, conn->get_address());
+		the_connection->_connect_send_count++;
+		the_connection->_connect_last_send_time = get_process_start_time();
+		out.send_to(_socket, the_connection->get_address());
 	}
 	
 	
@@ -364,9 +379,9 @@ protected:
 		if(!_allow_connections)
 			return;
 		nonce client_nonce;
-		read(*stream, &client_nonce);
-		bool wants_key_exchange = stream->readFlag();
-		bool wants_certificate = stream->readFlag();
+		core::read(*stream, client_nonce);
+		bool wants_key_exchange = stream->read_bool();
+		bool wants_certificate = stream->read_bool();
 		
 		send_connect_challenge_response(addr, client_nonce, wants_key_exchange, wants_certificate);
 	}
@@ -378,68 +393,68 @@ protected:
 	void send_connect_challenge_response(const address &addr, nonce &client_nonce, bool wants_key_exchange, bool wants_certificate)
 	{
 		packet_stream out;
-		write(out, uint8(connect_challenge_response));
-		write(out, client_nonce);
+		core::write(out, uint8(connect_challenge_response_packet));
+		core::write(out, client_nonce);
 		
 		uint32 identity_token = compute_client_identity_token(addr, client_nonce);
-		write(out, identity_token);
+		core::write(out, identity_token);
 		
 		// write out a client puzzle
 		nonce server_nonce = _puzzle_manager.get_current_nonce();
 		uint32 difficulty = _puzzle_manager.get_current_difficulty();
-		write(out, server_nonce);
-		write(out, difficulty);
+		core::write(out, server_nonce);
+		core::write(out, difficulty);
 		
-		if(out.writeFlag(_requires_key_exchange || (wants_key_exchange && !_private_key.is_null())))
+		if(out.write_bool(_requires_key_exchange || (wants_key_exchange && !_private_key.is_null())))
 		{
-			if(out.writeFlag(wants_certificate && !_certificate.is_null()))
+			if(out.write_bool(wants_certificate && !_certificate.is_null()))
 				write(out, _certificate);
 			else
-				write(out, _private_key->get_public_key());
+				core::write(out, _private_key->get_public_key());
 		}
 		TorqueLogMessageFormatted(LogNetInterface, ("Sending Challenge Response: %8x", identity_token));
 		
-		out.sendto(_socket, addr);
+		out.send_to(_socket, addr);
 	}
 	
 	
 	/// Processes a connect_challenge_response, by issueing a connect request if it was for
 	/// a connection this interface has pending.
-	void handle_connect_challenge_response(const address &address, bit_stream *stream)
+	void handle_connect_challenge_response(const address &the_address, bit_stream *stream)
 	{
-		connection *conn = find_pending_connection(address);
+		connection *conn = find_pending_connection(the_address);
 		if(!conn || conn->get_connection_state() != connection::awaiting_challenge_response)
 			return;
 		
 		nonce the_nonce;
-		read(*stream, &the_nonce);
+		core::read(*stream, the_nonce);
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
 		if(the_nonce != the_params._nonce)
 			return;
 		
-		read(*stream, &the_params._client_identity);
+		core::read(*stream, the_params._client_identity);
 		
 		// see if the server wants us to solve a client puzzle
-		read(*stream, &the_params._server_nonce);
-		read(*stream, &the_params._puzzle_difficulty);
+		core::read(*stream, the_params._server_nonce);
+		core::read(*stream, the_params._puzzle_difficulty);
 		
 		if(the_params._puzzle_difficulty > client_puzzle_manager::max_puzzle_difficulty)
 			return;
 		
 		// see if the connection needs to be authenticated or uses key exchange
-		if(stream->readFlag())
+		if(stream->read_bool())
 		{
-			if(stream->readFlag())
+			if(stream->read_bool())
 			{
-				the_params._certificate = new certificate(stream);
+				the_params._certificate = new certificate(*stream);
 				if(!the_params._certificate->is_valid() || !conn->validate_certificate(the_params._certificate, true))
 					return;         
 				the_params._public_key = the_params._certificate->get_public_key();
 			}
 			else
 			{
-				the_params._public_key = new asymmetric_key(stream);
+				the_params._public_key = new asymmetric_key(*stream);
 				if(!the_params._public_key->is_valid() || !conn->validate_public_key(the_params._public_key, true))
 					return;
 			}
@@ -452,7 +467,7 @@ protected:
 				the_params._private_key = _private_key;
 			the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
 			//logprintf("shared secret (client) %s", the_params._shared_secret->encodeBase64()->get_buffer());
-			Random::read(the_params._symmetric_key, symmetric_cipher::key_size);
+			_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
 			the_params._using_crypto = true;
 		}
 		
@@ -476,7 +491,7 @@ protected:
 		
 		if(solved)
 		{
-			logprintf("Client puzzle solved in %d ms.", GetTime() - conn->_connect_last_send_time);
+			logprintf("Client puzzle solved in %d ms.", (time::get_current() - conn->_connect_last_send_time).get_milliseconds());
 			conn->set_connection_state(connection::awaiting_connect_response);
 			send_connect_request(conn);
 		}
@@ -489,25 +504,24 @@ protected:
 		packet_stream out;
 		connection_parameters &the_params = conn->get_connection_parameters();
 		
-		write(out, uint8(connect_request));
-		write(out, the_params._nonce);
-		write(out, the_params._server_nonce);
-		write(out, the_params._client_identity);
-		write(out, the_params._puzzle_difficulty);
-		write(out, the_params._puzzle_solution);
+		core::write(out, uint8(connect_request_packet));
+		core::write(out, the_params._nonce);
+		core::write(out, the_params._server_nonce);
+		core::write(out, the_params._client_identity);
+		core::write(out, the_params._puzzle_difficulty);
+		core::write(out, the_params._puzzle_solution);
 		
 		uint32 encrypt_pos = 0;
 		
-		if(out.writeFlag(the_params._using_crypto))
+		if(out.write_bool(the_params._using_crypto))
 		{
-			write(out, the_params._private_key->get_public_key());
+			core::write(out, the_params._private_key->get_public_key());
 			encrypt_pos = out.get_byte_position();
 			out.set_byte_position(encrypt_pos);
-			out.write_buffer(symmetric_cipher::key_size, the_params._symmetric_key);
+			out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
 		}
-		out.writeFlag(the_params._debug_object_sizes);
-		write(out, conn->get_initial_send_sequence());
-		out.writeString(conn->getClassName());
+		out.write_bool(the_params._debug_object_sizes);
+		core::write(out, conn->get_initial_send_sequence());
 		conn->write_connect_request(&out);
 		
 		if(encrypt_pos)
@@ -524,7 +538,7 @@ protected:
 		conn->_connect_send_count++;
 		conn->_connect_last_send_time = get_process_start_time();
 		
-		out.sendto(_socket, conn->get_address());
+		out.send_to(_socket, conn->get_address());
 	}
 	
 	
@@ -534,28 +548,28 @@ protected:
 	/// to a client puzzle this interface sent to the remote host.  If those tests
 	/// pass, it will construct a local connection instance to handle the rest of the
 	/// connection negotiation.
-	void handle_connect_request(const address &address, bit_stream *stream)
+	void handle_connect_request(const address &the_address, bit_stream *stream)
 	{
 		if(!_allow_connections)
 			return;
 		
 		connection_parameters the_params;
-		read(*stream, &the_params._nonce);
-		read(*stream, &the_params._server_nonce);
-		read(*stream, &the_params._client_identity);
+		core::read(*stream, the_params._nonce);
+		core::read(*stream, the_params._server_nonce);
+		core::read(*stream, the_params._client_identity);
 		
-		if(the_params._client_identity != compute_client_identity_token(address, the_params._nonce))
+		if(the_params._client_identity != compute_client_identity_token(the_address, the_params._nonce))
 			return;
 		
-		read(*stream, &the_params._puzzle_difficulty);
-		read(*stream, &the_params._puzzle_solution);
+		core::read(*stream, the_params._puzzle_difficulty);
+		core::read(*stream, the_params._puzzle_solution);
 		
 		// see if the connection is in the main connection table.
 		// If the connection is in the connection table and it has
 		// the same initiatorSequence, we'll just resend the connect
 		// acceptance packet, assuming that the last time we sent it
 		// it was dropped.
-		connection *connect = find_connection(address);
+		connection *connect = find_connection(the_address);
 		if(connect)
 		{
 			connection_parameters &cp = connect->get_connection_parameters();
@@ -567,23 +581,23 @@ protected:
 		}
 		
 		// check the puzzle solution
-		client_puzzle_manager::ErrorCode result = _puzzle_manager.check_solution(
-																				the_params._puzzle_solution, the_params._nonce, the_params._server_nonce,
-																				the_params._puzzle_difficulty, the_params._client_identity);
+		client_puzzle_manager::result_code result = _puzzle_manager.check_solution(the_params._puzzle_solution, the_params._nonce, the_params._server_nonce, the_params._puzzle_difficulty, the_params._client_identity);
 		
-		if(result != client_puzzle_manager::Success)
+		if(result != client_puzzle_manager::success)
 		{
-			send_connect_reject(&the_params, address, "Puzzle");
+			const char *reason_buffer = "Puzzle";
+			byte_buffer_ptr reason = new byte_buffer( (const uint8 *)reason_buffer, strlen(reason_buffer) + 1);
+			send_connect_reject(&the_params, the_address, reason);
 			return;
 		}
 		
-		if(stream->readFlag())
+		if(stream->read_bool())
 		{
 			if(_private_key.is_null())
 				return;
 			
 			the_params._using_crypto = true;
-			the_params._public_key = new asymmetric_key(stream);
+			the_params._public_key = new asymmetric_key(*stream);
 			the_params._private_key = _private_key;
 			
 			uint32 decrypt_pos = stream->get_byte_position();
@@ -598,22 +612,19 @@ protected:
 				return;
 			
 			// now read the first part of the connection's symmetric key
-			stream->readBuffer(symmetric_cipher::key_size, the_params._symmetric_key);
-			Random::read(the_params.mInitVector, symmetric_cipher::key_size);
+			stream->read_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
+			_random_generator.random_buffer(the_params._init_vector, symmetric_cipher::key_size);
 		}
 		
 		uint32 connect_sequence;
-		the_params._debug_object_sizes = stream->readFlag();
-		read(*stream, &connect_sequence);
+		the_params._debug_object_sizes = stream->read_bool();
+		core::read(*stream, connect_sequence);
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Request %8x", the_params._client_identity));
 		
 		if(connect)
-			disconnect(connect, connection::reason_self_disconnect, "NewConnection");
+			disconnect(connect, reason_self_disconnect, _new_connection_reason_buffer);
 		
-		char connectionClass[256];
-		stream->readString(connectionClass);
-		
-		connection *conn = NetConnectionRep::create(connectionClass);
+		connection *conn = new connection(_random_generator);
 		
 		if(!conn)
 			return;
@@ -621,17 +632,17 @@ protected:
 		ref_ptr<connection> the_connection = conn;
 		conn->get_connection_parameters() = the_params;
 		
-		conn->set_address(address);
+		conn->set_address(the_address);
 		conn->set_initial_recv_sequence(connect_sequence);
 		conn->set_interface(this);
 		
 		if(the_params._using_crypto)
-			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params.mInitVector));
+			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		
-		const char *error_string = NULL;
-		if(!conn->read_connect_request(stream, &error_string))
+		byte_buffer_ptr reason;
+		if(!conn->read_connect_request(stream, reason))
 		{
-			send_connect_reject(&the_params, address, error_string);
+			send_connect_reject(&the_params, the_address, reason);
 			return;
 		}
 		add_connection(conn);
@@ -647,38 +658,38 @@ protected:
 		TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Accept - connection established."));
 		
 		packet_stream out;
-		write(out, uint8(connect_accept));
+		core::write(out, uint8(connect_accept_packet));
 		connection_parameters &the_params = conn->get_connection_parameters();
 		
-		write(out, the_params._nonce);
-		write(out, the_params._server_nonce);
+		core::write(out, the_params._nonce);
+		core::write(out, the_params._server_nonce);
 		uint32 encrypt_pos = out.get_byte_position();
 		out.set_byte_position(encrypt_pos);
 		
-		write(out, conn->get_initial_send_sequence());
+		core::write(out, conn->get_initial_send_sequence());
 		conn->write_connect_accept(&out);
 		
 		if(the_params._using_crypto)
 		{
-			out.write_buffer(symmetric_cipher::key_size, the_params.mInitVector);
+			out.write_bytes(the_params._init_vector, symmetric_cipher::key_size);
 			symmetric_cipher the_cipher(the_params._shared_secret);
 			bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
 		}
-		out.sendto(_socket, conn->get_address());
+		out.send_to(_socket, conn->get_address());
 	}
 	
 	/// Handles a connect accept packet, putting the connection associated with the
 	/// remote host (if there is one) into an active state.
-	void handle_connect_accept(const address &address, bit_stream *stream)
+	void handle_connect_accept(const address &the_address, bit_stream *stream)
 	{
 		nonce nonce, server_nonce;
 		
-		read(*stream, &nonce);
-		read(*stream, &server_nonce);
+		core::read(*stream, nonce);
+		core::read(*stream, server_nonce);
 		uint32 decrypt_pos = stream->get_byte_position();
 		stream->set_byte_position(decrypt_pos);
 		
-		connection *conn = find_pending_connection(address);
+		connection *conn = find_pending_connection(the_address);
 		if(!conn || conn->get_connection_state() != connection::awaiting_connect_response)
 			return;
 		
@@ -694,19 +705,19 @@ protected:
 				return;
 		}
 		uint32 recv_sequence;
-		read(*stream, &recv_sequence);
+		core::read(*stream, recv_sequence);
 		conn->set_initial_recv_sequence(recv_sequence);
 		
-		const char *error_string = NULL;
-		if(!conn->read_connect_accept(stream, &error_string))
+		byte_buffer_ptr error_buffer;
+		if(!conn->read_connect_accept(stream, error_buffer))
 		{
 			remove_pending_connection(conn);
 			return;
 		}
 		if(the_params._using_crypto)
 		{
-			stream->readBuffer(symmetric_cipher::key_size, the_params.mInitVector);
-			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params.mInitVector));
+			stream->read_bytes(the_params._init_vector, symmetric_cipher::key_size);
+			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		}
 		
 		add_connection(conn); // first, add it as a regular connection
@@ -720,56 +731,53 @@ protected:
 	
 	/// Sends a connect rejection to a valid connect request in response to possible error
 	/// conditions (server full, wrong password, etc).
-	void send_connect_reject(connection_parameters *the_params, const address &the_address, const string &reason)
+	void send_connect_reject(connection_parameters *the_params, const address &the_address, const byte_buffer_ptr &reason)
 	{
-		if(reason.isEmpty())
-			return; // if the reason is "", we reject silently
-		
 		packet_stream out;
-		write(out, uint8(connect_reject));
-		write(out, conn->_nonce);
-		write(out, conn->_server_nonce);
-		out.writeString(reason.c_str());
-		out.sendto(_socket, the_address);
+		core::write(out, uint8(connect_reject_packet));
+		core::write(out, the_params->_nonce);
+		core::write(out, the_params->_server_nonce);
+		core::write(out, reason);
+		out.send_to(_socket, the_address);
 	}
 	
 	
 	/// Handles a connect rejection packet by notifying the connection ref_object
 	/// that the connection was rejected.
-	void handle_connect_reject(const address &address, bit_stream *stream)
+	void handle_connect_reject(const address &the_address, bit_stream *stream)
 	{
-		nonce nonce;
+		nonce the_nonce;
 		nonce server_nonce;
 		
-		read(*stream, &nonce);
-		read(*stream, &server_nonce);
+		core::read(*stream, the_nonce);
+		core::read(*stream, server_nonce);
 		
-		connection *conn = find_pending_connection(address);
+		connection *conn = find_pending_connection(the_address);
 		if(!conn || (conn->get_connection_state() != connection::awaiting_challenge_response &&
 					 conn->get_connection_state() != connection::awaiting_connect_response))
 			return;
 		connection_parameters &p = conn->get_connection_parameters();
-		if(p._nonce != nonce || p._server_nonce != server_nonce)
+		if(p._nonce != the_nonce || p._server_nonce != server_nonce)
 			return;
 		
-		char reason[256];
-		stream->readString(reason);
+		byte_buffer_ptr reason;
+		core::read(*stream, reason);
 		
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Reject - reason %s", reason));
 		// if the reason is a bad puzzle solution, try once more with a
 		// new nonce.
-		if(!strcmp(reason, "Puzzle") && !p._puzzle_retried)
+		if(!strcmp((const char *) reason->get_buffer(), "Puzzle") && !p._puzzle_retried)
 		{
 			p._puzzle_retried = true;
 			conn->set_connection_state(connection::awaiting_challenge_response);
 			conn->_connect_send_count = 0;
-			p._nonce.getRandom();
+			_random_generator.random_buffer((uint8 *) &(p._nonce), sizeof(nonce));
 			send_connect_challenge_request(conn);
 			return;
 		}
 		
 		conn->set_connection_state(connection::connect_rejected);
-		conn->on_connect_terminated(connection::reason_remote_host_rejected_connection, reason);
+		conn->on_connect_terminated(reason_remote_host_rejected_connection, reason);
 		remove_pending_connection(conn);
 	}
 	
@@ -790,27 +798,27 @@ protected:
 	{
 		connection_parameters &the_params = conn->get_connection_parameters();
 		packet_stream out;
-		write(out, uint8(punch));
+		core::write(out, uint8(punch_packet));
 		
 		if(the_params._is_initiator)
-			write(out, the_params._nonce);
+			core::write(out, the_params._nonce);
 		else
-			write(out, the_params._server_nonce);
+			core::write(out, the_params._server_nonce);
 		
 		uint32 encrypt_pos = out.get_byte_position();
 		out.set_byte_position(encrypt_pos);
 		
 		if(the_params._is_initiator)
-			write(out, the_params._server_nonce);
+			core::write(out, the_params._server_nonce);
 		else
 		{
-			write(out, the_params._nonce);
-			if(out.writeFlag(_requires_key_exchange || (the_params._request_key_exchange && !_private_key.is_null())))
+			core::write(out, the_params._nonce);
+			if(out.write_bool(_requires_key_exchange || (the_params._request_key_exchange && !_private_key.is_null())))
 			{
-				if(out.writeFlag(the_params._request_certificate && !_certificate.is_null()))
+				if(out.write_bool(the_params._request_certificate && !_certificate.is_null()))
 					write(out, _certificate);
 				else
-					write(out, _private_key->get_public_key());
+					core::write(out, _private_key->get_public_key());
 			}
 		}
 		symmetric_cipher the_cipher(the_params._arranged_secret);
@@ -818,7 +826,7 @@ protected:
 		
 		for(uint32 i = 0; i < the_params._possible_addresses.size(); i++)
 		{
-			out.sendto(_socket, the_params._possible_addresses[i]);
+			out.send_to(_socket, the_params._possible_addresses[i]);
 			
 			TorqueLogMessageFormatted(LogNetInterface, ("Sending punch packet (%s, %s) to %s",
 														BufferEncodeBase64(byte_buffer(the_params._nonce.data, nonce::NonceSize))->get_buffer(),
@@ -837,9 +845,9 @@ protected:
 		connection *conn;
 		
 		nonce first_nonce;
-		read(*stream, &first_nonce);
+		core::read(*stream, first_nonce);
 		
-		byte_buffer b(first_nonce.data, nonce::NonceSize);
+		byte_buffer b((uint8 *) &first_nonce, sizeof(nonce));
 		
 		TorqueLogMessageFormatted(LogNetInterface, ("Received punch packet from %s - %s", the_address.toString(), BufferEncodeBase64(b)->get_buffer()));
 		
@@ -876,7 +884,7 @@ protected:
 			// we'll want to send a punch to the address it came from, as long
 			// as only the port is not an exact match:
 			for(j = 0; j < the_params._possible_addresses.size(); j++)
-				if(the_address.is_equal_address(the_params._possible_addresses[j]))
+				if(the_address.is_same_host(the_params._possible_addresses[j]))
 					break;
 			
 			// if the address wasn't even partially in the list, just exit out
@@ -903,24 +911,24 @@ protected:
 			return;
 		
 		nonce next_nonce;
-		read(*stream, &next_nonce);
+		core::read(*stream, next_nonce);
 		
 		if(next_nonce != the_params._nonce)
 			return;
 		
 		// see if the connection needs to be authenticated or uses key exchange
-		if(stream->readFlag())
+		if(stream->read_bool())
 		{
-			if(stream->readFlag())
+			if(stream->read_bool())
 			{
-				the_params._certificate = new certificate(stream);
+				the_params._certificate = new certificate(*stream);
 				if(!the_params._certificate->is_valid() || !conn->validate_certificate(the_params._certificate, true))
 					return;         
 				the_params._public_key = the_params._certificate->get_public_key();
 			}
 			else
 			{
-				the_params._public_key = new asymmetric_key(stream);
+				the_params._public_key = new asymmetric_key(*stream);
 				if(!the_params._public_key->is_valid() || !conn->validate_public_key(the_params._public_key, true))
 					return;
 			}
@@ -933,7 +941,7 @@ protected:
 				the_params._private_key = _private_key;
 			the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
 			//logprintf("shared secret (client) %s", the_params._shared_secret->encodeBase64()->get_buffer());
-			Random::read(the_params._symmetric_key, symmetric_cipher::key_size);
+			_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
 			the_params._using_crypto = true;
 		}
 		conn->set_address(the_address);
@@ -954,23 +962,23 @@ protected:
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
 		
-		write(out, uint8(arranged_connect_request));
-		write(out, the_params._nonce);
+		core::write(out, uint8(arranged_connect_request_packet));
+		core::write(out, the_params._nonce);
 		uint32 encrypt_pos = out.get_byte_position();
 		uint32 inner_encrypt_pos = 0;
 		
 		out.set_byte_position(encrypt_pos);
 		
-		write(out, the_params._server_nonce);
-		if(out.writeFlag(the_params._using_crypto))
+		core::write(out, the_params._server_nonce);
+		if(out.write_bool(the_params._using_crypto))
 		{
-			write(out, the_params._private_key->get_public_key());
+			core::write(out, the_params._private_key->get_public_key());
 			inner_encrypt_pos = out.get_byte_position();
 			out.set_byte_position(inner_encrypt_pos);
-			out.write_buffer(symmetric_cipher::key_size, the_params._symmetric_key);
+			out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
 		}
-		out.writeFlag(the_params._debug_object_sizes);
-		write(out, conn->get_initial_send_sequence());
+		out.write_bool(the_params._debug_object_sizes);
+		core::write(out, conn->get_initial_send_sequence());
 		conn->write_connect_request(&out);
 		
 		if(inner_encrypt_pos)
@@ -984,7 +992,7 @@ protected:
 		conn->_connect_send_count++;
 		conn->_connect_last_send_time = get_process_start_time();
 		
-		out.sendto(_socket, conn->get_address());
+		out.send_to(_socket, conn->get_address());
 	}
 	
 	/// Handles an incoming connect request from an arranged connection.
@@ -993,7 +1001,7 @@ protected:
 		uint32 i, j;
 		connection *conn;
 		nonce nonce, server_nonce;
-		read(*stream, &nonce);
+		core::read(*stream, nonce);
 		
 		// see if the connection is in the main connection table.
 		// If the connection is in the connection table and it has
@@ -1023,7 +1031,7 @@ protected:
 				continue;
 			
 			for(j = 0; j < the_params._possible_addresses.size(); j++)
-				if(the_address.is_equal_address(the_params._possible_addresses[j]))
+				if(the_address.is_same_host(the_params._possible_addresses[j]))
 					break;
 			if(j != the_params._possible_addresses.size())
 				break;
@@ -1038,16 +1046,16 @@ protected:
 		
 		stream->set_byte_position(stream->get_byte_position());
 		
-		read(*stream, &server_nonce);
+		core::read(*stream, server_nonce);
 		if(server_nonce != the_params._server_nonce)
 			return;
 		
-		if(stream->readFlag())
+		if(stream->read_bool())
 		{
 			if(_private_key.is_null())
 				return;
 			the_params._using_crypto = true;
-			the_params._public_key = new asymmetric_key(stream);
+			the_params._public_key = new asymmetric_key(*stream);
 			the_params._private_key = _private_key;
 			
 			uint32 decrypt_pos = stream->get_byte_position();
@@ -1059,27 +1067,27 @@ protected:
 				return;
 			
 			// now read the first part of the connection's session (symmetric) key
-			stream->readBuffer(symmetric_cipher::key_size, the_params._symmetric_key);
-			Random::read(the_params.mInitVector, symmetric_cipher::key_size);
+			stream->read_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
+			_random_generator.random_buffer(the_params._init_vector, symmetric_cipher::key_size);
 		}
 		
 		uint32 connect_sequence;
-		the_params._debug_object_sizes = stream->readFlag();
-		read(*stream, &connect_sequence);
+		the_params._debug_object_sizes = stream->read_bool();
+		core::read(*stream, connect_sequence);
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Arranged Connect Request"));
 		
 		if(old_connection)
-			disconnect(old_connection, connection::reason_self_disconnect, "");
+			disconnect(old_connection, reason_self_disconnect, _old_connection_reason_buffer);
 		
 		conn->set_address(the_address);
 		conn->set_initial_recv_sequence(connect_sequence);
 		if(the_params._using_crypto)
-			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params.mInitVector));
+			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		
-		const char *error_string = NULL;
-		if(!conn->read_connect_request(stream, &error_string))
+		byte_buffer_ptr reason;
+		if(!conn->read_connect_request(stream, reason))
 		{
-			send_connect_reject(&the_params, the_address, error_string);
+			send_connect_reject(&the_params, the_address, reason);
 			remove_pending_connection(conn);
 			return;
 		}
@@ -1092,19 +1100,19 @@ protected:
 	
 	
 	/// Dispatches a disconnect packet for a specified connection.
-	void handle_disconnect(const address &address, bit_stream *stream)
+	void handle_disconnect(const address &the_address, bit_stream *stream)
 	{
-		connection *conn = find_connection(address);
+		connection *conn = find_connection(the_address);
 		if(!conn)
 			return;
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
 		
 		nonce nonce, server_nonce;
-		char reason[256];
+		byte_buffer_ptr reason;
 		
-		read(*stream, &nonce);
-		read(*stream, &server_nonce);
+		core::read(*stream, nonce);
+		core::read(*stream, server_nonce);
 		
 		if(nonce != the_params._nonce || server_nonce != the_params._server_nonce)
 			return;
@@ -1118,71 +1126,83 @@ protected:
 			if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
 				return;
 		}
-		stream->readString(reason);
+		core::read(*stream, reason);
 		
 		conn->set_connection_state(connection::disconnected);
-		conn->on_connection_terminated(connection::reason_remote_disconnect_packet, reason);
+		conn->on_connection_terminated(reason_remote_disconnect_packet, reason);
 		remove_connection(conn);
 	}
 	
 	/// Handles an error reported while reading a packet from this remote connection.
-	void handle_connection_error(connection *the_connection, const string &error_string)
+	void handle_connection_error(connection *the_connection, byte_buffer_ptr &reason)
 	{
-		disconnect(the_connection, connection::reason_error, error_string);
+		disconnect(the_connection, reason_error, reason);
 	}
 	
 	/// Disconnects the given connection and removes it from the interface
-	void disconnect(connection *conn, connection::termination_reason reason, const string &reasonString)
+	void disconnect(connection *conn, termination_reason reason, byte_buffer_ptr &reason_buffer)
 	{
 		if(conn->get_connection_state() == connection::awaiting_challenge_response ||
 		   conn->get_connection_state() == connection::awaiting_connect_response)
 		{
-			conn->on_connect_terminated(reason, reasonString);
+			conn->on_connect_terminated(reason, reason_buffer);
 			remove_pending_connection(conn);
 		}
 		else if(conn->get_connection_state() == connection::connected)
 		{
 			conn->set_connection_state(connection::disconnected);
-			conn->on_connection_terminated(reason, reasonString);
-			if(conn->is_network_connection())
+			conn->on_connection_terminated(reason, reason_buffer);
+
+			// send a disconnect packet...
+			packet_stream out;
+			core::write(out, uint8(disconnect_packet));
+			connection_parameters &the_params = conn->get_connection_parameters();
+			core::write(out, the_params._nonce);
+			core::write(out, the_params._server_nonce);
+			uint32 encrypt_pos = out.get_byte_position();
+			out.set_byte_position(encrypt_pos);
+			core::write(out, reason_buffer);
+			
+			if(the_params._using_crypto)
 			{
-				// send a disconnect packet...
-				packet_stream out;
-				write(out, uint8(disconnect));
-				connection_parameters &the_params = conn->get_connection_parameters();
-				write(out, the_params._nonce);
-				write(out, the_params._server_nonce);
-				uint32 encrypt_pos = out.get_byte_position();
-				out.set_byte_position(encrypt_pos);
-				out.writeString(reasonString.c_str());
-				
-				if(the_params._using_crypto)
-				{
-					symmetric_cipher the_cipher(the_params._shared_secret);
-					bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
-				}
-				out.sendto(_socket, conn->get_address());
+				symmetric_cipher the_cipher(the_params._shared_secret);
+				bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
 			}
+			out.send_to(_socket, conn->get_address());
+
 			remove_connection(conn);
 		}
 	}
 	
 	/// @}
 public:
+	byte_buffer_ptr _old_connection_reason_buffer;
+	byte_buffer_ptr _new_connection_reason_buffer;
+	byte_buffer_ptr _reconnecting_reason_buffer;
+	byte_buffer_ptr _shutdown_reason_buffer;
+	byte_buffer_ptr _timed_out_reason_buffer;
+	zone_allocator _allocator;
+	
 	/// @param   bind_address    Local network address to bind this interface to.
-	interface(const address &bind_address)
+	interface(const address &bind_address) : _puzzle_manager(_random_generator, &_allocator)
 	{
-		_last_timeout_check_time = millisecondsToTime(0);
+		_old_connection_reason_buffer = new byte_buffer("OLD_CONNECTION");
+		_new_connection_reason_buffer = new byte_buffer("NEW_CONNECTION");
+		_reconnecting_reason_buffer = new byte_buffer("RECONNECTING");
+		_shutdown_reason_buffer = new byte_buffer("SHUTDOWN");
+		_timed_out_reason_buffer = new byte_buffer("TIMEDOUT");
+		
+		_last_timeout_check_time = time(0);
 		_allow_connections = true;
 		_requires_key_exchange = false;
 		
-		Random::read(_random_hash_data, sizeof(_random_hash_data));
+		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
 		
 		_connection_hash_table.resize(129);
 		for(uint32 i = 0; i < _connection_hash_table.size(); i++)
 			_connection_hash_table[i] = NULL;
 		_send_packet_list = NULL;
-		_process_start_time = GetTime();
+		_process_start_time = time::get_current();
 	}
 	
 	~interface()
@@ -1191,7 +1211,7 @@ public:
 		while(_connection_list.size())
 		{
 			connection *c = _connection_list[0];
-			disconnect(c, connection::reason_self_disconnect, "Shutdown");
+			disconnect(c, reason_self_disconnect, _shutdown_reason_buffer);
 		}
 	}
 	
@@ -1201,15 +1221,15 @@ public:
 	{
 		address the_address = _socket.get_bound_address();
 		
-		if(the_address.is_equal_address(address(address::IPProtocol, address::Any, 0)))
+		if(the_address.is_same_host(address(address::any, 0)))
 		{
 			array<address> interface_addresses;
-			udp_socket::get_interface_addresses(interface_addresses);
-			uint16 save_port = the_address.port;
+			address::get_interface_addresses(interface_addresses);
+			uint16 save_port = the_address.get_port();
 			if(interface_addresses.size())
 			{
 				the_address = interface_addresses[0];
-				the_address.port = save_port;
+				the_address.set_port(save_port);
 			}
 		}
 		return the_address;
@@ -1242,23 +1262,23 @@ public:
 	udp_socket &get_socket() { return _socket; }
 	
 	/// Sends a packet to the remote address over this interface's socket.
-	udp_socket::Status sendto(const address &address, bit_stream *stream)
+	udp_socket::send_to_result send_to(const address &the_address, bit_stream *stream)
 	{
-		return _socket.sendto(address, stream->get_buffer(), stream->get_byte_position());
+		return _socket.send_to(the_address, stream->get_buffer(), stream->get_byte_position());
 	}
 	
 	
-	/// Sends a packet to the remote address after millisecondDelay time has elapsed.
+	/// Sends a packet to the remote address after millisecond_delay time has elapsed.
 	///
 	/// This is used to simulate network latency on a LAN or single computer.
-	void sendto_delayed(const address &address, bit_stream *stream, uint32 millisecondDelay)
+	void send_to_delayed(const address &the_address, bit_stream *stream, uint32 millisecond_delay)
 	{
 		uint32 data_size = stream->get_byte_position();
 		
 		// allocate the send packet, with the data size added on
 		delay_send_packet *the_packet = (delay_send_packet *) memory_allocate(sizeof(delay_send_packet) + data_size);
-		the_packet->remote_address = address;
-		the_packet->send_time = get_process_start_time() + millisecondsToTime(millisecondDelay);
+		the_packet->remote_address = the_address;
+		the_packet->send_time = get_process_start_time() + time(millisecond_delay);
 		the_packet->packet_size = data_size;
 		memcpy(the_packet->packet_data, stream->get_buffer(), data_size);
 		
@@ -1274,19 +1294,19 @@ public:
 	void check_incoming_packets()
 	{
 		packet_stream stream;
-		udp_socket::Status error;
+		udp_socket::recv_from_result result;
 		address sourceAddress;
 		
-		_process_start_time = GetTime();
+		_process_start_time = time::get_current();
 		
 		// read out all the available packets:
-		while((error = stream.recvfrom(_socket, &sourceAddress)) == udp_socket::OK)
+		while((result = stream.recv_from(_socket, &sourceAddress)) == udp_socket::packet_received)
 			process_packet(sourceAddress, &stream);
 	}
 	
 	/// Processes a single packet, and dispatches either to handle_info_packet or to
 	/// the connection associated with the remote address.
-	virtual void process_packet(const address &address, bit_stream *packet_stream)
+	virtual void process_packet(const address &the_address, bit_stream *packet_stream)
 	{
 		
 		// Determine what to do with this packet:
@@ -1298,7 +1318,7 @@ public:
 			
 			// lookup the connection in the addressTable
 			// if this packet causes a disconnection, keep the conn around until this function exits
-			ref_ptr<connection> conn = find_connection(sourceAddress);
+			ref_ptr<connection> conn = find_connection(the_address);
 			if(conn)
 				conn->read_raw_packet(packet_stream);
 		}
@@ -1308,38 +1328,38 @@ public:
 			// connection handshake packet.
 			
 			uint8 packet_type;
-			read(*packet_stream, &packet_type);
+			core::read(*packet_stream, packet_type);
 			
 			if(packet_type >= first_valid_info_packet_id)
-				handle_info_packet(sourceAddress, packet_type, packet_stream);
+				handle_info_packet(the_address, packet_type, packet_stream);
 			else
 			{
 				// check if there's a connection already:
 				switch(packet_type)
 				{
-					case connect_challenge_request:
-						handle_connect_challenge_request(sourceAddress, packet_stream);
+					case connect_challenge_request_packet:
+						handle_connect_challenge_request(the_address, packet_stream);
 						break;
-					case connect_challenge_response:
-						handle_connect_challenge_response(sourceAddress, packet_stream);
+					case connect_challenge_response_packet:
+						handle_connect_challenge_response(the_address, packet_stream);
 						break;
-					case connect_request:
-						handle_connect_request(sourceAddress, packet_stream);
+					case connect_request_packet:
+						handle_connect_request(the_address, packet_stream);
 						break;
-					case connect_reject:
-						handle_connect_reject(sourceAddress, packet_stream);
+					case connect_reject_packet:
+						handle_connect_reject(the_address, packet_stream);
 						break;
-					case connect_accept:
-						handle_connect_accept(sourceAddress, packet_stream);
+					case connect_accept_packet:
+						handle_connect_accept(the_address, packet_stream);
 						break;
-					case disconnect:
-						handle_disconnect(sourceAddress, packet_stream);
+					case disconnect_packet:
+						handle_disconnect(the_address, packet_stream);
 						break;
-					case punch:
-						handle_punch(sourceAddress, packet_stream);
+					case punch_packet:
+						handle_punch(the_address, packet_stream);
 						break;
-					case arranged_connect_request:
-						handle_arranged_connect_request(sourceAddress, packet_stream);
+					case arranged_connect_request_packet:
+						handle_arranged_connect_request(the_address, packet_stream);
 						break;
 				}
 			}
@@ -1355,14 +1375,14 @@ public:
 	/// and pending connections.
 	void process_connections()
 	{
-		_process_start_time = GetTime();
-		_puzzle_manager.tick(_process_start_time);
+		_process_start_time = time::get_current();
+		_puzzle_manager.tick(_process_start_time, _random_generator);
 		
 		// first see if there are any delayed packets that need to be sent...
 		while(_send_packet_list && _send_packet_list->send_time < get_process_start_time())
 		{
 			delay_send_packet *next = _send_packet_list->next_packet;
-			_socket.sendto(_send_packet_list->remote_address,
+			_socket.send_to(_send_packet_list->remote_address,
 						   _send_packet_list->packet_data, _send_packet_list->packet_size);
 			memory_deallocate(_send_packet_list);
 			_send_packet_list = next;
@@ -1371,7 +1391,7 @@ public:
 		for(uint32 i = 0; i < _connection_list.size(); i++)
 			_connection_list[i]->check_packet_send(false, get_process_start_time());
 		
-		if(get_process_start_time() > _last_timeout_check_time + millisecondsToTime(timeout_check_interval))
+		if(get_process_start_time() > _last_timeout_check_time + time(timeout_check_interval))
 		{
 			for(uint32 i = 0; i < _pending_connections.size();)
 			{
@@ -1379,12 +1399,12 @@ public:
 				
 				if(pending->get_connection_state() == connection::awaiting_challenge_response &&
 				   get_process_start_time() > pending->_connect_last_send_time + 
-				   millisecondsToTime(challenge_retry_time))
+				   time(challenge_retry_time))
 				{
 					if(pending->_connect_send_count > challenge_retry_count)
 					{
 						pending->set_connection_state(connection::connect_timed_out);
-						pending->on_connect_terminated(connection::reason_timed_out, "Timeout");
+						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
 						remove_pending_connection(pending);
 						continue;
 					}
@@ -1393,12 +1413,12 @@ public:
 				}
 				else if(pending->get_connection_state() == connection::awaiting_connect_response &&
 						get_process_start_time() > pending->_connect_last_send_time + 
-						millisecondsToTime(connect_retry_time))
+						time(connect_retry_time))
 				{
 					if(pending->_connect_send_count > connect_retry_count)
 					{
 						pending->set_connection_state(connection::connect_timed_out);
-						pending->on_connect_terminated(connection::reason_timed_out, "Timeout");
+						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
 						remove_pending_connection(pending);
 						continue;
 					}
@@ -1411,12 +1431,12 @@ public:
 					}
 				}
 				else if(pending->get_connection_state() == connection::sending_punch_packets &&
-						get_process_start_time() > pending->_connect_last_send_time + millisecondsToTime(punch_retry_time))
+						get_process_start_time() > pending->_connect_last_send_time + time(punch_retry_time))
 				{
 					if(pending->_connect_send_count > punch_retry_count)
 					{
 						pending->set_connection_state(connection::connect_timed_out);
-						pending->on_connect_terminated(connection::reason_timed_out, "Timeout");
+						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
 						remove_pending_connection(pending);
 						continue;
 					}
@@ -1425,10 +1445,10 @@ public:
 				}
 				else if(pending->get_connection_state() == connection::computing_puzzle_solution &&
 						get_process_start_time() > pending->_connect_last_send_time + 
-						millisecondsToTime(puzzle_solution_timeout))
+						time(puzzle_solution_timeout))
 				{
 					pending->set_connection_state(connection::connect_timed_out);
-					pending->on_connect_terminated(connection::reason_timed_out, "Timeout");
+					pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
 					remove_pending_connection(pending);
 				}
 				i++;
@@ -1440,7 +1460,7 @@ public:
 				if(_connection_list[i]->check_timeout(get_process_start_time()))
 				{
 					_connection_list[i]->set_connection_state(connection::timed_out);
-					_connection_list[i]->on_connection_terminated(connection::reason_timed_out, "Timeout");
+					_connection_list[i]->on_connection_terminated(reason_timed_out, _timed_out_reason_buffer);
 					remove_connection(_connection_list[i]);
 				}
 				else
@@ -1470,14 +1490,14 @@ public:
 		// resolved to the next open space in the table.
 		
 		// Compute the hash index based on the network address
-		uint32 hash_index = addr.hash() % _connection_hash_table.size();
+		uint32 hash_index = remote_address.hash() % _connection_hash_table.size();
 		
 		// Search through the table for an address that matches the source
 		// address.  If the connection pointer is NULL, we've found an
 		// empty space and a connection with that address is not in the table
 		while(_connection_hash_table[hash_index] != NULL)
 		{
-			if(addr == _connection_hash_table[hash_index]->get_address())
+			if(remote_address == _connection_hash_table[hash_index]->get_address())
 				return _connection_hash_table[hash_index];
 			hash_index++;
 			if(hash_index >= (uint32) _connection_hash_table.size())

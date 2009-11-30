@@ -131,6 +131,10 @@ struct address
 	{
 		return _host == the_address._host && _port == the_address._port;
 	}
+	bool is_same_host(const address &the_address) const
+	{
+		return _host == the_address._host;
+	}
 
 	bool operator!=(const address &the_address) const
 	{

@@ -1,7 +1,7 @@
 /// Class for symmetric encryption of data across a connection.  Internally it uses
 /// the libtomcrypt AES algorithm to encrypt the data.
 
-class symmetric_cipher
+class symmetric_cipher : public ref_object
 {
 	public:
 	enum {
@@ -29,7 +29,7 @@ class symmetric_cipher
 		_pad_len = 0;
 	}
 
-	symmetric_cipher(const byte_stream_fixed *the_bytes)
+	symmetric_cipher(const byte_buffer_ptr the_bytes)
 	{
 		if(the_bytes->get_buffer_size() != key_size * 2)
 		{

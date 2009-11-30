@@ -127,14 +127,14 @@ public:
 	byte_buffer_ptr get_payload() { return _payload; }
 };
 
-inline void read(bit_stream &str, ref_ptr<certificate> &the_certificate)
+static inline void read(bit_stream &str, ref_ptr<certificate> &the_certificate)
 {
 	byte_buffer_ptr theBuffer;
 	core::read(str, theBuffer);
 	the_certificate = new certificate(theBuffer);
 }
 
-inline void write(bit_stream &str, const ref_ptr<certificate> &the_certificate)
+static inline void write(bit_stream &str, const ref_ptr<certificate> &the_certificate)
 {
 	core::write(str, the_certificate->get_certificate_data());
 }
