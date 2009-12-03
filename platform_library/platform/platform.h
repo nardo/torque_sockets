@@ -38,12 +38,18 @@ static const char *compiler_string = "GNU C Compiler";
 #  error "Unknown Compiler"
 #endif
 
-#if defined(_M_IX86) || defined(i386)
+#if defined(_M_IX86) || defined(i386) || defined(__x86_64__)
 	static const char *cpu_string = "Intel x86";
 	#define CPU_X86
     #ifndef LITTLE_ENDIAN
 	#define LITTLE_ENDIAN
     #endif
+
+	#ifdef x86_64
+	#define CPU_64BIT
+	#else
+	#define CPU_32BIT
+	#endif
 
 	#if defined (__GNUC__)
 		#define INLINE_ASM_STYLE_GCC_X86
