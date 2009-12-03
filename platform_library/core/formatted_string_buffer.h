@@ -37,7 +37,7 @@ public:
 		return format(fmt, args);
 	}
 
-	int32 format(const char8 *fmt, void *args)
+	int32 format(const char8 *fmt, va_list args)
 	{
 		if(_dynamic_buffer)
 		{
@@ -45,7 +45,7 @@ public:
 			_dynamic_buffer = 0;
 		}
 		
-		_len = vsnprintf(_fixed_buffer, sizeof(_fixed_buffer), fmt, (char *) args);
+		_len = vsnprintf(_fixed_buffer, sizeof(_fixed_buffer), fmt, args);
 		if(_len < sizeof(_fixed_buffer))
 			return _len;
 		
@@ -54,7 +54,7 @@ public:
 		{
 			_dynamic_size *= 2;
 			_dynamic_buffer = (char8 *) memory_reallocate(_dynamic_buffer, _dynamic_size, false);
-			_len = vsnprintf(_dynamic_buffer, _dynamic_size, fmt, (char *) args);
+			_len = vsnprintf(_dynamic_buffer, _dynamic_size, fmt, args);
 			if(_len < _dynamic_size)
 			{
 				// trim off the remainder of the allocation
@@ -96,10 +96,10 @@ public:
 		return format_buffer(buffer, buffer_size, fmt, args);
 	}
 		
-	static int32 format_buffer(char8 *buffer, uint32 buffer_size, const char8 *fmt, void *args)
+	static int32 format_buffer(char8 *buffer, uint32 buffer_size, const char8 *fmt, va_list args)
 	{
 		assert(buffer_size > 0);
-		int32 len = vsnprintf(buffer, buffer_size, fmt, (char *) args);
+		int32 len = vsnprintf(buffer, buffer_size, fmt, args);
 		buffer[buffer_size - 1] = 0;
 		return len;
 	}
