@@ -9,27 +9,18 @@ namespace core
 
 };
 
-namespace net
-{
-	using namespace core;
-	struct internal {
-		#include "crypto/crypto.h"
-		#include "net/net.h"
-	};
-	typedef internal::address address;
-	typedef internal::udp_socket udp_socket;
-	typedef internal::time time;
-	typedef internal::interface interface;
-	typedef internal::connection connection;
+using namespace core;
+struct net {
+	#include "net/net.h"
 };
 
-using namespace core;
 struct nat_discovery {
 #include "nat_discovery.h"
 };
 
 int main(int argc, const char **argv)
 {
+	ltc_mp = ltm_desc;
 	net::address bind_address(net::address::any, 0);
 	
 	ref_ptr<net::interface> my_interface = new net::interface(bind_address);

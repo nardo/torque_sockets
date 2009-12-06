@@ -1,5 +1,5 @@
-/// The Random class encapsulates a cryptographically secure
-/// pseudo random number generator (PRNG).  Internally the Random class
+/// The random_generator class encapsulates a cryptographically secure
+/// pseudo random number generator (PRNG).  Internally the random_generator class
 /// uses the Yarrow PRNG algorithm.
 class random_generator
 {

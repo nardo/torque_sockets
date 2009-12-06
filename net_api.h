@@ -27,11 +27,8 @@ class interface
 	// a single interface is not thread safe, although you can have different
 	// interfaces used by different threads
 	
-	set_certificate(certificate *the_cert)
-	
 	typedef void (*packet_process_function)(interface, address, buffer);
 	typedef void (*connect_request_process_function)(interface, address, buffer);
-	
 		
 	void set_packet_process_function(packet_process_function the_func);
 	void set_connect_request_process_function(connect_request_process_function the_func);
@@ -44,7 +41,7 @@ class interface
 		// processes connection requests and timeouts
 	    // continues puzzle solutions
 	
-	connection *coonect(address remote_host, buffer)
+	connection *connect(address remote_host, buffer)
 	connection *connect_arranged(client_identity_buffer, connection *referring_connection, buffer)  
 }
 

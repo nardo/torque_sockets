@@ -6,7 +6,7 @@
 ///
 /// <b>Connection handshaking basic overview:</b>
 ///
-/// TNL does a two phase connect handshake to prevent a several types of
+/// TNP does a two phase connect handshake to prevent a several types of
 /// Denial-of-Service (DoS) attacks.
 ///
 /// The initiator of the connection (client) starts the connection by sending
@@ -48,15 +48,9 @@
 /// are the initial send and receive sequence numbers for the connection, and the
 /// key2 value becomes the IV of the symmetric cipher.  The connection subclass is
 /// also allowed to write any connection specific data into this packet.
-///
-/// This system can operate in one of 3 ways: unencrypted, encrypted key exchange (ECDH),
-/// or encrypted key exchange with server and/or client signed certificates (ECDSA).
 /// 
-/// The unencrypted communication mode is NOT secure.  Packets en route between hosts
-/// can be modified without detection by the hosts at either end.  Connections using
-/// the secure key exchange are still vulnerable to Man-in-the-middle attacks, but still
-/// much more secure than the unencrypted channels.  Using certificate(s) signed by a
-/// trusted certificate authority (CA), makes the communications channel as securely
+/// Connections using the secure key exchange are still vulnerable to Man-in-the-middle attacks.
+/// Using a key signed by a trusted certificate authority (CA), makes the communications channel as securely
 /// trusted as the trust in the CA.
 ///
 /// <b>Arranged Connection handshaking:</b>
@@ -83,8 +77,7 @@
 /// for the non-initiator, and the nonce for the initiator encrypted
 /// with the shared secret.
 /// The ArrangedPunch packet for the receiver of the connection
-/// contains all that, plus the public key/key_size or the certificate
-/// of the receiver.
+/// contains all that, plus the public key/key_size of the receiver.
 
 class connection;
 struct connection_parameters;
@@ -93,11 +86,279 @@ class interface : public ref_object
 {
 	friend class connection;
 public:
-	random_generator _random_generator;
+	enum termination_reason {
+		reason_timed_out,
+		reason_failed_connect_handshake,
+		reason_remote_host_rejected_connection,
+		reason_remote_disconnect_packet,
+		reason_duplicate_connection_attempt,
+		reason_self_disconnect,
+		reason_error,
+	};
+		
+	/// @param   bind_address    Local network address to bind this interface to.
+	interface(const address &bind_address) : _puzzle_manager(_random_generator, &_allocator)
+	{
+		_old_connection_reason_buffer = new byte_buffer("OLD_CONNECTION");
+		_new_connection_reason_buffer = new byte_buffer("NEW_CONNECTION");
+		_reconnecting_reason_buffer = new byte_buffer("RECONNECTING");
+		_shutdown_reason_buffer = new byte_buffer("SHUTDOWN");
+		_timed_out_reason_buffer = new byte_buffer("TIMEDOUT");
+		_private_key = new asymmetric_key(20);
+		
+		_last_timeout_check_time = time(0);
+		_allow_connections = true;
+		
+		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
+		
+		_connection_hash_table.resize(129);
+		for(uint32 i = 0; i < _connection_hash_table.size(); i++)
+			_connection_hash_table[i] = NULL;
+		_send_packet_list = NULL;
+		_process_start_time = time::get_current();
+	}
+	
+	~interface()
+	{
+		// gracefully close all the connections on this interface:
+		while(_connection_list.size())
+		{
+			connection *c = _connection_list[0];
+			disconnect(c, reason_self_disconnect, _shutdown_reason_buffer);
+		}
+	}
+	
+	
+	/// Returns the address of the first network interface in the list that the socket on this interface is bound to.
+	address get_first_bound_interface_address()
+	{
+		address the_address = _socket.get_bound_address();
+		
+		if(the_address.is_same_host(address(address::any, 0)))
+		{
+			array<address> interface_addresses;
+			address::get_interface_addresses(interface_addresses);
+			uint16 save_port = the_address.get_port();
+			if(interface_addresses.size())
+			{
+				the_address = interface_addresses[0];
+				the_address.set_port(save_port);
+			}
+		}
+		return the_address;
+	}
+	
+	
+	/// Sets the private key this interface will use for authentication and key exchange
+	void set_private_key(asymmetric_key *the_key)
+	{
+		_private_key = the_key;
+	}
+	
+	/// Returns whether or not this interface allows connections from remote hosts.
+	bool does_allow_connections() { return _allow_connections; }
+	
+	/// Sets whether or not this interface allows connections from remote hosts.
+	void set_allows_connections(bool conn) { _allow_connections = conn; }
+	
+	/// Returns the Socket associated with this interface
+	udp_socket &get_socket() { return _socket; }
+	
+	/// Sends a packet to the remote address over this interface's socket.
+	udp_socket::send_to_result send_to(const address &the_address, bit_stream &stream)
+	{
+		return _socket.send_to(the_address, stream.get_buffer(), stream.get_byte_position());
+	}
+	
+	
+	/// Sends a packet to the remote address after millisecond_delay time has elapsed.
+	///
+	/// This is used to simulate network latency on a LAN or single computer.
+	void send_to_delayed(const address &the_address, bit_stream &stream, uint32 millisecond_delay)
+	{
+		uint32 data_size = stream.get_byte_position();
+		
+		// allocate the send packet, with the data size added on
+		delay_send_packet *the_packet = (delay_send_packet *) memory_allocate(sizeof(delay_send_packet) + data_size);
+		the_packet->remote_address = the_address;
+		the_packet->send_time = get_process_start_time() + time(millisecond_delay);
+		the_packet->packet_size = data_size;
+		memcpy(the_packet->packet_data, stream.get_buffer(), data_size);
+		
+		// insert it into the delay_send_packet list, sorted by time
+		delay_send_packet **list;
+		for(list = &_send_packet_list; *list && ((*list)->send_time <= the_packet->send_time); list = &((*list)->next_packet))
+			;
+		the_packet->next_packet = *list;
+		*list = the_packet;
+	}
+	
+	/// Dispatch function for processing all network packets through this interface.
+	void check_incoming_packets()
+	{
+		packet_stream stream;
+		udp_socket::recv_from_result result;
+		address sourceAddress;
+		
+		_process_start_time = time::get_current();
+		
+		// read out all the available packets:
+		while((result = stream.recv_from(_socket, &sourceAddress)) == udp_socket::packet_received)
+			process_packet(sourceAddress, stream);
+	}
+	
+	/// returns the current process time for this interface
+	time get_process_start_time() { return _process_start_time; }
+	
+	/// Disconnects the given connection and removes it from the interface
+	void disconnect(connection *conn, termination_reason reason, byte_buffer_ptr &reason_buffer)
+	{
+		if(conn->get_connection_state() == connection::awaiting_challenge_response ||
+		   conn->get_connection_state() == connection::awaiting_connect_response)
+		{
+			conn->on_connect_terminated(reason, reason_buffer);
+			remove_pending_connection(conn);
+		}
+		else if(conn->get_connection_state() == connection::connected)
+		{
+			conn->set_connection_state(connection::disconnected);
+			conn->on_connection_terminated(reason, reason_buffer);
+			
+			// send a disconnect packet...
+			packet_stream out;
+			core::write(out, uint8(disconnect_packet));
+			connection_parameters &the_params = conn->get_connection_parameters();
+			core::write(out, the_params._nonce);
+			core::write(out, the_params._server_nonce);
+			uint32 encrypt_pos = out.get_byte_position();
+			out.set_byte_position(encrypt_pos);
+			core::write(out, reason_buffer);
+			
+			symmetric_cipher the_cipher(the_params._shared_secret);
+			bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
+			
+			out.send_to(_socket, conn->get_address());
+			
+			remove_connection(conn);
+		}
+	}
+	/// Handles all packets that don't fall into the category of connection handshake or game data.
+	virtual void handle_info_packet(const address &address, uint8 packet_type, bit_stream &stream)
+	{}
+	
+	/// Checks all connections on this interface for packet sends, and for timeouts and all valid
+	/// and pending connections.
+	void process_connections()
+	{
+		_process_start_time = time::get_current();
+		_puzzle_manager.tick(_process_start_time, _random_generator);
+		
+		// first see if there are any delayed packets that need to be sent...
+		while(_send_packet_list && _send_packet_list->send_time < get_process_start_time())
+		{
+			delay_send_packet *next = _send_packet_list->next_packet;
+			_socket.send_to(_send_packet_list->remote_address,
+							_send_packet_list->packet_data, _send_packet_list->packet_size);
+			memory_deallocate(_send_packet_list);
+			_send_packet_list = next;
+		}
+		
+		for(uint32 i = 0; i < _connection_list.size(); i++)
+			_connection_list[i]->check_packet_send(false, get_process_start_time());
+		
+		if(get_process_start_time() > _last_timeout_check_time + time(timeout_check_interval))
+		{
+			for(uint32 i = 0; i < _pending_connections.size();)
+			{
+				connection *pending = _pending_connections[i];
+				
+				if(pending->get_connection_state() == connection::awaiting_challenge_response &&
+				   get_process_start_time() > pending->_connect_last_send_time + 
+				   time(challenge_retry_time))
+				{
+					if(pending->_connect_send_count > challenge_retry_count)
+					{
+						pending->set_connection_state(connection::connect_timed_out);
+						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
+						remove_pending_connection(pending);
+						continue;
+					}
+					else
+						send_connect_challenge_request(pending);
+				}
+				else if(pending->get_connection_state() == connection::awaiting_connect_response &&
+						get_process_start_time() > pending->_connect_last_send_time + 
+						time(connect_retry_time))
+				{
+					if(pending->_connect_send_count > connect_retry_count)
+					{
+						pending->set_connection_state(connection::connect_timed_out);
+						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
+						remove_pending_connection(pending);
+						continue;
+					}
+					else
+					{
+						if(pending->get_connection_parameters()._is_arranged)
+							send_arranged_connect_request(pending);
+						else
+							send_connect_request(pending);
+					}
+				}
+				else if(pending->get_connection_state() == connection::sending_punch_packets &&
+						get_process_start_time() > pending->_connect_last_send_time + time(punch_retry_time))
+				{
+					if(pending->_connect_send_count > punch_retry_count)
+					{
+						pending->set_connection_state(connection::connect_timed_out);
+						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
+						remove_pending_connection(pending);
+						continue;
+					}
+					else
+						send_punch_packets(pending);
+				}
+				else if(pending->get_connection_state() == connection::computing_puzzle_solution &&
+						get_process_start_time() > pending->_connect_last_send_time + 
+						time(puzzle_solution_timeout))
+				{
+					pending->set_connection_state(connection::connect_timed_out);
+					pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
+					remove_pending_connection(pending);
+				}
+				i++;
+			}
+			_last_timeout_check_time = get_process_start_time();
+			
+			for(uint32 i = 0; i < _connection_list.size();)
+			{
+				if(_connection_list[i]->check_timeout(get_process_start_time()))
+				{
+					_connection_list[i]->set_connection_state(connection::timed_out);
+					_connection_list[i]->on_connection_terminated(reason_timed_out, _timed_out_reason_buffer);
+					remove_connection(_connection_list[i]);
+				}
+				else
+					i++;
+			}
+		}
+		
+		// check if we're trying to solve any client connection puzzles
+		for(uint32 i = 0; i < _pending_connections.size(); i++)
+		{
+			if(_pending_connections[i]->get_connection_state() == connection::computing_puzzle_solution)
+			{
+				continue_puzzle_solution(_pending_connections[i]);
+				break;
+			}
+		}
+	}
+	
 	random_generator &random() {
 		return _random_generator;
 	}
 	
+protected:
 	/// packet_type is encoded as the first byte of each packet.
 	///
 	/// Subclasses of interface can add custom, non-connected data
@@ -119,17 +380,16 @@ public:
 		disconnect_packet = 5, ///< A packet sent to notify a host that the specified connection has terminated.
 		punch_packet = 6, ///< A packet sent in order to create a hole in a firewall or NAT so packets from the remote host can be received.
 		arranged_connect_request_packet = 7, ///< A connection request for an "arranged" connection.
-		first_valid_info_packet_id        = 8, ///< The first valid ID for a interface subclass's info packets.
+		first_valid_info_packet_id  = 8, ///< The first valid ID for a interface subclass's info packets.
 	};
 	
-protected:
-	array<ref_ptr<connection> > _connection_list;      ///< List of all the connections that are in a connected state on this interface.
+	array<ref_ptr<connection> > _connection_list; ///< List of all the connections that are in a connected state on this interface.
 	array<connection *> _connection_hash_table; ///< A resizable hash table for all connected connections.  This is a flat hash table (no buckets).
 	
 	array<ref_ptr<connection> > _pending_connections; ///< List of connections that are in the startup state, where the remote host has not fully
 	///  validated the connection.
 	
-	ref_ptr<asymmetric_key> _private_key;  ///< The private key used by this interface for secure key exchange.
+	ref_ptr<asymmetric_key> _private_key; ///< The private key used by this interface for secure key exchange.
 	client_puzzle_manager _puzzle_manager; ///< The ref_object that tracks the current client puzzle difficulty, current puzzle and solutions for this interface.
 	
 	/// @name NetInterfaceSocket Socket
@@ -139,15 +399,22 @@ protected:
 	/// @{
 	
 	///
-	udp_socket    _socket;   ///< Network socket this interface communicates over.
+	udp_socket _socket; ///< Network socket this interface communicates over.
+	random_generator _random_generator;
+	byte_buffer_ptr _old_connection_reason_buffer;
+	byte_buffer_ptr _new_connection_reason_buffer;
+	byte_buffer_ptr _reconnecting_reason_buffer;
+	byte_buffer_ptr _shutdown_reason_buffer;
+	byte_buffer_ptr _timed_out_reason_buffer;
+	zone_allocator _allocator;
 	
 	/// @}
 	
-	time _process_start_time;      ///< Current time tracked by this interface.
-	bool _requires_key_exchange;   ///< True if all connections outgoing and incoming require key exchange.
-	time _last_timeout_check_time;  ///< Last time all the active connections were checked for timeouts.
-	uint8  _random_hash_data[12];    ///< Data that gets hashed with connect challenge requests to prevent connection spoofing.
-	bool _allow_connections;      ///< Set if this interface allows connections from remote instances.
+	time _process_start_time; ///< Current time tracked by this interface.
+	bool _requires_key_exchange; ///< True if all connections outgoing and incoming require key exchange.
+	time _last_timeout_check_time; ///< Last time all the active connections were checked for timeouts.
+	uint8  _random_hash_data[12]; ///< Data that gets hashed with connect challenge requests to prevent connection spoofing.
+	bool _allow_connections; ///< Set if this interface allows connections from remote instances.
 	
 	/// Structure used to track packets that are delayed in sending for simulating a high-latency connection.
 	///
@@ -155,36 +422,26 @@ protected:
 	struct delay_send_packet
 	{
 		delay_send_packet *next_packet; ///< The next packet in the list of delayed packets.
-		address remote_address;    ///< The address to send this packet to.
-		time send_time;                ///< time when we should send the packet.
-		uint32 packet_size;              ///< Size, in bytes, of the packet data.
-		uint8 packet_data[1];            ///< Packet data.
+		address remote_address; ///< The address to send this packet to.
+		time send_time; ///< time when we should send the packet.
+		uint32 packet_size; ///< Size, in bytes, of the packet data.
+		uint8 packet_data[1]; ///< Packet data.
 	};
 	delay_send_packet *_send_packet_list; ///< List of delayed packets pending to send.
 	
 	
 	enum interface_constants {
-		challenge_retry_count = 4,     ///< Number of times to send connect challenge requests before giving up.
-		challenge_retry_time = 2500,   ///< Timeout interval in milliseconds before retrying connect challenge.
+		challenge_retry_count = 4, ///< Number of times to send connect challenge requests before giving up.
+		challenge_retry_time = 2500, ///< Timeout interval in milliseconds before retrying connect challenge.
 		
-		connect_retry_count = 4,       ///< Number of times to send connect requests before giving up.
-		connect_retry_time = 2500,     ///< Timeout interval in milliseconds before retrying connect request.
+		connect_retry_count = 4, ///< Number of times to send connect requests before giving up.
+		connect_retry_time = 2500, ///< Timeout interval in milliseconds before retrying connect request.
 		
-		punch_retry_count = 6,         ///< Number of times to send groups of firewall punch packets before giving up.
-		punch_retry_time = 2500,       ///< Timeout interval in milliseconds before retrying punch sends.
+		punch_retry_count = 6, ///< Number of times to send groups of firewall punch packets before giving up.
+		punch_retry_time = 2500, ///< Timeout interval in milliseconds before retrying punch sends.
 		
 		timeout_check_interval = 1500, ///< Interval in milliseconds between checking for connection timeouts.
 		puzzle_solution_timeout = 30000, ///< If the server gives us a puzzle that takes more than 30 seconds, time out.
-	};
-	
-	enum termination_reason {
-		reason_timed_out,
-		reason_failed_connect_handshake,
-		reason_remote_host_rejected_connection,
-		reason_remote_disconnect_packet,
-		reason_duplicate_connection_attempt,
-		reason_self_disconnect,
-		reason_error,
 	};
 	
 	/// Computes an identity token for the connecting client based on the address of the client and the
@@ -1067,162 +1324,11 @@ protected:
 		disconnect(the_connection, reason_error, reason);
 	}
 	
-	/// Disconnects the given connection and removes it from the interface
-	void disconnect(connection *conn, termination_reason reason, byte_buffer_ptr &reason_buffer)
-	{
-		if(conn->get_connection_state() == connection::awaiting_challenge_response ||
-		   conn->get_connection_state() == connection::awaiting_connect_response)
-		{
-			conn->on_connect_terminated(reason, reason_buffer);
-			remove_pending_connection(conn);
-		}
-		else if(conn->get_connection_state() == connection::connected)
-		{
-			conn->set_connection_state(connection::disconnected);
-			conn->on_connection_terminated(reason, reason_buffer);
-
-			// send a disconnect packet...
-			packet_stream out;
-			core::write(out, uint8(disconnect_packet));
-			connection_parameters &the_params = conn->get_connection_parameters();
-			core::write(out, the_params._nonce);
-			core::write(out, the_params._server_nonce);
-			uint32 encrypt_pos = out.get_byte_position();
-			out.set_byte_position(encrypt_pos);
-			core::write(out, reason_buffer);
-			
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
-
-			out.send_to(_socket, conn->get_address());
-
-			remove_connection(conn);
-		}
-	}
-	
 	/// @}
-public:
-	byte_buffer_ptr _old_connection_reason_buffer;
-	byte_buffer_ptr _new_connection_reason_buffer;
-	byte_buffer_ptr _reconnecting_reason_buffer;
-	byte_buffer_ptr _shutdown_reason_buffer;
-	byte_buffer_ptr _timed_out_reason_buffer;
-	zone_allocator _allocator;
-	
-	/// @param   bind_address    Local network address to bind this interface to.
-	interface(const address &bind_address) : _puzzle_manager(_random_generator, &_allocator)
-	{
-		_old_connection_reason_buffer = new byte_buffer("OLD_CONNECTION");
-		_new_connection_reason_buffer = new byte_buffer("NEW_CONNECTION");
-		_reconnecting_reason_buffer = new byte_buffer("RECONNECTING");
-		_shutdown_reason_buffer = new byte_buffer("SHUTDOWN");
-		_timed_out_reason_buffer = new byte_buffer("TIMEDOUT");
-		_private_key = new asymmetric_key(20);
-		
-		_last_timeout_check_time = time(0);
-		_allow_connections = true;
-		
-		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
-		
-		_connection_hash_table.resize(129);
-		for(uint32 i = 0; i < _connection_hash_table.size(); i++)
-			_connection_hash_table[i] = NULL;
-		_send_packet_list = NULL;
-		_process_start_time = time::get_current();
-	}
-	
-	~interface()
-	{
-		// gracefully close all the connections on this interface:
-		while(_connection_list.size())
-		{
-			connection *c = _connection_list[0];
-			disconnect(c, reason_self_disconnect, _shutdown_reason_buffer);
-		}
-	}
-	
-	
-	/// Returns the address of the first network interface in the list that the socket on this interface is bound to.
-	address get_first_bound_interface_address()
-	{
-		address the_address = _socket.get_bound_address();
-		
-		if(the_address.is_same_host(address(address::any, 0)))
-		{
-			array<address> interface_addresses;
-			address::get_interface_addresses(interface_addresses);
-			uint16 save_port = the_address.get_port();
-			if(interface_addresses.size())
-			{
-				the_address = interface_addresses[0];
-				the_address.set_port(save_port);
-			}
-		}
-		return the_address;
-	}
-	
-	
-	/// Sets the private key this interface will use for authentication and key exchange
-	void set_private_key(asymmetric_key *the_key)
-	{
-		_private_key = the_key;
-	}
-	
-	/// Returns whether or not this interface allows connections from remote hosts.
-	bool does_allow_connections() { return _allow_connections; }
-	
-	/// Sets whether or not this interface allows connections from remote hosts.
-	void set_allows_connections(bool conn) { _allow_connections = conn; }
-	
-	/// Returns the Socket associated with this interface
-	udp_socket &get_socket() { return _socket; }
-	
-	/// Sends a packet to the remote address over this interface's socket.
-	udp_socket::send_to_result send_to(const address &the_address, bit_stream &stream)
-	{
-		return _socket.send_to(the_address, stream.get_buffer(), stream.get_byte_position());
-	}
-	
-	
-	/// Sends a packet to the remote address after millisecond_delay time has elapsed.
-	///
-	/// This is used to simulate network latency on a LAN or single computer.
-	void send_to_delayed(const address &the_address, bit_stream &stream, uint32 millisecond_delay)
-	{
-		uint32 data_size = stream.get_byte_position();
-		
-		// allocate the send packet, with the data size added on
-		delay_send_packet *the_packet = (delay_send_packet *) memory_allocate(sizeof(delay_send_packet) + data_size);
-		the_packet->remote_address = the_address;
-		the_packet->send_time = get_process_start_time() + time(millisecond_delay);
-		the_packet->packet_size = data_size;
-		memcpy(the_packet->packet_data, stream.get_buffer(), data_size);
-		
-		// insert it into the delay_send_packet list, sorted by time
-		delay_send_packet **list;
-		for(list = &_send_packet_list; *list && ((*list)->send_time <= the_packet->send_time); list = &((*list)->next_packet))
-			;
-		the_packet->next_packet = *list;
-		*list = the_packet;
-	}
-	
-	/// Dispatch function for processing all network packets through this interface.
-	void check_incoming_packets()
-	{
-		packet_stream stream;
-		udp_socket::recv_from_result result;
-		address sourceAddress;
-		
-		_process_start_time = time::get_current();
-		
-		// read out all the available packets:
-		while((result = stream.recv_from(_socket, &sourceAddress)) == udp_socket::packet_received)
-			process_packet(sourceAddress, stream);
-	}
-	
+
 	/// Processes a single packet, and dispatches either to handle_info_packet or to
 	/// the connection associated with the remote address.
-	virtual void process_packet(const address &the_address, bit_stream &packet_stream)
+	void process_packet(const address &the_address, bit_stream &packet_stream)
 	{
 		
 		// Determine what to do with this packet:
@@ -1283,118 +1389,6 @@ public:
 	}
 	
 	
-	/// Handles all packets that don't fall into the category of connection handshake or game data.
-	virtual void handle_info_packet(const address &address, uint8 packet_type, bit_stream &stream)
-	{}
-	
-	/// Checks all connections on this interface for packet sends, and for timeouts and all valid
-	/// and pending connections.
-	void process_connections()
-	{
-		_process_start_time = time::get_current();
-		_puzzle_manager.tick(_process_start_time, _random_generator);
-		
-		// first see if there are any delayed packets that need to be sent...
-		while(_send_packet_list && _send_packet_list->send_time < get_process_start_time())
-		{
-			delay_send_packet *next = _send_packet_list->next_packet;
-			_socket.send_to(_send_packet_list->remote_address,
-						   _send_packet_list->packet_data, _send_packet_list->packet_size);
-			memory_deallocate(_send_packet_list);
-			_send_packet_list = next;
-		}
-		
-		for(uint32 i = 0; i < _connection_list.size(); i++)
-			_connection_list[i]->check_packet_send(false, get_process_start_time());
-		
-		if(get_process_start_time() > _last_timeout_check_time + time(timeout_check_interval))
-		{
-			for(uint32 i = 0; i < _pending_connections.size();)
-			{
-				connection *pending = _pending_connections[i];
-				
-				if(pending->get_connection_state() == connection::awaiting_challenge_response &&
-				   get_process_start_time() > pending->_connect_last_send_time + 
-				   time(challenge_retry_time))
-				{
-					if(pending->_connect_send_count > challenge_retry_count)
-					{
-						pending->set_connection_state(connection::connect_timed_out);
-						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
-						remove_pending_connection(pending);
-						continue;
-					}
-					else
-						send_connect_challenge_request(pending);
-				}
-				else if(pending->get_connection_state() == connection::awaiting_connect_response &&
-						get_process_start_time() > pending->_connect_last_send_time + 
-						time(connect_retry_time))
-				{
-					if(pending->_connect_send_count > connect_retry_count)
-					{
-						pending->set_connection_state(connection::connect_timed_out);
-						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
-						remove_pending_connection(pending);
-						continue;
-					}
-					else
-					{
-						if(pending->get_connection_parameters()._is_arranged)
-							send_arranged_connect_request(pending);
-						else
-							send_connect_request(pending);
-					}
-				}
-				else if(pending->get_connection_state() == connection::sending_punch_packets &&
-						get_process_start_time() > pending->_connect_last_send_time + time(punch_retry_time))
-				{
-					if(pending->_connect_send_count > punch_retry_count)
-					{
-						pending->set_connection_state(connection::connect_timed_out);
-						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
-						remove_pending_connection(pending);
-						continue;
-					}
-					else
-						send_punch_packets(pending);
-				}
-				else if(pending->get_connection_state() == connection::computing_puzzle_solution &&
-						get_process_start_time() > pending->_connect_last_send_time + 
-						time(puzzle_solution_timeout))
-				{
-					pending->set_connection_state(connection::connect_timed_out);
-					pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
-					remove_pending_connection(pending);
-				}
-				i++;
-			}
-			_last_timeout_check_time = get_process_start_time();
-			
-			for(uint32 i = 0; i < _connection_list.size();)
-			{
-				if(_connection_list[i]->check_timeout(get_process_start_time()))
-				{
-					_connection_list[i]->set_connection_state(connection::timed_out);
-					_connection_list[i]->on_connection_terminated(reason_timed_out, _timed_out_reason_buffer);
-					remove_connection(_connection_list[i]);
-				}
-				else
-					i++;
-			}
-		}
-		
-		// check if we're trying to solve any client connection puzzles
-		for(uint32 i = 0; i < _pending_connections.size(); i++)
-		{
-			if(_pending_connections[i]->get_connection_state() == connection::computing_puzzle_solution)
-			{
-				continue_puzzle_solution(_pending_connections[i]);
-				break;
-			}
-		}
-	}
-	
 	
 	/// Returns the list of connections on this interface.
 	array<ref_ptr<connection> > &get_connection_list() { return _connection_list; }
@@ -1422,9 +1416,6 @@ public:
 		return NULL;
 	}
 	
-	
-	/// returns the current process time for this interface
-	time get_process_start_time() { return _process_start_time; }
 };
 
 
