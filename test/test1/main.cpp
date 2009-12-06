@@ -19,6 +19,8 @@ namespace net
 	typedef internal::address address;
 	typedef internal::udp_socket udp_socket;
 	typedef internal::time time;
+	typedef internal::interface interface;
+	typedef internal::connection connection;
 };
 
 using namespace core;
@@ -28,5 +30,9 @@ struct nat_discovery {
 
 int main(int argc, const char **argv)
 {
+	net::address bind_address(net::address::any, 0);
+	
+	ref_ptr<net::interface> my_interface = new net::interface(bind_address);
+
 	return nat_discovery::run(argc, argv);
 }

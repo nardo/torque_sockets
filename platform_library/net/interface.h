@@ -130,7 +130,6 @@ protected:
 	///  validated the connection.
 	
 	ref_ptr<asymmetric_key> _private_key;  ///< The private key used by this interface for secure key exchange.
-	ref_ptr<certificate> _certificate;   ///< A certificate, signed by some certificate Authority, to authenticate this host.
 	client_puzzle_manager _puzzle_manager; ///< The ref_object that tracks the current client puzzle difficulty, current puzzle and solutions for this interface.
 	
 	/// @name NetInterfaceSocket Socket
@@ -360,9 +359,6 @@ protected:
 		core::write(out, uint8(connect_challenge_request_packet));
 		connection_parameters &params = the_connection->get_connection_parameters();
 		core::write(out, params._nonce);
-		out.write_bool(params._request_key_exchange);
-		out.write_bool(params._request_certificate);
-		
 		the_connection->_connect_send_count++;
 		the_connection->_connect_last_send_time = get_process_start_time();
 		out.send_to(_socket, the_connection->get_address());
@@ -372,25 +368,22 @@ protected:
 	/// Handles a connect challenge request by replying to the requestor of a connection with a
 	/// unique token for that connection, as well as (possibly) a client puzzle (for DoS prevention),
 	/// or this interface's public key.
-	void handle_connect_challenge_request(const address &addr, bit_stream *stream)
+	void handle_connect_challenge_request(const address &addr, bit_stream &stream)
 	{
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Challenge Request from %s", addr.toString()));
 		
 		if(!_allow_connections)
 			return;
 		nonce client_nonce;
-		core::read(*stream, client_nonce);
-		bool wants_key_exchange = stream->read_bool();
-		bool wants_certificate = stream->read_bool();
-		
-		send_connect_challenge_response(addr, client_nonce, wants_key_exchange, wants_certificate);
+		core::read(stream, client_nonce);
+		send_connect_challenge_response(addr, client_nonce);
 	}
 	
 	
 	/// Sends a connect challenge request to the specified address.  This can happen as a result
 	/// of receiving a connect challenge request, or during an "arranged" connection for the non-initiator
 	/// of the connection.
-	void send_connect_challenge_response(const address &addr, nonce &client_nonce, bool wants_key_exchange, bool wants_certificate)
+	void send_connect_challenge_response(const address &addr, nonce &client_nonce)
 	{
 		packet_stream out;
 		core::write(out, uint8(connect_challenge_response_packet));
@@ -404,14 +397,8 @@ protected:
 		uint32 difficulty = _puzzle_manager.get_current_difficulty();
 		core::write(out, server_nonce);
 		core::write(out, difficulty);
-		
-		if(out.write_bool(_requires_key_exchange || (wants_key_exchange && !_private_key.is_null())))
-		{
-			if(out.write_bool(wants_certificate && !_certificate.is_null()))
-				write(out, _certificate);
-			else
-				core::write(out, _private_key->get_public_key());
-		}
+		core::write(out, _private_key->get_public_key());
+
 		TorqueLogMessageFormatted(LogNetInterface, ("Sending Challenge Response: %8x", identity_token));
 		
 		out.send_to(_socket, addr);
@@ -420,57 +407,43 @@ protected:
 	
 	/// Processes a connect_challenge_response, by issueing a connect request if it was for
 	/// a connection this interface has pending.
-	void handle_connect_challenge_response(const address &the_address, bit_stream *stream)
+	void handle_connect_challenge_response(const address &the_address, bit_stream &stream)
 	{
 		connection *conn = find_pending_connection(the_address);
 		if(!conn || conn->get_connection_state() != connection::awaiting_challenge_response)
 			return;
 		
 		nonce the_nonce;
-		core::read(*stream, the_nonce);
+		core::read(stream, the_nonce);
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
 		if(the_nonce != the_params._nonce)
 			return;
 		
-		core::read(*stream, the_params._client_identity);
+		core::read(stream, the_params._client_identity);
 		
 		// see if the server wants us to solve a client puzzle
-		core::read(*stream, the_params._server_nonce);
-		core::read(*stream, the_params._puzzle_difficulty);
+		core::read(stream, the_params._server_nonce);
+		core::read(stream, the_params._puzzle_difficulty);
 		
 		if(the_params._puzzle_difficulty > client_puzzle_manager::max_puzzle_difficulty)
 			return;
 		
-		// see if the connection needs to be authenticated or uses key exchange
-		if(stream->read_bool())
+		the_params._public_key = new asymmetric_key(stream);
+		if(!the_params._public_key->is_valid())
+			return;
+
+		if(_private_key.is_null() || _private_key->get_key_size() != the_params._public_key->get_key_size())
 		{
-			if(stream->read_bool())
-			{
-				the_params._certificate = new certificate(*stream);
-				if(!the_params._certificate->is_valid() || !conn->validate_certificate(the_params._certificate, true))
-					return;         
-				the_params._public_key = the_params._certificate->get_public_key();
-			}
-			else
-			{
-				the_params._public_key = new asymmetric_key(*stream);
-				if(!the_params._public_key->is_valid() || !conn->validate_public_key(the_params._public_key, true))
-					return;
-			}
-			if(_private_key.is_null() || _private_key->get_key_size() != the_params._public_key->get_key_size())
-			{
-				// we don't have a private key, so generate one for this connection
-				the_params._private_key = new asymmetric_key(the_params._public_key->get_key_size());
-			}
-			else
-				the_params._private_key = _private_key;
-			the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
-			//logprintf("shared secret (client) %s", the_params._shared_secret->encodeBase64()->get_buffer());
-			_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
-			the_params._using_crypto = true;
+			// we don't have a private key, so generate one for this connection
+			the_params._private_key = new asymmetric_key(the_params._public_key->get_key_size());
 		}
-		
+		else
+			the_params._private_key = _private_key;
+		the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
+		//logprintf("shared secret (client) %s", the_params._shared_secret->encodeBase64()->get_buffer());
+		_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
+
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Challenge Response: %8x", the_params._client_identity ));
 		
 		conn->set_connection_state(connection::computing_puzzle_solution);
@@ -491,7 +464,7 @@ protected:
 		
 		if(solved)
 		{
-			logprintf("Client puzzle solved in %d ms.", (time::get_current() - conn->_connect_last_send_time).get_milliseconds());
+			TorqueLogMessageFormatted(LogNetInterface, ("Client puzzle solved in %d ms.", (time::get_current() - conn->_connect_last_send_time).get_milliseconds()));
 			conn->set_connection_state(connection::awaiting_connect_response);
 			send_connect_request(conn);
 		}
@@ -512,28 +485,22 @@ protected:
 		core::write(out, the_params._puzzle_solution);
 		
 		uint32 encrypt_pos = 0;
-		
-		if(out.write_bool(the_params._using_crypto))
-		{
-			core::write(out, the_params._private_key->get_public_key());
-			encrypt_pos = out.get_byte_position();
-			out.set_byte_position(encrypt_pos);
-			out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
-		}
-		out.write_bool(the_params._debug_object_sizes);
+	
+		core::write(out, the_params._private_key->get_public_key());
+		encrypt_pos = out.get_byte_position();
+		out.set_byte_position(encrypt_pos);
+		out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
+
 		core::write(out, conn->get_initial_send_sequence());
-		conn->write_connect_request(&out);
+		conn->write_connect_request(out);
 		
-		if(encrypt_pos)
-		{
-			// if we're using crypto on this connection,
-			// then write a hash of everything we wrote into the packet
-			// key.  Then we'll symmetrically encrypt the packet from
-			// the end of the public key to the end of the signature.
-			
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);      
-		}
+		// if we're using crypto on this connection,
+		// then write a hash of everything we wrote into the packet
+		// key.  Then we'll symmetrically encrypt the packet from
+		// the end of the public key to the end of the signature.
+		
+		symmetric_cipher the_cipher(the_params._shared_secret);
+		bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &the_cipher);      
 		
 		conn->_connect_send_count++;
 		conn->_connect_last_send_time = get_process_start_time();
@@ -548,21 +515,21 @@ protected:
 	/// to a client puzzle this interface sent to the remote host.  If those tests
 	/// pass, it will construct a local connection instance to handle the rest of the
 	/// connection negotiation.
-	void handle_connect_request(const address &the_address, bit_stream *stream)
+	void handle_connect_request(const address &the_address, bit_stream &stream)
 	{
 		if(!_allow_connections)
 			return;
 		
 		connection_parameters the_params;
-		core::read(*stream, the_params._nonce);
-		core::read(*stream, the_params._server_nonce);
-		core::read(*stream, the_params._client_identity);
+		core::read(stream, the_params._nonce);
+		core::read(stream, the_params._server_nonce);
+		core::read(stream, the_params._client_identity);
 		
 		if(the_params._client_identity != compute_client_identity_token(the_address, the_params._nonce))
 			return;
 		
-		core::read(*stream, the_params._puzzle_difficulty);
-		core::read(*stream, the_params._puzzle_solution);
+		core::read(stream, the_params._puzzle_difficulty);
+		core::read(stream, the_params._puzzle_solution);
 		
 		// see if the connection is in the main connection table.
 		// If the connection is in the connection table and it has
@@ -591,34 +558,29 @@ protected:
 			return;
 		}
 		
-		if(stream->read_bool())
-		{
-			if(_private_key.is_null())
-				return;
-			
-			the_params._using_crypto = true;
-			the_params._public_key = new asymmetric_key(*stream);
-			the_params._private_key = _private_key;
-			
-			uint32 decrypt_pos = stream->get_byte_position();
-			
-			stream->set_byte_position(decrypt_pos);
-			the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
-			//logprintf("shared secret (server) %s", the_params._shared_secret->encodeBase64()->get_buffer());
-			
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			
-			if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
-				return;
-			
-			// now read the first part of the connection's symmetric key
-			stream->read_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
-			_random_generator.random_buffer(the_params._init_vector, symmetric_cipher::key_size);
-		}
+		if(_private_key.is_null())
+			return;
+		
+		the_params._public_key = new asymmetric_key(stream);
+		the_params._private_key = _private_key;
+		
+		uint32 decrypt_pos = stream.get_byte_position();
+		
+		stream.set_byte_position(decrypt_pos);
+		the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
+		//logprintf("shared secret (server) %s", the_params._shared_secret->encodeBase64()->get_buffer());
+		
+		symmetric_cipher the_cipher(the_params._shared_secret);
+		
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
+			return;
+		
+		// now read the first part of the connection's symmetric key
+		stream.read_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
+		_random_generator.random_buffer(the_params._init_vector, symmetric_cipher::key_size);
 		
 		uint32 connect_sequence;
-		the_params._debug_object_sizes = stream->read_bool();
-		core::read(*stream, connect_sequence);
+		core::read(stream, connect_sequence);
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Request %8x", the_params._client_identity));
 		
 		if(connect)
@@ -636,8 +598,7 @@ protected:
 		conn->set_initial_recv_sequence(connect_sequence);
 		conn->set_interface(this);
 		
-		if(the_params._using_crypto)
-			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
+		conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		
 		byte_buffer_ptr reason;
 		if(!conn->read_connect_request(stream, reason))
@@ -667,27 +628,25 @@ protected:
 		out.set_byte_position(encrypt_pos);
 		
 		core::write(out, conn->get_initial_send_sequence());
-		conn->write_connect_accept(&out);
+		conn->write_connect_accept(out);
 		
-		if(the_params._using_crypto)
-		{
-			out.write_bytes(the_params._init_vector, symmetric_cipher::key_size);
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
-		}
+		out.write_bytes(the_params._init_vector, symmetric_cipher::key_size);
+		symmetric_cipher the_cipher(the_params._shared_secret);
+		bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
+
 		out.send_to(_socket, conn->get_address());
 	}
 	
 	/// Handles a connect accept packet, putting the connection associated with the
 	/// remote host (if there is one) into an active state.
-	void handle_connect_accept(const address &the_address, bit_stream *stream)
+	void handle_connect_accept(const address &the_address, bit_stream &stream)
 	{
 		nonce nonce, server_nonce;
 		
-		core::read(*stream, nonce);
-		core::read(*stream, server_nonce);
-		uint32 decrypt_pos = stream->get_byte_position();
-		stream->set_byte_position(decrypt_pos);
+		core::read(stream, nonce);
+		core::read(stream, server_nonce);
+		uint32 decrypt_pos = stream.get_byte_position();
+		stream.set_byte_position(decrypt_pos);
 		
 		connection *conn = find_pending_connection(the_address);
 		if(!conn || conn->get_connection_state() != connection::awaiting_connect_response)
@@ -698,14 +657,12 @@ protected:
 		if(the_params._nonce != nonce || the_params._server_nonce != server_nonce)
 			return;
 		
-		if(the_params._using_crypto)
-		{
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
-				return;
-		}
+		symmetric_cipher the_cipher(the_params._shared_secret);
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
+			return;
+
 		uint32 recv_sequence;
-		core::read(*stream, recv_sequence);
+		core::read(stream, recv_sequence);
 		conn->set_initial_recv_sequence(recv_sequence);
 		
 		byte_buffer_ptr error_buffer;
@@ -714,11 +671,9 @@ protected:
 			remove_pending_connection(conn);
 			return;
 		}
-		if(the_params._using_crypto)
-		{
-			stream->read_bytes(the_params._init_vector, symmetric_cipher::key_size);
-			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
-		}
+
+		stream.read_bytes(the_params._init_vector, symmetric_cipher::key_size);
+		conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		
 		add_connection(conn); // first, add it as a regular connection
 		remove_pending_connection(conn); // remove from the pending connection list
@@ -744,13 +699,13 @@ protected:
 	
 	/// Handles a connect rejection packet by notifying the connection ref_object
 	/// that the connection was rejected.
-	void handle_connect_reject(const address &the_address, bit_stream *stream)
+	void handle_connect_reject(const address &the_address, bit_stream &stream)
 	{
 		nonce the_nonce;
 		nonce server_nonce;
 		
-		core::read(*stream, the_nonce);
-		core::read(*stream, server_nonce);
+		core::read(stream, the_nonce);
+		core::read(stream, server_nonce);
 		
 		connection *conn = find_pending_connection(the_address);
 		if(!conn || (conn->get_connection_state() != connection::awaiting_challenge_response &&
@@ -761,7 +716,7 @@ protected:
 			return;
 		
 		byte_buffer_ptr reason;
-		core::read(*stream, reason);
+		core::read(stream, reason);
 		
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Reject - reason %s", reason));
 		// if the reason is a bad puzzle solution, try once more with a
@@ -813,16 +768,10 @@ protected:
 		else
 		{
 			core::write(out, the_params._nonce);
-			if(out.write_bool(_requires_key_exchange || (the_params._request_key_exchange && !_private_key.is_null())))
-			{
-				if(out.write_bool(the_params._request_certificate && !_certificate.is_null()))
-					write(out, _certificate);
-				else
-					core::write(out, _private_key->get_public_key());
-			}
+			core::write(out, _private_key->get_public_key());
 		}
 		symmetric_cipher the_cipher(the_params._arranged_secret);
-		bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
+		bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
 		
 		for(uint32 i = 0; i < the_params._possible_addresses.size(); i++)
 		{
@@ -839,13 +788,13 @@ protected:
 	
 	
 	/// Handles an incoming punch packet from a remote host.
-	void handle_punch(const address &the_address, bit_stream *stream)
+	void handle_punch(const address &the_address, bit_stream &stream)
 	{
 		uint32 i, j;
 		connection *conn;
 		
 		nonce first_nonce;
-		core::read(*stream, first_nonce);
+		core::read(stream, first_nonce);
 		
 		byte_buffer b((uint8 *) &first_nonce, sizeof(nonce));
 		
@@ -907,43 +856,34 @@ protected:
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
 		symmetric_cipher the_cipher(the_params._arranged_secret);
-		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream->get_byte_position(), &the_cipher))
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream.get_byte_position(), &the_cipher))
 			return;
 		
 		nonce next_nonce;
-		core::read(*stream, next_nonce);
+		core::read(stream, next_nonce);
 		
 		if(next_nonce != the_params._nonce)
 			return;
 		
 		// see if the connection needs to be authenticated or uses key exchange
-		if(stream->read_bool())
+		if(the_params._is_initiator)
 		{
-			if(stream->read_bool())
-			{
-				the_params._certificate = new certificate(*stream);
-				if(!the_params._certificate->is_valid() || !conn->validate_certificate(the_params._certificate, true))
-					return;         
-				the_params._public_key = the_params._certificate->get_public_key();
-			}
-			else
-			{
-				the_params._public_key = new asymmetric_key(*stream);
-				if(!the_params._public_key->is_valid() || !conn->validate_public_key(the_params._public_key, true))
-					return;
-			}
-			if(_private_key.is_null() || _private_key->get_key_size() != the_params._public_key->get_key_size())
-			{
-				// we don't have a private key, so generate one for this connection
-				the_params._private_key = new asymmetric_key(the_params._public_key->get_key_size());
-			}
-			else
-				the_params._private_key = _private_key;
-			the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
-			//logprintf("shared secret (client) %s", the_params._shared_secret->encodeBase64()->get_buffer());
-			_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
-			the_params._using_crypto = true;
+			the_params._public_key = new asymmetric_key(stream);
+			if(!the_params._public_key->is_valid())
+				return;
 		}
+
+		if(_private_key.is_null() || _private_key->get_key_size() != the_params._public_key->get_key_size())
+		{
+			// we don't have a private key, so generate one for this connection
+			the_params._private_key = new asymmetric_key(the_params._public_key->get_key_size());
+		}
+		else
+			the_params._private_key = _private_key;
+		the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
+		//logprintf("shared secret (client) %s", the_params._shared_secret->encodeBase64()->get_buffer());
+		_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
+
 		conn->set_address(the_address);
 		TorqueLogMessageFormatted(LogNetInterface, ("punch from %s matched nonces - connecting...", the_address.toString()));
 		
@@ -965,29 +905,24 @@ protected:
 		core::write(out, uint8(arranged_connect_request_packet));
 		core::write(out, the_params._nonce);
 		uint32 encrypt_pos = out.get_byte_position();
-		uint32 inner_encrypt_pos = 0;
 		
 		out.set_byte_position(encrypt_pos);
 		
 		core::write(out, the_params._server_nonce);
-		if(out.write_bool(the_params._using_crypto))
-		{
-			core::write(out, the_params._private_key->get_public_key());
-			inner_encrypt_pos = out.get_byte_position();
-			out.set_byte_position(inner_encrypt_pos);
-			out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
-		}
-		out.write_bool(the_params._debug_object_sizes);
+		core::write(out, the_params._private_key->get_public_key());
+
+		uint32 inner_encrypt_pos = out.get_byte_position();
+		out.set_byte_position(inner_encrypt_pos);
+		out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
+
 		core::write(out, conn->get_initial_send_sequence());
-		conn->write_connect_request(&out);
+		conn->write_connect_request(out);
 		
-		if(inner_encrypt_pos)
-		{
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, inner_encrypt_pos, &the_cipher);
-		}
-		symmetric_cipher the_cipher(the_params._arranged_secret);
-		bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
+		symmetric_cipher shared_secret_cipher(the_params._shared_secret);
+		bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, inner_encrypt_pos, &shared_secret_cipher);
+
+		symmetric_cipher arranged_secret_cipher(the_params._arranged_secret);
+		bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &arranged_secret_cipher);
 		
 		conn->_connect_send_count++;
 		conn->_connect_last_send_time = get_process_start_time();
@@ -996,12 +931,12 @@ protected:
 	}
 	
 	/// Handles an incoming connect request from an arranged connection.
-	void handle_arranged_connect_request(const address &the_address, bit_stream *stream)
+	void handle_arranged_connect_request(const address &the_address, bit_stream &stream)
 	{
 		uint32 i, j;
 		connection *conn;
 		nonce nonce, server_nonce;
-		core::read(*stream, nonce);
+		core::read(stream, nonce);
 		
 		// see if the connection is in the main connection table.
 		// If the connection is in the connection table and it has
@@ -1040,40 +975,35 @@ protected:
 			return;
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
-		symmetric_cipher the_cipher(the_params._arranged_secret);
-		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream->get_byte_position(), &the_cipher))
+		symmetric_cipher arraged_secret_cipher(the_params._arranged_secret);
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream.get_byte_position(), &arraged_secret_cipher))
 			return;
 		
-		stream->set_byte_position(stream->get_byte_position());
+		stream.set_byte_position(stream.get_byte_position());
 		
-		core::read(*stream, server_nonce);
+		core::read(stream, server_nonce);
 		if(server_nonce != the_params._server_nonce)
 			return;
 		
-		if(stream->read_bool())
-		{
-			if(_private_key.is_null())
-				return;
-			the_params._using_crypto = true;
-			the_params._public_key = new asymmetric_key(*stream);
-			the_params._private_key = _private_key;
-			
-			uint32 decrypt_pos = stream->get_byte_position();
-			stream->set_byte_position(decrypt_pos);
-			the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			
-			if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
-				return;
-			
-			// now read the first part of the connection's session (symmetric) key
-			stream->read_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
-			_random_generator.random_buffer(the_params._init_vector, symmetric_cipher::key_size);
-		}
+		if(_private_key.is_null())
+			return;
+		the_params._public_key = new asymmetric_key(stream);
+		the_params._private_key = _private_key;
+		
+		uint32 decrypt_pos = stream.get_byte_position();
+		stream.set_byte_position(decrypt_pos);
+		the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
+		symmetric_cipher shared_secret_cipher(the_params._shared_secret);
+		
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &shared_secret_cipher))
+			return;
+		
+		// now read the first part of the connection's session (symmetric) key
+		stream.read_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
+		_random_generator.random_buffer(the_params._init_vector, symmetric_cipher::key_size);
 		
 		uint32 connect_sequence;
-		the_params._debug_object_sizes = stream->read_bool();
-		core::read(*stream, connect_sequence);
+		core::read(stream, connect_sequence);
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Arranged Connect Request"));
 		
 		if(old_connection)
@@ -1081,8 +1011,8 @@ protected:
 		
 		conn->set_address(the_address);
 		conn->set_initial_recv_sequence(connect_sequence);
-		if(the_params._using_crypto)
-			conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
+
+		conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		
 		byte_buffer_ptr reason;
 		if(!conn->read_connect_request(stream, reason))
@@ -1100,7 +1030,7 @@ protected:
 	
 	
 	/// Dispatches a disconnect packet for a specified connection.
-	void handle_disconnect(const address &the_address, bit_stream *stream)
+	void handle_disconnect(const address &the_address, bit_stream &stream)
 	{
 		connection *conn = find_connection(the_address);
 		if(!conn)
@@ -1111,22 +1041,20 @@ protected:
 		nonce nonce, server_nonce;
 		byte_buffer_ptr reason;
 		
-		core::read(*stream, nonce);
-		core::read(*stream, server_nonce);
+		core::read(stream, nonce);
+		core::read(stream, server_nonce);
 		
 		if(nonce != the_params._nonce || server_nonce != the_params._server_nonce)
 			return;
 		
-		uint32 decrypt_pos = stream->get_byte_position();
-		stream->set_byte_position(decrypt_pos);
+		uint32 decrypt_pos = stream.get_byte_position();
+		stream.set_byte_position(decrypt_pos);
 		
-		if(the_params._using_crypto)
-		{
-			symmetric_cipher the_cipher(the_params._shared_secret);
-			if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
-				return;
-		}
-		core::read(*stream, reason);
+		symmetric_cipher the_cipher(the_params._shared_secret);
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, decrypt_pos, &the_cipher))
+			return;
+
+		core::read(stream, reason);
 		
 		conn->set_connection_state(connection::disconnected);
 		conn->on_connection_terminated(reason_remote_disconnect_packet, reason);
@@ -1163,11 +1091,9 @@ protected:
 			out.set_byte_position(encrypt_pos);
 			core::write(out, reason_buffer);
 			
-			if(the_params._using_crypto)
-			{
-				symmetric_cipher the_cipher(the_params._shared_secret);
-				bit_stream_hash_and_encrypt(&out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
-			}
+			symmetric_cipher the_cipher(the_params._shared_secret);
+			bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &the_cipher);
+
 			out.send_to(_socket, conn->get_address());
 
 			remove_connection(conn);
@@ -1191,10 +1117,10 @@ public:
 		_reconnecting_reason_buffer = new byte_buffer("RECONNECTING");
 		_shutdown_reason_buffer = new byte_buffer("SHUTDOWN");
 		_timed_out_reason_buffer = new byte_buffer("TIMEDOUT");
+		_private_key = new asymmetric_key(20);
 		
 		_last_timeout_check_time = time(0);
 		_allow_connections = true;
-		_requires_key_exchange = false;
 		
 		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
 		
@@ -1242,16 +1168,6 @@ public:
 		_private_key = the_key;
 	}
 	
-	/// Requires that all connections use encryption and key exchange
-	void set_requires_key_exchange(bool requires) { _requires_key_exchange = requires; }
-	
-	/// Sets the public certificate that validates the private key and stores
-	/// information about this host.  If no certificate is set, this interface can
-	/// still initiate and accept encrypted connections, but they will be vulnerable to
-	/// man in the middle attacks, unless the remote host can validate the public key
-	/// in another way.
-	void set_certificate(certificate *the_certificate);
-	
 	/// Returns whether or not this interface allows connections from remote hosts.
 	bool does_allow_connections() { return _allow_connections; }
 	
@@ -1262,25 +1178,25 @@ public:
 	udp_socket &get_socket() { return _socket; }
 	
 	/// Sends a packet to the remote address over this interface's socket.
-	udp_socket::send_to_result send_to(const address &the_address, bit_stream *stream)
+	udp_socket::send_to_result send_to(const address &the_address, bit_stream &stream)
 	{
-		return _socket.send_to(the_address, stream->get_buffer(), stream->get_byte_position());
+		return _socket.send_to(the_address, stream.get_buffer(), stream.get_byte_position());
 	}
 	
 	
 	/// Sends a packet to the remote address after millisecond_delay time has elapsed.
 	///
 	/// This is used to simulate network latency on a LAN or single computer.
-	void send_to_delayed(const address &the_address, bit_stream *stream, uint32 millisecond_delay)
+	void send_to_delayed(const address &the_address, bit_stream &stream, uint32 millisecond_delay)
 	{
-		uint32 data_size = stream->get_byte_position();
+		uint32 data_size = stream.get_byte_position();
 		
 		// allocate the send packet, with the data size added on
 		delay_send_packet *the_packet = (delay_send_packet *) memory_allocate(sizeof(delay_send_packet) + data_size);
 		the_packet->remote_address = the_address;
 		the_packet->send_time = get_process_start_time() + time(millisecond_delay);
 		the_packet->packet_size = data_size;
-		memcpy(the_packet->packet_data, stream->get_buffer(), data_size);
+		memcpy(the_packet->packet_data, stream.get_buffer(), data_size);
 		
 		// insert it into the delay_send_packet list, sorted by time
 		delay_send_packet **list;
@@ -1301,17 +1217,17 @@ public:
 		
 		// read out all the available packets:
 		while((result = stream.recv_from(_socket, &sourceAddress)) == udp_socket::packet_received)
-			process_packet(sourceAddress, &stream);
+			process_packet(sourceAddress, stream);
 	}
 	
 	/// Processes a single packet, and dispatches either to handle_info_packet or to
 	/// the connection associated with the remote address.
-	virtual void process_packet(const address &the_address, bit_stream *packet_stream)
+	virtual void process_packet(const address &the_address, bit_stream &packet_stream)
 	{
 		
 		// Determine what to do with this packet:
 		
-		if(packet_stream->get_buffer()[0] & 0x80) // it's a protocol packet...
+		if(packet_stream.get_buffer()[0] & 0x80) // it's a protocol packet...
 		{
 			// if the LSB of the first byte is set, it's a game data packet
 			// so pass it to the appropriate connection.
@@ -1328,7 +1244,7 @@ public:
 			// connection handshake packet.
 			
 			uint8 packet_type;
-			core::read(*packet_stream, packet_type);
+			core::read(packet_stream, packet_type);
 			
 			if(packet_type >= first_valid_info_packet_id)
 				handle_info_packet(the_address, packet_type, packet_stream);
@@ -1368,7 +1284,7 @@ public:
 	
 	
 	/// Handles all packets that don't fall into the category of connection handshake or game data.
-	virtual void handle_info_packet(const address &address, uint8 packet_type, bit_stream *stream)
+	virtual void handle_info_packet(const address &address, uint8 packet_type, bit_stream &stream)
 	{}
 	
 	/// Checks all connections on this interface for packet sends, and for timeouts and all valid

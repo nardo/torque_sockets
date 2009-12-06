@@ -9,7 +9,11 @@ class ref_object
 	friend class safe_object_ref;
 	friend class ref_object_ref;
 public:
-	ref_object();
+	ref_object()
+	{
+		_first_object_ref = 0;
+		_ref_count = 0;
+	}
 	virtual ~ref_object();
 	
 	/// object destroy self call (from ref_ptr).
@@ -199,4 +203,18 @@ public:
 	operator T*() { return reinterpret_cast<T*>(_object); }
 	T* get_pointer() { return static_cast<T*>(_object); }
 };
+
+ref_object::~ref_object()
+{
+	assert(_ref_count == 0);
+	safe_object_ref *walk = _first_object_ref;
+	while(walk)
+	{
+		safe_object_ref *next = walk->_next_object_ref;
+		walk->_object = 0;
+		walk->_prev_object_ref = 0;
+		walk->_next_object_ref = 0;
+		walk = next;
+	}
+} 
 
