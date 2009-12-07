@@ -53,11 +53,11 @@ struct tnp_connection_state
 	// connection state
 };
 
-interface tnp_create_interface();
+interface tnp_create_interface(bind_address);
 void tnp_seed_entropy(interface, uint8 entropy[32]);
 void tnp_read_entropy(interface, uint8 entropy[32]);
-void tnp_bind_interface(interface, address);
 void tnp_allow_incoming_connections(interface, bool allowed);
+bool tnp_does_allow_incoming_connections(interface);
 bool tnp_get_next_event(interface, tnp_event &the_event);
 connection tnp_connect(address remote_host, uint32 connect_data_size, uint8 connect_data[tnp_max_status_datagram_size]);
 connection tnp_accept_connection(tnp_event &connect_request_event, uint32 connect_accept_data_size, uint8 connect_accept_data[tnp_max_status_datagram_size]);
