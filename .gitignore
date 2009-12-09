@@ -1,3 +1,8 @@
 test/test1/test
 *.o
 lib/*/*.a
+test/test2/client
+test/test2/client.dSYM/
+test/test2/server
+test/test2/server.dSYM/
+
