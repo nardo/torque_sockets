@@ -141,6 +141,10 @@ public:
 		if(bytes_read == SOCKET_ERROR)
 			return no_incoming_packets_available;
 		*incoming_packet_size = uint32(bytes_read);
+
+		if(sender_address)
+			sender_address->from_sockaddr(&sender_sockaddr);
+
 		return packet_received;
 	}
 private:
