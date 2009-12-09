@@ -1,8 +1,11 @@
 test/test1/test
 *.o
+*.pyc
+.sconsign.dblite
 lib/*/*.a
-test/test2/client
-test/test2/client.dSYM/
-test/test2/server
-test/test2/server.dSYM/
+tnp/*.a
+tnp/build
+test/test2/build
+test/test2/client*
+test/test2/server*
 
