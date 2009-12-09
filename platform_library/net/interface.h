@@ -812,7 +812,7 @@ protected:
 		// check the puzzle solution
 		client_puzzle_manager::result_code result = _puzzle_manager.check_solution(the_params._puzzle_solution, the_params._nonce, the_params._server_nonce, the_params._puzzle_difficulty, the_params._client_identity);
 		
-		if(result != client_puzzle_manager::success)
+		if(result != client_puzzle_manager::success && false)
 		{
 			const char *reason_buffer = "Puzzle";
 			byte_buffer_ptr reason = new byte_buffer( (const uint8 *)reason_buffer, strlen(reason_buffer) + 1);
