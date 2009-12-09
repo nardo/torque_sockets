@@ -70,8 +70,12 @@ int tnp_does_allow_incoming_connections(tnp_interface iface)
 	return iface->i->does_allow_connections();
 }
 
-int tnp_get_next_event(tnp_interface, tnp_event* the_event)
+int tnp_get_next_event(tnp_interface iface, tnp_event* the_event)
 {
+	assert(iface)
+
+	iface->i->check_incoming_packets();
+	iface->i->process_connections();
 	return 0;
 }
 

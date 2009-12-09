@@ -1,34 +1,18 @@
 // Copyright GarageGames.  See /license/info.txt in this distribution for licensing terms.
 
-#include "tomcrypt.h"
-#include "platform/platform.h"
-namespace core
-{
-	
-#include "core/core.h"
+#include "net_api.h"
 
-};
-
-using namespace core;
-struct net {
-	#include "net/net.h"
-};
+#include <stdlib.h>
+#include <unistd.h>
 
 int main(int argc, const char **argv)
 {
-	ltc_mp = ltm_desc;
-	net::address bind_address(net::address::localhost, 31337);
-
-	ref_ptr<net::interface> my_interface = new net::interface(bind_address);
-	my_interface->set_allows_connections(true);
-
-	net::address addr = my_interface->get_first_bound_interface_address();
-	printf("%s\n", addr.to_string().c_str());
+	tnp_interface my_interface = tnp_create_interface("localhost:31337");
+	tnp_allow_incoming_connections(my_interface, true);
 
 	while(true)
 	{
-		my_interface->check_incoming_packets();
-		my_interface->process_connections();
+		tnp_get_next_event(my_interface, NULL);
 		sleep(1);
 	}
 
