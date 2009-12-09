@@ -116,6 +116,11 @@ public:
 			_connection_hash_table[i] = NULL;
 		_send_packet_list = NULL;
 		_process_start_time = time::get_current();
+
+		udp_socket::bind_result res = _socket.bind(bind_address);
+
+		// Supply our own (small) unique private key for the time being.
+		_private_key = new asymmetric_key(256, _random_generator);
 	}
 	
 	~interface()
