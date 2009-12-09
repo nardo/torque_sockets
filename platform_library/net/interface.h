@@ -120,7 +120,7 @@ public:
 		udp_socket::bind_result res = _socket.bind(bind_address);
 
 		// Supply our own (small) unique private key for the time being.
-		_private_key = new asymmetric_key(256, _random_generator);
+		_private_key = new asymmetric_key(16, _random_generator);
 	}
 	
 	~interface()
@@ -209,7 +209,10 @@ public:
 		
 		// read out all the available packets:
 		while((result = stream.recv_from(_socket, &sourceAddress)) == udp_socket::packet_received)
+      {
+         printf("Handling a packet\n");
 			process_packet(sourceAddress, stream);
+      }
 	}
 	
 	/// returns the current process time for this interface
@@ -616,7 +619,8 @@ protected:
 	/// Sends a connect challenge request on behalf of the connection to the remote host.
 	void send_connect_challenge_request(connection *the_connection)
 	{
-		TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Challenge Request to %s", conn->get_address().toString()));
+   	printf("sent a request\n");
+		TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Challenge Request to %s", the_connection->get_address().to_string().c_str()));
 		packet_stream out;
 		core::write(out, uint8(connect_challenge_request_packet));
 		connection_parameters &params = the_connection->get_connection_parameters();
@@ -632,7 +636,7 @@ protected:
 	/// or this interface's public key.
 	void handle_connect_challenge_request(const address &addr, bit_stream &stream)
 	{
-		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Challenge Request from %s", addr.toString()));
+		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Challenge Request from %s", addr.to_string().c_str()));
 		
 		if(!_allow_connections)
 			return;
@@ -671,6 +675,7 @@ protected:
 	/// a connection this interface has pending.
 	void handle_connect_challenge_response(const address &the_address, bit_stream &stream)
 	{
+   	printf("handle_connect_challenge_response\n");
 		connection *conn = find_pending_connection(the_address);
 		if(!conn || conn->get_connection_state() != connection::awaiting_challenge_response)
 			return;
@@ -726,7 +731,7 @@ protected:
 		
 		if(solved)
 		{
-			TorqueLogMessageFormatted(LogNetInterface, ("Client puzzle solved in %d ms.", (time::get_current() - conn->_connect_last_send_time).get_milliseconds()));
+			TorqueLogMessageFormatted(LogNetInterface, ("Client puzzle solved in %lli ms.", (time::get_current() - conn->_connect_last_send_time).get_milliseconds()));
 			conn->set_connection_state(connection::awaiting_connect_response);
 			send_connect_request(conn);
 		}
@@ -980,7 +985,7 @@ protected:
 		byte_buffer_ptr reason;
 		core::read(stream, reason);
 		
-		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Reject - reason %s", reason));
+		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Reject - reason %s", reason->get_buffer()));
 		// if the reason is a bad puzzle solution, try once more with a
 		// new nonce.
 		if(!strcmp((const char *) reason->get_buffer(), "Puzzle") && !p._puzzle_retried)
@@ -1039,10 +1044,10 @@ protected:
 		{
 			out.send_to(_socket, the_params._possible_addresses[i]);
 			
-			TorqueLogMessageFormatted(LogNetInterface, ("Sending punch packet (%s, %s) to %s",
-														BufferEncodeBase64(byte_buffer(the_params._nonce.data, nonce::NonceSize))->get_buffer(),
-														BufferEncodeBase64(byte_buffer(the_params._server_nonce.data, nonce::NonceSize))->get_buffer(),
-														the_params._possible_addresses[i].toString()));
+//			TorqueLogMessageFormatted(LogNetInterface, ("Sending punch packet (%s, %s) to %s",
+//														BufferEncodeBase64(byte_buffer(the_params._nonce.data, nonce::NonceSize))->get_buffer(),
+//														BufferEncodeBase64(byte_buffer(the_params._server_nonce.data, nonce::NonceSize))->get_buffer(),
+//														the_params._possible_addresses[i].toString()));
 		}
 		conn->_connect_send_count++;
 		conn->_connect_last_send_time = get_process_start_time();
@@ -1060,7 +1065,7 @@ protected:
 		
 		byte_buffer b((uint8 *) &first_nonce, sizeof(nonce));
 		
-		TorqueLogMessageFormatted(LogNetInterface, ("Received punch packet from %s - %s", the_address.toString(), BufferEncodeBase64(b)->get_buffer()));
+//		TorqueLogMessageFormatted(LogNetInterface, ("Received punch packet from %s - %s", the_address.toString(), BufferEncodeBase64(b)->get_buffer()));
 		
 		for(i = 0; i < _pending_connections.size(); i++)
 		{
@@ -1147,7 +1152,7 @@ protected:
 		_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
 
 		conn->set_address(the_address);
-		TorqueLogMessageFormatted(LogNetInterface, ("punch from %s matched nonces - connecting...", the_address.toString()));
+		TorqueLogMessageFormatted(LogNetInterface, ("punch from %s matched nonces - connecting...", the_address.to_string().c_str()));
 		
 		conn->set_connection_state(connection::awaiting_connect_response);
 		conn->_connect_send_count = 0;

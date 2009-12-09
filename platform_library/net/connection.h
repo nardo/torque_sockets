@@ -251,10 +251,10 @@ protected:
 	{
 		if(_simulated_packet_loss && _interface->random().random_unit_float() < _simulated_packet_loss)
 		{
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: RECVDROP - %d", _address.toString(), get_last_send_sequence()));
+			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: RECVDROP - %d", _address.to_string().c_str(), get_last_send_sequence()));
 			return;
 		}
-		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: RECV- %d bytes", _address.toString(), bstream->getMaxReadBitPosition() >> 3));
+		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: RECV bytes", _address.to_string().c_str()));
 		
 		if(read_packet_header(bstream))
 		{
@@ -284,9 +284,9 @@ protected:
 			write_packet_rate_info(bstream, note);
 			int32 start = bstream.get_bit_position();
 			
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: START %s", _address.toString(), getClassName()) );
+			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: START", _address.to_string().c_str()) );
 			write_packet(bstream, note);
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: END %s - %d bits", _address.toString(), getClassName(), bstream->get_bit_position() - start) );
+			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: END - %llu bits", _address.to_string().c_str(), bstream.get_bit_position() - start) );
 		}
 		if(!_symmetric_cipher.is_null())
 		{
@@ -416,7 +416,7 @@ protected:
 			_symmetric_cipher->setup_counter(pk_sequence_number, pk_highest_ack, pk_packet_type, 0);
 			if(!bit_stream_decrypt_and_check_hash(pstream, message_signature_bytes, packet_header_byte_size, _symmetric_cipher))
 			{
-				TorqueLogMessage(LogNetConnection, "Packet failed crypto");
+				TorqueLogMessage(LogNetConnection, ("Packet failed crypto"));
 				return false;
 			}
 		}
@@ -578,7 +578,7 @@ protected:
 	/// Dispatches a notify when a packet is ACK'd or NACK'd.
 	void handle_notify(uint32 sequence, bool recvd)
 	{
-		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: NOTIFY %d %s", _address.toString(), sequence, recvd ? "RECVD" : "DROPPED"));
+		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: NOTIFY %d %s", _address.to_string().c_str(), sequence, recvd ? "RECVD" : "DROPPED"));
 		
 		packet_notify *note = _notify_queue_head;
 		assert(note != NULL);
@@ -798,11 +798,11 @@ public:
 	{
 		if(_simulated_packet_loss && _interface->random().random_unit_float() < _simulated_packet_loss)
 		{
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SENDDROP - %d", _address.toString(), get_last_send_sequence()));
+			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SENDDROP - %d", _address.to_string().c_str(), get_last_send_sequence()));
 			return udp_socket::send_to_success;
 		}
 		
-		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SEND - %d bytes", _address.toString(), stream->get_byte_position()));
+		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SEND - %d bytes", _address.to_string().c_str(), stream.get_byte_position()));
 		
 		if(_simulated_latency)
 		{
