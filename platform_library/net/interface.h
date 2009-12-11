@@ -198,6 +198,38 @@ public:
 		*list = the_packet;
 	}
 	
+	bool tnp_get_next_packet(address& source_address, uint8& packet_type, byte_buffer_ptr& data)
+	{
+		packet_stream stream;
+		udp_socket::recv_from_result result;
+			   
+		_process_start_time = time::get_current();
+	   
+		result = stream.recv_from(_socket, &source_address);
+		if (result != udp_socket::packet_received)
+			return false;
+				
+		core::read(stream, packet_type);
+		core::read(stream, data);
+		
+		return true;
+	}
+	
+	void tnp_send_packet(ref_ptr<connection> the_connection, uint8 packet_type, const byte_buffer_ptr& data)
+	{
+		the_connection->_connect_send_count++;
+		the_connection->_connect_last_send_time = get_process_start_time();
+		tnp_send_packet(the_connection->get_address(), packet_type, data);
+	}
+	
+	void tnp_send_packet(const address& the_address, uint8 packet_type, const byte_buffer_ptr& data)
+	{
+		packet_stream out;
+		core::write(out, packet_type);
+		core::write(out, data);
+		out.send_to(_socket, the_address);
+	}
+	
 	/// Dispatch function for processing all network packets through this interface.
 	void check_incoming_packets()
 	{
@@ -452,6 +484,7 @@ protected:
 		puzzle_solution_timeout = 30000, ///< If the server gives us a puzzle that takes more than 30 seconds, time out.
 	};
 	
+public:
 	/// Computes an identity token for the connecting client based on the address of the client and the
 	/// client's unique nonce value.
 	uint32 compute_client_identity_token(const address &the_address, const nonce &the_nonce)

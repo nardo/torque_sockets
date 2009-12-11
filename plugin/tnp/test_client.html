@@ -1,0 +1,39 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+  "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<script type="text/javascript">
+
+function pump() {
+	var event = iface.getNextEvent();
+	if(!event.recv)
+		return;
+
+	console.log(event.data);
+//	console.log(event.eventType);
+	if(event.eventType == plugin.tnp.CONNECTION_ACCEPTED_EVENT)
+	{
+		console.log("Connection Accepted");
+	}
+}
+
+function init() {
+	plugin = document.getElementById("plugin");
+	iface = plugin.tnp.interface("localhost:31338");
+	if (!iface) {
+	alert("no plugin");
+	}
+
+	iface.allowsConnections = false;
+	connection = iface.connect("localhost:31337", "Hello Mr. Server");
+	
+	setInterval('pump()', 32);
+
+}
+</script>
+</head>
+
+<body onload="init()">
+<object type="application/x-torque-network-platform-debug" id="plugin" width="0" height="0"> </object>
+</body>
+</html>

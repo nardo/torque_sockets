@@ -24,8 +24,9 @@ struct _tnp_opaque_interface_t
 	ref_ptr<net::interface> i;
 };
 
-tnp_interface tnp_create_interface(tnp_address addr)
+tnp_interface tnp_create_interface(const tnp_address addr)
 {
+	fprintf(stderr, "Creatinging interface bound to %s\n", addr);
 	ltc_mp = ltm_desc;
 
 	assert(addr);
@@ -41,9 +42,11 @@ tnp_interface tnp_create_interface(tnp_address addr)
 
 void tnp_destroy_interface(tnp_interface* iface)
 {
+	fprintf(stderr, "Destroying interface, maybe?\n");
 	if (!iface || !*iface)
 		return;
 	
+	fprintf(stderr, "Destroying interface\n");
 	delete *iface;
 	*iface = 0;
 }
@@ -73,13 +76,29 @@ int tnp_does_allow_incoming_connections(tnp_interface iface)
 int tnp_get_next_event(tnp_interface iface, tnp_event* the_event)
 {
 	assert(iface)
+	assert(the_event);
+		
+	uint8 packet_type;
+	net::address source_address;
+	byte_buffer_ptr data;
+	
+	bool recv = iface->i->tnp_get_next_packet(source_address, packet_type, data);
 
-	iface->i->check_incoming_packets();
-	iface->i->process_connections();
-	return 0;
+	if (!recv)
+		return 0;
+
+	fprintf(stderr, "Got an event\n");
+	the_event->event_type = (tnp_event::tnp_event_types)packet_type;
+	the_event->data_size = data->get_buffer_size();
+	memcpy(the_event->data, data->get_buffer(), the_event->data_size);
+	
+	core::string addr_s = source_address.to_string();
+	strncpy(the_event->source_address, addr_s.c_str(), MAX_ADDR);
+	
+	return 1;
 }
 
-tnp_connection tnp_connect(tnp_interface iface, tnp_address remote_host, unsigned int connect_data_size,
+tnp_connection tnp_connect(tnp_interface iface, const tnp_address remote_host, unsigned int connect_data_size,
 					   unsigned char connect_data[tnp_max_status_datagram_size])
 {
 	assert(iface);
@@ -87,20 +106,41 @@ tnp_connection tnp_connect(tnp_interface iface, tnp_address remote_host, unsigne
 	assert(remote_host[0]);
 	
 	tnp_connection ret = new _tnp_opaque_connection_t;
+	ret->c = new net::connection(iface->i->random());
 	
-	net::random_generator rnd = net::random_generator();
-	ret->c = new net::connection(rnd);
+	ret->c->set_address(remote_host);
+	ret->c->set_interface(iface->i);
+	ret->c->_connect_send_count = 0;
+	ret->c->set_connection_state(net::connection::awaiting_connect_response);
 	
-	ret->c->connect(iface->i, remote_host); 
+	byte_buffer_ptr data = new byte_buffer(connect_data, connect_data_size);
+	
+	iface->i->tnp_send_packet(ret->c, tnp_event::tnp_connection_requested_event, data);
+	
+	return ret;
 }
 
-tnp_connection tnp_accept_connection(tnp_event* connect_request_event,
+tnp_connection tnp_accept_connection(tnp_interface iface, tnp_event* connect_request_event,
 					unsigned int connect_accept_data_size,
 					unsigned char connect_accept_data[tnp_max_status_datagram_size])
 {
+	assert(iface);
+	assert(connect_request_event);
+	
+	tnp_connection ret = new _tnp_opaque_connection_t;
+	ret->c = new net::connection(iface->i->random());
+	
+	ret->c->set_address(connect_request_event->source_address);
+	ret->c->set_interface(iface->i);
+	
+	byte_buffer_ptr data = new byte_buffer(connect_accept_data, connect_accept_data_size);
+	
+	iface->i->tnp_send_packet(ret->c, tnp_event::tnp_connection_accepted_event, data);
+
+	return ret;
 }
 
-void tnp_reject_connection(tnp_event* connect_request_event,
+void tnp_reject_connection(tnp_interface, tnp_event* connect_request_event,
 						   unsigned int reject_data_size,
 						   unsigned char reject_data[tnp_max_status_datagram_size])
 {
@@ -112,8 +152,9 @@ void tnp_disconnect(tnp_connection* conn, unsigned int disconnect_data_size,
 	if (!conn || !*conn)
 		return;
 	
-	byte_buffer_ptr b = new byte_buffer(disconnect_data, disconnect_data_size);
-	(*conn)->c->disconnect(b);
+	byte_buffer_ptr data = new byte_buffer(disconnect_data, disconnect_data_size);
+	
+	(*conn)->c->get_interface()->tnp_send_packet((*conn)->c, tnp_event::tnp_connection_disconnected_event, data);
 	
 	delete *conn;
 	*conn = NULL;

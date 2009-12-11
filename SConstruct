@@ -12,3 +12,4 @@ Export('env')
 
 libs = env.SConscript('tnp/SConscript')
 env.SConscript('test/test2/SConscript', 'libs')
+env.SConscript('plugin/tnp/SConscript', 'libs')

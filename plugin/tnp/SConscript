@@ -1,0 +1,123 @@
+from Config import *
+from Bundle import *
+from rez import *
+from NixysaBuilder import *
+
+# Import the build environment and static libs from our parent SConstruct.
+Import('env')
+Import('libs')
+
+# files stores the files which will be compiled for the NPAPI plugin.
+files = Glob('*.cpp')
+
+# MIME types by configuration.  Optimized Debug uses MIME_RELEASE
+MIME_RELEASE = 'application/x-torque-network-platform'
+MIME_DEBUG = 'application/x-torque-network-platform-debug'
+
+# Metadata configuration.  This is for Win32...
+hellorc_subst = {}
+hellorc_subst['dbg'] = {'FILE_DESC':'nptnp_debug', 'FILE_OPEN_NAME':'nptnp_debug'}
+hellorc_subst['dbg'].update({'INTERNAL_NAME':'Torque Network Platform Debug', 'MIME_TYPE':MIME_DEBUG})
+hellorc_subst['dbg'].update({'ORIGINAL_FILE_NAME':'nptnp_debug.dll', 'PRODUCT_NAME':'Torque Network Platform Plugin Debug'})
+
+hellorc_subst['optdbg'] = {'FILE_DESC':'nptnp_optimized', 'FILE_OPEN_NAME':'nptnp_optimized'}
+hellorc_subst['optdbg'].update({'INTERNAL_NAME':'Torque Network Platform OptDebug', 'MIME_TYPE':MIME_RELEASE})
+hellorc_subst['optdbg'].update({'ORIGINAL_FILE_NAME':'nptnp_optimized.dll', 'PRODUCT_NAME':'Torque Network Platform Plugin OptDebug'})
+
+hellorc_subst['release'] = {'FILE_DESC':'nptnp', 'FILE_OPEN_NAME':'nptnp'}
+hellorc_subst['release'].update({'INTERNAL_NAME':'Torque Network Platform', 'MIME_TYPE':MIME_RELEASE})
+hellorc_subst['release'].update({'ORIGINAL_FILE_NAME':'nptnp.dll', 'PRODUCT_NAME':'Torque Network Platform Plugin'})
+
+hellodef_subst = {}
+hellodef_subst['dbg'] = {'LIBNAME':'NPTNP_DEBUG'}
+hellodef_subst['optdbg'] = {'LIBNAME':'NPTNP_OPTIMIZED'}
+hellodef_subst['release'] = {'LIBNAME':'NPTNP'}
+
+# And this is for OS X...
+infoplist_subst = {}
+infoplist_subst['dbg'] = {'MIME_TYPE':MIME_DEBUG}
+infoplist_subst['optdbg'] = {'MIME_TYPE':MIME_RELEASE}
+infoplist_subst['release'] = {'MIME_TYPE':MIME_RELEASE}
+
+hellor_osx_subst = {}
+hellor_osx_subst['dbg'] = {'FILE_DESC':'Torque Network Platform Debug Plugin', 'FILE_NAME':'Torque Network Platform Debug Plugin'}
+hellor_osx_subst['dbg'].update({'MIME_TYPE':MIME_DEBUG, 'MIME_DESC':'Torque Network Platform Debug'})
+
+hellor_osx_subst['optdbg'] = {'FILE_DESC':'Torque Network Platform Optimized Plugin', 'FILE_NAME':'Torque Network Platform Optimized Plugin'}
+hellor_osx_subst['optdbg'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Network Platform'})
+
+hellor_osx_subst['release'] = {'FILE_DESC':'Torque Network Platform Plugin', 'FILE_NAME':'Torque Network Platform Plugin'}
+hellor_osx_subst['release'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Network Platform'})
+
+TOOL_SUBST(env)
+env.Append(CPPPATH=['../inc', '#/tnp/include', '.'], LIBPATH=['#/tnp', '#/lib/libtommath', '#/lib/libtomcrypt'])
+
+# Determine which platform we're on.
+isLinux = env['PLATFORM'] == 'posix' or env['PLATFORM'] == 'linux'
+isOSX = env['PLATFORM'] == 'darwin'
+isWindows = env['PLATFORM'] == 'win32'
+cppdefines = []
+
+# Specify our unadorned target name.  Certain platforms may need to change this.
+target = 'torque'
+
+# Linux and OS X need the XP_UNIX #define and prcpucfg_unix.h
+if isLinux or isOSX:
+   cppdefines += ["XP_UNIX", 'MDCPUCFG="\\"prcpucfg_unix.h"\\"']
+if isLinux:
+	cppdefines += ["OS_LINUX"]
+if isOSX:
+   cppdefines += ["XP_MACOSX", "OS_MACOSX"]
+   env.Append(LINKFLAGS='-framework CoreFoundation')
+if isWindows:
+   cppdefines += ["WIN32", "OS_WINDOWS", "NOMINMAX", "_WINDOWS", 'MDCPUCFG="\\"prcpucfg_win32.h"\\"']
+   # Substitue the proper names into our *.in files for each configuration we
+   # are building.
+   f = env.Build('SubstInFile', 'tnp.def', 'tnp.def.in', copy=False, suffix=False, SUBST_DICT_CFG=hellodef_subst)[0]
+   files.append(f)
+   f = env.Build('SubstInFile', 'tnp.rc', 'tnp.rc.in', copy=False, suffix=False, SUBST_DICT_CFG=hellorc_subst)[0]
+   files.append(f)
+   # On windows the plugin name must start with np.
+   target = 'nptnp'
+
+TOOL_NIXYSA(env)
+AUTOGEN_OUTPUT = env.Nixysa('tnp.idl')
+AUTOGEN_CC_FILES = [f for f in AUTOGEN_OUTPUT if f.suffix == '.cc']
+files += AUTOGEN_CC_FILES
+
+# These are the files that nixysa needs, but does not generate (i.e. they're
+# static).  $STATIC_GLUE_DIR is added to the environment with the nixysa
+# builder is added by TOOL_NIXYSA.
+STATIC_GLUE_SOURCES=['common.cc', 'npn_api.cc', 'static_object.cc', 'main.cc']
+files += ['$STATIC_GLUE_DIR/' + f for f in STATIC_GLUE_SOURCES]
+
+# This is the Linux "metadata" configuration.  Linux uses CPP for everything
+# instead of a separate config file, so some of this stuff is still hardcoded
+# in plugin.cpp. Sorry.
+cppdefine_cfg = {}
+cppdefine_cfg['release'] = cppdefines + ['MIME_TYPE="\\"%s"\\"' % MIME_RELEASE]
+cppdefine_cfg['optdbg'] = cppdefines + ['MIME_TYPE="\\"%s"\\"' % MIME_RELEASE]
+cppdefine_cfg['dbg'] = cppdefines + ['MIME_TYPE="\\"%s"\\"' % MIME_DEBUG]
+
+# And this is where we finally build the plugin.
+ret = env.Build('LoadableModule', target, files, LIBS_CFG=libs[1], CPPDEFINES_CFG=cppdefine_cfg)
+
+# On OS X we need to build the resource files and turn the whole thing into a
+# bundle.  We build the Info.plist and tnp.r files here because it's simpler
+# and keeps the related code together, as neither are inputs into the
+# LoadableModule builder (as compaared with the Win32 .def and .rc files)
+if isOSX:
+   TOOL_BUNDLE(env)
+   TOOL_REZ(env)
+   f = env.Build('SubstInFile', 'Info.plist', 'Info.plist.in', copy=False, suffix=False, SUBST_DICT_CFG=infoplist_subst)[0]
+   res = env.Build('SubstInFile', 'tnp.r', 'tnp.r.in', copy=False, suffix=False, SUBST_DICT_CFG=hellor_osx_subst)[0]
+   rsrc = env.Build('REZ', 'tnp', res, copy=False, suffix=True)[0]
+   configs = env.subst('${cfg}').split()
+   for config in configs:
+      config = Config.allConfigs[config]
+      env.MakeBundle('torque' + config.suffix + '.plugin', 'torque' + config.suffix,
+                     'build/' + config.name + '/Info.plist',
+                     typecode='BRPL', creator='????',
+                     resources=['English.lproj', rsrc[config.name]])
+
+Return('ret')

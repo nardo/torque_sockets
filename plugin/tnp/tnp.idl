@@ -1,0 +1,41 @@
+namespace tnp {
+
+enum EventTypes
+{
+	ConnectionAcceptedEvent,
+	ConnectioRrejectedEvent,
+	ConnectionRequestedEvent,
+	ConnectionTimedOutEvent,
+	ConnectionDisconnectedEvent,
+	ConnectionEstablishedEvent,
+	ConnectionPacketEvent,
+	ConnectionPacketNotifyEvent,
+	InterfacePacketEvent
+};
+
+[binding_model=by_value, include="net_api.h"]
+class connection
+{
+};
+
+[binding_model=by_value, include="net_api.h"]
+class event
+{
+	[getter] std::string sourceAddress;
+	[getter] EventTypes eventType;
+	[getter] std::string data;
+	[getter] bool recv;
+};
+
+[binding_model=by_pointer, include="net_api.h"]
+class interface
+{
+	interface(std::string addy);
+	[getter, setter] bool allowsConnections;
+	event get_next_event();
+	
+	connection connect(std::string host, std::string data);
+	connection accept_connection(event evt, std::string data);
+};
+
+}

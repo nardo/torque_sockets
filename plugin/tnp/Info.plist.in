@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>WebPluginDescription</key>
+	<string>Torque Network Platform Plugin</string>
+	<key>WebPluginName</key>
+	<string>Torque Network Platform Plugin</string>
+	<key>WebPluginMIMETypes</key>
+	<dict>
+		<key>${MIME_TYPE}</key>
+		<dict>
+			<key>WebPluginTypeDescription</key>
+			<string>Torque Network Platform</string>
+		</dict>
+	</dict>
+	<key>CSResourcesFileMapped</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>${EXECUTABLE_NAME}</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.yourcompany.${PRODUCT_NAME}</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>BRPL</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+</dict>
+</plist>

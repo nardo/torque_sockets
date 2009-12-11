@@ -1,0 +1,27 @@
+#include <Carbon/Carbon.r>
+
+resource 'STR#' (126) 
+{
+	{
+		"${FILE_DESC}",
+      "${FILE_NAME}",
+	}
+};
+
+// Human-readable description of MIME types this plugin handles.
+resource 'STR#' (127) 
+{
+	{
+		"${MIME_DESC}",
+	}
+};
+
+// This is the actual list of MIME types, in the odd-numbered entries.
+// The even entries are some other flavor of description.
+resource 'STR#' (128) 
+{
+	{
+		"${MIME_TYPE}",
+		"",
+	}
+};
