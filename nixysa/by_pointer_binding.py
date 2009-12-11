@@ -298,6 +298,7 @@ class NPAPIObject : public NPObject {
   ${Class} *value_;
  public:
   NPAPIObject(NPP npp): npp_(npp), value_() { }
+  ~NPAPIObject() { delete value_; }
   NPP npp() { return npp_; }
   ${Class} *value() { return value_; }
   ${Class} *value_mutable() { return value_; }
