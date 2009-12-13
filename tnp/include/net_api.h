@@ -108,7 +108,8 @@ namespace tnp
 		ConnectionEstablishedEvent,
 		ConnectionPacketEvent,
 		ConnectionPacketNotifyEvent,
-		InterfacePacketEvent
+		InterfacePacketEvent,
+		UserBarrier
 	};
 
 	class connection
@@ -122,6 +123,11 @@ namespace tnp
 		{
 		}
 		
+		void send(std::string data)
+		{
+			tnp_send_to(c, data.length() + 1, (unsigned char*)data.c_str());
+		}
+		
 	private:
 		tnp_connection c;
 	};
@@ -133,9 +139,9 @@ namespace tnp
 		tnp_event e;
 		bool recv_;
 		
-		EventTypes event_type() const
+		int event_type() const
 		{
-			return (EventTypes)e.event_type;
+			return e.event_type;
 		}
 		
 		std::string source_address() const

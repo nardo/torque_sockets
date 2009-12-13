@@ -4,36 +4,112 @@
 <head>
 <script type="text/javascript">
 
+function sendData()
+{
+	connection.send(document.output.doSay.value);
+}
+
+function acceptConnection()
+{
+	connection = iface.acceptConnection(connectionEvent, document.output.say.value);
+	document.output.theButton.disabled = true;
+	document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
+}
+
 function pump() {
 	var event = iface.getNextEvent();
 	if(!event.recv)
 		return;
 
-	console.log(event.data);
-//	console.log(event.eventType);
 	if(event.eventType == plugin.tnp.CONNECTION_REQUESTED_EVENT)
 	{
-		console.log("Accepting connection");
-		iface.acceptConnection(event, "Hello Mr. Client");
+		connectionEvent = event;
+		var req = "Connection requested from " + event.sourceAddress + ".  It says " + event.data + "<br/>Reply: <input type=\"text\" name=\"say\"/><br/><input type=\"button\" onclick=\"acceptConnection();\" name=\"theButton\" value=\"Accept\"/>"
+		document.output.innerHTML = req;
+	}
+	
+	if(event.eventType == plugin.tnp.CONNECTION_ACCEPTED_EVENT)
+	{
+		document.output.innerHTML = "Connection accepted from " + event.sourceAddress + ".  It says " + event.data;
+		document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
+	}
+	
+	if(event.eventType > plugin.tnp.USER_BARRIER)
+	{
+		document.output.innerHTML += event.sourceAddress + " says " + event.data + "<br/>"
 	}
 }
 
 function init() {
+	if(document.params.addy.value == '')
+	{
+		document.getElementById("output").innerHTML = "Please enter a valid address";
+		return;
+	}
+	
+	document.getElementById("output").innerHTML = "";
+	
+	document.params.theButton.disabled = true;
+	var connType = '';
+	for(i = 0; i < document.params.connType.length; i++)
+	{
+		if(document.params.connType[i].checked)
+		{
+			connType = document.params.connType[i].value;
+			break;
+		}
+	}
+	
+	isServer = connType == 'Server';
+
 	plugin = document.getElementById("plugin");
-	iface = plugin.tnp.interface("localhost:31337");
+	iface = plugin.tnp.interface(document.params.addy.value);
 	if (!iface) {
 	alert("no plugin");
 	}
 
-	iface.allowsConnections = true;
+	iface.allowsConnections = isServer;
 	
 	setInterval('pump()', 32);
-
+	
+	if(!isServer)
+	{
+		document.params.innerHTML = "Connect to address: <input type=\"text\" name=\"addy\"/><br/>And say:<input type=\"text\" name=\"say\"/><br/><input type=\"button\" name=\"theButton\" onclick=\"connect()\" value=\"Connect!\">";
+	}
 }
+
+function connect()
+{
+	if(document.params.addy.value == '')
+	{
+		document.getElementById("output").innerHTML = "Please enter a valid address";
+		return;
+	}
+	
+	document.getElementById("output").innerHTML = "";
+	
+	connection = iface.connect(document.params.addy.value, document.params.say.value);
+	
+	document.params.theButton.disabled = true;
+}
+
 </script>
+
 </head>
 
-<body onload="init()">
-<object type="application/x-torque-network-platform-debug" id="plugin" width="0" height="0"> </object>
+<body>
+<object type="application/x-torque-network-platform-debug" id="plugin" width="0" height="0"> </object><br/>
+<form name="params">
+I am a:
+<input type="radio" name="connType" value="Server" checked>Server
+<input type="radio" name="connType" value="Client">Client
+<br/>
+Bound to the address <input type="text" id="addy" name="addy" /><br/>
+
+<input type="button" name="theButton" onclick="init()" value="Go!">
+</form>
+
+<form name="output" id="output"></form>
+
 </body>
 </html>
