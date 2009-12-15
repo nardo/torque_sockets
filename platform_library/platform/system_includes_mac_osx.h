@@ -13,6 +13,8 @@
 #include <mach/mach_vm.h>
 #include <mach/vm_map.h>
 #include <mach/mach_init.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 #include <sys/ioctl.h>   /* ioctl() */
 #define NO_IPX_SUPPORT

@@ -18,3 +18,4 @@
 #include "core/zone_allocator.h"
 #include "core/page_allocator.h"
 #include "core/log.h"
+#include "core/thread.h"
