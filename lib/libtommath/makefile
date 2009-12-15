@@ -5,7 +5,7 @@
 #version of library 
 VERSION=0.42
 
-CFLAGS  +=  -I./ -Wall -W -Wshadow -Wsign-compare
+CFLAGS  +=  -arch i386 -I./ -Wall -W -Wshadow -Wsign-compare
 
 ifndef MAKE
    MAKE=make

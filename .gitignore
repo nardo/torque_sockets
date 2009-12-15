@@ -1,0 +1,11 @@
+test/test1/test
+*.o
+*.pyc
+.sconsign.dblite
+lib/*/*.a
+tnp/*.a
+tnp/build
+test/test2/build
+test/test2/client*
+test/test2/server*
+
