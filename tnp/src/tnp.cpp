@@ -113,14 +113,10 @@ tnp_connection tnp_accept_connection(tnp_interface iface, tnp_event* connect_req
 	assert(connect_request_event);
 	
 	tnp_connection ret = new _tnp_opaque_connection_t;
-	ret->c = new net::connection(iface->i->random());
-	
-	ret->c->set_address(connect_request_event->source_address);
-	ret->c->set_interface(iface->i);
 	
 	byte_buffer_ptr data = new byte_buffer(connect_accept_data, connect_accept_data_size);
 	
-	iface->i->tnp_send_packet(ret->c, tnp_event::tnp_connection_accepted_event, data);
+	ret->c = iface->i->tnp_accept_connection(connect_request_event->source_address, data);
 
 	return ret;
 }

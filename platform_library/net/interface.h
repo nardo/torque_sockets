@@ -204,8 +204,16 @@ public:
 		evt.event_type = type;
 		strncpy(evt.source_address, source_address.to_string().c_str(), MAX_ADDR);
 		evt.packet_sequence = packet_sequence;
-		evt.data_size = data->get_buffer_size();
-		memcpy(evt.data, data->get_buffer(), evt.data_size);
+		if(data.is_valid())
+		{
+			evt.data_size = data->get_buffer_size();
+			memcpy(evt.data, data->get_buffer(), evt.data_size);
+		}
+		else 
+		{
+			evt.data_size = 0;
+		}
+
 		_event_queue.push(evt);
 	}
 	
@@ -930,14 +938,31 @@ public:
 			send_connect_reject(&the_params, the_address, reason);
 			return;
 		}
-		
+
+		add_pending_connection(conn);
 		tnp_post_event(tnp_event::tnp_connection_requested_event, the_address, 0, reason);
-		
-//		add_connection(conn);
-//		conn->set_connection_state(connection::connected);
-//		conn->on_connection_established();
-//		send_connect_accept(conn);
 	}
+	
+	ref_ptr<connection> tnp_accept_connection(const address& the_address, const byte_buffer_ptr& data)
+	{
+		connection* conn = find_pending_connection(the_address);
+		if(!conn)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("Trying to accept a non-pending connection."));
+			return NULL;
+		}
+		
+		conn->get_connection_parameters().connect_data = data;
+		
+		add_connection(conn);
+		remove_pending_connection(conn);
+		conn->set_connection_state(connection::connected);
+		conn->on_connection_established();
+		send_connect_accept(conn);
+		
+		return conn;
+	}
+	
 	
 	
 	/// Sends a connect accept packet to acknowledge the successful acceptance of a connect request.
@@ -1008,6 +1033,7 @@ public:
 		conn->set_connection_state(connection::connected);
 		conn->on_connection_established(); // notify the connection that it has been established
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Accept - connection established."));
+		tnp_post_event(tnp_event::tnp_connection_accepted_event, the_address, 0, error_buffer);
 	}
 	
 	

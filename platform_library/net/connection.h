@@ -204,14 +204,13 @@ protected:
 	/// Writes any data needed to start the connection on the accept packet.
 	virtual void write_connect_accept(bit_stream &stream)
 	{
-		stream;
+		core::write(stream, _connection_parameters.connect_data);;
 	}
 	
 	/// Reads out the extra data read by write_connect_accept and returns true if it is processed properly.
 	virtual bool read_connect_accept(bit_stream &stream, byte_buffer_ptr &error_buffer)
 	{
-		stream;
-		error_buffer;
+		core::read(stream, error_buffer);
 		return true;
 	}
 	
