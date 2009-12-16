@@ -74,7 +74,6 @@ class connection : public ref_object
 		
 		message_signature_bytes = 5, ///< Special data bytes written into the end of the packet to guarantee data consistency
 	};
-	time _last_packet_recv_time; ///< time of the receipt of the last data packet.
 	uint32 _last_seq_recvd_at_send[max_packet_window_size]; ///< The sequence number of the last packet received from the remote host when we sent the packet with sequence X & packet_window_mask.
 	uint32 _last_seq_recvd;                            ///< The sequence number of the most recently received packet from the remote host.
 	uint32 _highest_acked_seq;                         ///< The highest sequence number the remote side has acknowledged.
@@ -200,8 +199,6 @@ protected:
 		
 		if(read_packet_header(bstream))
 		{
-			_last_packet_recv_time = _interface->get_process_start_time();
-			
 			read_packet(bstream);
 		}
 	}
@@ -258,11 +255,6 @@ protected:
 		for(uint32 i = 0; i < word_count; i++)
 			stream.write_integer(_ack_mask[i], i == word_count - 1 ?
 								  (ack_byte_count - (i * 4)) * 8 : 32);
-		
-		time send_delay = _interface->get_process_start_time() - _last_packet_recv_time;
-		if(send_delay > time(2047))
-			send_delay = time(2047);
-		stream.write_integer(uint32(send_delay.get_milliseconds() >> 3), 8);
 		
 		// if we're resending this header, we can't advance the
 		// sequence recieved (in case this packet drops and the prev one
@@ -375,14 +367,12 @@ protected:
 		//      _highest_acked_seq, pk_highest_ack, _last_send_seq, pk_sequence_number, _last_seq_recvd, pk_ack_mask[0]));
 		//}
 		
-		time pk_send_delay = time((pstream.read_integer(8) << 3) + 4);
 		static const char *packet_type_names[] = 
 		{
 			"data_packet",
 			"ping_packet",
 			"ack_packet",
 		};
-		
 		
 		TorqueLogBlock(LogConnectionProtocol,
 					   for(uint32 i = _last_seq_recvd+1; i < pk_sequence_number; i++)
