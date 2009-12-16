@@ -3,7 +3,7 @@ namespace tnp {
 enum EventTypes
 {
 	ConnectionAcceptedEvent,
-	ConnectioRrejectedEvent,
+	ConnectionRejectedEvent,
 	ConnectionRequestedEvent,
 	ConnectionTimedOutEvent,
 	ConnectionDisconnectedEvent,
@@ -38,6 +38,7 @@ class interface
 	
 	connection connect(std::string host, std::string data);
 	connection accept_connection(event evt, std::string data);
+	void reject_connection(event evt, std::string data);
 };
 
 }

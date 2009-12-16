@@ -13,7 +13,15 @@ function acceptConnection()
 {
 	connection = iface.acceptConnection(connectionEvent, document.output.say.value);
 	document.output.theButton.disabled = true;
+	document.output.theRButton.disabled = true;
 	document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
+}
+
+function rejectConnection()
+{
+	document.output.theButton.disabled = true;
+	document.output.theRButton.disabled = true;
+	iface.rejectConnection(connectionEvent, document.output.say.value);
 }
 
 function pump() {
@@ -24,7 +32,7 @@ function pump() {
 	if(event.eventType == plugin.tnp.CONNECTION_REQUESTED_EVENT)
 	{
 		connectionEvent = event;
-		var req = "Connection requested from " + event.sourceAddress + ".  It says " + event.data + "<br/>Reply: <input type=\"text\" name=\"say\"/><br/><input type=\"button\" onclick=\"acceptConnection();\" name=\"theButton\" value=\"Accept\"/>"
+		var req = "Connection requested from " + event.sourceAddress + ".  It says " + event.data + "<br/>Reply: <input type=\"text\" name=\"say\"/><br/><input type=\"button\" onclick=\"acceptConnection();\" name=\"theButton\" value=\"Accept\"/><input type=\"button\" onclick=\"rejectConnection();\" name=\"theRButton\" value=\"Reject\"/>"
 		document.output.innerHTML = req;
 	}
 	
@@ -32,6 +40,11 @@ function pump() {
 	{
 		document.output.innerHTML = "Connection accepted from " + event.sourceAddress + ".  It says " + event.data;
 		document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
+	}
+	
+	if(event.eventType == plugin.tnp.CONNECTION_REJECTED_EVENT)
+	{
+		document.output.innerHTML = "Connection rejected from " + event.sourceAddress + ".  It says " + event.data;
 	}
 	
 	if(event.eventType > plugin.tnp.USER_BARRIER)

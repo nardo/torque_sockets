@@ -963,8 +963,6 @@ public:
 		return conn;
 	}
 	
-	
-	
 	/// Sends a connect accept packet to acknowledge the successful acceptance of a connect request.
 	void send_connect_accept(connection *conn)
 	{
@@ -1036,6 +1034,18 @@ public:
 		tnp_post_event(tnp_event::tnp_connection_accepted_event, the_address, 0, error_buffer);
 	}
 	
+	void tnp_reject_connection(const address& the_address, const byte_buffer_ptr& data)
+	{
+		connection* conn = find_pending_connection(the_address);
+		if(!conn)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("Trying to rejected a non-pending connection."));
+			return;
+		}
+		
+		send_connect_reject(&(conn->get_connection_parameters()), the_address, data);
+		remove_pending_connection(conn);
+	}
 	
 	/// Sends a connect rejection to a valid connect request in response to possible error
 	/// conditions (server full, wrong password, etc).
@@ -1087,6 +1097,8 @@ public:
 		conn->set_connection_state(connection::connect_rejected);
 		conn->on_connect_terminated(reason_remote_host_rejected_connection, reason);
 		remove_pending_connection(conn);
+		
+		tnp_post_event(tnp_event::tnp_connection_rejected_event, the_address, 0, reason);
 	}
 	
 	

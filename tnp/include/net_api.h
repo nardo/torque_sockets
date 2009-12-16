@@ -70,7 +70,7 @@ namespace tnp
 	enum EventTypes
 	{
 		ConnectionAcceptedEvent,
-		ConnectioRrejectedEvent,
+		ConnectionRejectedEvent,
 		ConnectionRequestedEvent,
 		ConnectionTimedOutEvent,
 		ConnectionDisconnectedEvent,
@@ -169,6 +169,11 @@ namespace tnp
 		{
 			connection ret(tnp_accept_connection(i, &e.e, data.length() + 1, (unsigned char*)data.c_str()));
 			return ret;
+		}
+		
+		void reject_connection(event e, std::string data)
+		{
+			tnp_reject_connection(i, &e.e, data.length() + 1, (unsigned char*)data.c_str());
 		}
 	
 	private:

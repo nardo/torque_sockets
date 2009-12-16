@@ -121,10 +121,15 @@ tnp_connection tnp_accept_connection(tnp_interface iface, tnp_event* connect_req
 	return ret;
 }
 
-void tnp_reject_connection(tnp_interface, tnp_event* connect_request_event,
+void tnp_reject_connection(tnp_interface iface, tnp_event* connect_request_event,
 						   unsigned int reject_data_size,
 						   unsigned char reject_data[tnp_max_status_datagram_size])
 {
+	assert(iface)
+	assert(connect_request_event);
+	
+	byte_buffer_ptr data = new byte_buffer(reject_data, reject_data_size);
+	iface->i->tnp_reject_connection(connect_request_event->source_address, data);
 }
 
 void tnp_disconnect(tnp_connection* conn, unsigned int disconnect_data_size, 
