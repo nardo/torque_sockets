@@ -250,6 +250,7 @@ public:
 		uint32 resolution;
 		uint32 last_timer_time;
 		int64 system_time;
+		mutex _lock;
 		public:
 		win32_multimedia_timer()
 		{
@@ -270,9 +271,11 @@ public:
 
 		int64 get_current()
 		{
+			_lock.lock();
 			uint32 current = timeGetTime();
 			system_time += current - last_timer_time;
 			last_timer_time = current;
+			_lock.unlock();
 			return system_time;
 		}
 	};

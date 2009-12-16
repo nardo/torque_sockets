@@ -303,9 +303,6 @@ public:
 			_send_packet_list = next;
 		}
 		
-		for(uint32 i = 0; i < _connection_list.size(); i++)
-			_connection_list[i]->check_packet_send(false, get_process_start_time());
-		
 		if(get_process_start_time() > _last_timeout_check_time + time(timeout_check_interval))
 		{
 			for(uint32 i = 0; i < _pending_connections.size();)
