@@ -10,7 +10,7 @@
 tnp_interface my_interface;
 tnp_connection my_connection;
 
-void handle_event(tnp_event& evt)
+bool handle_event(tnp_event& evt)
 {
 	if (evt.event_type == tnp_event::tnp_connection_requested_event)
 	{
@@ -18,10 +18,11 @@ void handle_event(tnp_event& evt)
 		printf("Connection message: %s\n", evt.data);
 		const char* msg = "Hello Mr. Client";
 		my_connection = tnp_accept_connection(my_interface, &evt, strlen(msg) + 1, (unsigned char*)msg);
-		return;
+		return false;
 	}
 	
 	printf("Unknown event type\n");
+	return false;
 }
 
 int main(int argc, const char **argv)
@@ -34,11 +35,14 @@ int main(int argc, const char **argv)
 		tnp_event evt;
 		if (tnp_get_next_event(my_interface, &evt))
 		{
-			handle_event(evt);
+			if(!handle_event(evt))
+				break;
 		}
 		
 		sleep(1);
 	}
+	
+	tnp_destroy_interface(&my_interface);
 
 	return 0;
 }

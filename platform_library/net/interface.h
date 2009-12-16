@@ -198,6 +198,28 @@ public:
 		*list = the_packet;
 	}
 	
+	void tnp_post_event(int32 type, const address& source_address, uint32 packet_sequence, const byte_buffer_ptr& data)
+	{
+		tnp_event evt;
+		evt.event_type = type;
+		strncpy(evt.source_address, source_address.to_string().c_str(), MAX_ADDR);
+		evt.packet_sequence = packet_sequence;
+		evt.data_size = data->get_buffer_size();
+		memcpy(evt.data, data->get_buffer(), evt.data_size);
+		_event_queue.push(evt);
+	}
+	
+	bool tnp_pop_event(tnp_event& evt)
+	{
+		if(_event_queue.empty())
+			return false;
+			
+		evt = _event_queue.back();
+		_event_queue.pop();
+		
+		return true;
+	}
+	
 	bool tnp_get_next_packet(address& source_address, uint8& packet_type, byte_buffer_ptr& data)
 	{
 		packet_stream stream;
@@ -483,6 +505,8 @@ protected:
 		timeout_check_interval = 1500, ///< Interval in milliseconds between checking for connection timeouts.
 		puzzle_solution_timeout = 30000, ///< If the server gives us a puzzle that takes more than 30 seconds, time out.
 	};
+	
+	std::queue<tnp_event> _event_queue;
 	
 public:
 	/// Computes an identity token for the connecting client based on the address of the client and the
@@ -906,10 +930,13 @@ public:
 			send_connect_reject(&the_params, the_address, reason);
 			return;
 		}
-		add_connection(conn);
-		conn->set_connection_state(connection::connected);
-		conn->on_connection_established();
-		send_connect_accept(conn);
+		
+		tnp_post_event(tnp_event::tnp_connection_requested_event, the_address, 0, reason);
+		
+//		add_connection(conn);
+//		conn->set_connection_state(connection::connected);
+//		conn->on_connection_established();
+//		send_connect_accept(conn);
 	}
 	
 	
