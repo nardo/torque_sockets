@@ -19,3 +19,4 @@
 #include "core/page_allocator.h"
 #include "core/log.h"
 #include "core/thread.h"
+#include "core/thread_queue.h"
