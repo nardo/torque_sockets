@@ -384,12 +384,29 @@ public:
 		}
 		
 		// check if we're trying to solve any client connection puzzles
-		for(uint32 i = 0; i < _pending_connections.size(); i++)
+		byte_buffer_ptr result;
+		uint32 request_index;
+		while(_puzzle_solver.get_next_result(result, request_index))
 		{
-			if(_pending_connections[i]->get_connection_state() == connection::computing_puzzle_solution)
+			uint32 solution;
+			bit_stream s(result->get_buffer(), result->get_buffer_size());
+			core::read(s, solution);
+
+			for(uint32 i = 0; i < _pending_connections.size(); i++)
 			{
-				continue_puzzle_solution(_pending_connections[i]);
-				break;
+				connection *conn = _pending_connections[i];
+				if(conn->get_connection_state() == connection::computing_puzzle_solution)
+				{
+					connection_parameters &the_params = conn->get_connection_parameters();
+					if(the_params._puzzle_request_index != request_index)
+						continue;
+					// this was the solution for this client...
+					the_params._puzzle_solution = solution;
+					
+					conn->set_connection_state(connection::awaiting_connect_response);
+					send_connect_request(conn);
+					break;
+				}
 			}
 		}
 	}
@@ -751,24 +768,50 @@ public:
 		
 		the_params._puzzle_solution = 0;
 		conn->_connect_last_send_time = get_process_start_time();
-		continue_puzzle_solution(conn);   
-	}
-	
-	
-	/// Continues computation of the solution of a client puzzle, and issues a connect request
-	/// when the solution is found.
-	void continue_puzzle_solution(connection *conn)
-	{
-		connection_parameters &the_params = conn->get_connection_parameters();
-		bool solved = client_puzzle_manager::solve_puzzle(&the_params._puzzle_solution, the_params._nonce, the_params._server_nonce, the_params._puzzle_difficulty, the_params._client_identity);
+		packet_stream s;
+		core::write(s, the_params._nonce);
+		core::write(s, the_params._server_nonce);
+		core::write(s, the_params._puzzle_difficulty);
+		core::write(s, the_params._client_identity);
+		byte_buffer_ptr request = new byte_buffer(s.get_buffer(), s.get_byte_position());
 		
-		if(solved)
-		{
-			TorqueLogMessageFormatted(LogNetInterface, ("Client puzzle solved in %lli ms.", (time::get_current() - conn->_connect_last_send_time).get_milliseconds()));
-			conn->set_connection_state(connection::awaiting_connect_response);
-			send_connect_request(conn);
-		}
+		the_params._puzzle_request_index = _puzzle_solver.post_request(request);
 	}
+	class puzzle_solver : public thread_queue
+	{
+	public:
+		puzzle_solver() : thread_queue(1) { }
+		void process_request(const byte_buffer_ptr &the_request, byte_buffer_ptr &the_response, bool *cancelled, float *progress)
+		{
+			nonce the_nonce;
+			nonce remote_nonce;
+			uint32 puzzle_difficulty;
+			uint32 client_identity;
+			bit_stream s(the_request->get_buffer(), the_request->get_buffer_size());
+			core::read(s, the_nonce);
+			core::read(s, remote_nonce);
+			core::read(s, puzzle_difficulty);
+			core::read(s, client_identity);
+			uint32 solution = 0;
+			time start = time::get_current();
+			for(;;)
+			{
+				if(*cancelled)
+					break;
+				if(client_puzzle_manager::check_one_solution(solution, the_nonce, remote_nonce, puzzle_difficulty, client_identity))
+					break;
+			}
+			if(!*cancelled)
+			{
+				byte_buffer_ptr response = new byte_buffer(sizeof(solution));
+				bit_stream s(response->get_buffer(), response->get_buffer_size());
+				core::write(s, solution);
+				the_response = response;
+				TorqueLogMessageFormatted(LogNetInterface, ("Client puzzle solved in %lli ms.", (time::get_current() - start).get_milliseconds()));
+			}
+		}
+	};
+	puzzle_solver _puzzle_solver;
 	
 	/// Sends a connect request on behalf of a pending connection.
 	void send_connect_request(connection *conn)

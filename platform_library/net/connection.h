@@ -12,7 +12,7 @@ struct connection_parameters
 	uint32 _puzzle_difficulty; ///< Difficulty of the client puzzle solved by this client.
 	uint32 _puzzle_solution; ///< Solution to the client puzzle the server sends to the client.
 	uint32 _client_identity; ///< The client identity as computed by the remote host.
-	
+	uint32 _puzzle_request_index; ///< The index of the puzzle solver thread queue request.
 	ref_ptr<asymmetric_key> _public_key; ///< The public key of the remote host.
 	ref_ptr<asymmetric_key> _private_key;///< The private key for this connection.  May be generated on the connection attempt.
 	byte_buffer_ptr _shared_secret; ///< The shared secret key 

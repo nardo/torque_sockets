@@ -60,34 +60,6 @@ private:
 
 	nonce_table *_current_nonce_table;
 	nonce_table *_last_nonce_table;
-	static bool check_one_solution(uint32 solution, nonce &client_nonce, nonce &server_nonce, uint32 puzzle_difficulty, uint32 client_identity)
-	{
-		uint8 buffer[24];
-		write_uint32_to_buffer(solution, buffer);
-		write_uint32_to_buffer(client_identity, buffer + 4);
-		write_uint64_to_buffer(client_nonce, buffer + 8);
-		write_uint64_to_buffer(server_nonce, buffer + 16);
-
-		hash_state hash_state;
-		uint8 hash[32];
-
-		sha256_init(&hash_state);
-		sha256_process(&hash_state, buffer, sizeof(buffer));
-		sha256_done(&hash_state, hash);
-
-		uint32 index = 0;
-		while(puzzle_difficulty > 8)
-		{
-			if(hash[index])
-				return false;
-			index++;
-			puzzle_difficulty -= 8;
-		}
-		uint8 mask = 0xFF << (8 - puzzle_difficulty);
-		return (mask & hash[index]) == 0;
-	}
-
-
 	public:
 	client_puzzle_manager(random_generator &random_gen, zone_allocator *zone)
 	{
@@ -170,46 +142,33 @@ private:
 			return invalid_client_nonce;
 		return success;
 	}
-	/// Computes a puzzle solution value for the given puzzle difficulty and server nonce.  If the execution time of this function
-	/// exceeds max_solution_compute_fragment milliseconds, it will return the current trail solution in the solution variable and a
-	/// return value of false.
-	///
-	/// @note Although the behavior of this function can be tweaked using max_solution_compute_fragment and
-	///       solution_fragment_iterations, it's important to bias these settings in favor of rapid puzzle
-	///       completion. A client puzzle is only valid for two times puzzle_refresh_time, so for about a
-	///       minute, maximum. Most of the time the puzzle can be solved in only a few hundred
-	///       milliseconds. It's better to solve the puzzle fast than to let it drag out, (ie, it's better to
-	///       let your application hitch for a moment whilst calculating than to make the user endure many
-	///       seconds of lag) so reducing the timeout or iterations should be done only if you know what
-	///       you're doing.
-	///
-	static bool solve_puzzle(uint32 *solution, nonce &client_nonce, nonce &server_nonce, uint32 puzzle_difficulty, uint32 client_identity)
+
+	static bool check_one_solution(uint32 solution, nonce &client_nonce, nonce &server_nonce, uint32 puzzle_difficulty, uint32 client_identity)
 	{
-		time start_time = time::get_current();
-		uint32 start_value = *solution;
-
-		// Until we're done...
-		for(;;)
+		uint8 buffer[24];
+		write_uint32_to_buffer(solution, buffer);
+		write_uint32_to_buffer(client_identity, buffer + 4);
+		write_uint64_to_buffer(client_nonce, buffer + 8);
+		write_uint64_to_buffer(server_nonce, buffer + 16);
+		
+		hash_state hash_state;
+		uint8 hash[32];
+		
+		sha256_init(&hash_state);
+		sha256_process(&hash_state, buffer, sizeof(buffer));
+		sha256_done(&hash_state, hash);
+		
+		uint32 index = 0;
+		while(puzzle_difficulty > 8)
 		{
-			uint32 next_value = start_value + solution_fragment_iterations;
-			for(;start_value < next_value; start_value++)
-			{
-				if(check_one_solution(start_value, client_nonce, server_nonce, puzzle_difficulty, client_identity))
-				{
-					*solution = start_value;
-					return true;
-				}
-			}
-
-			// Then we check to see if we're out of time...
-			if(time::get_current() - start_time > time(max_solution_compute_fragment))
-			{
-				*solution = start_value;
+			if(hash[index])
 				return false;
-			}
+			index++;
+			puzzle_difficulty -= 8;
 		}
+		uint8 mask = 0xFF << (8 - puzzle_difficulty);
+		return (mask & hash[index]) == 0;
 	}
-
 
 	/// Returns the current server nonce
 	nonce get_current_nonce() { return _current_nonce; }
