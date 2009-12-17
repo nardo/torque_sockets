@@ -198,6 +198,36 @@ public:
 		*list = the_packet;
 	}
 	
+	void tnp_post_event(int32 type, const address& source_address, uint32 packet_sequence, const byte_buffer_ptr& data)
+	{
+		tnp_event evt;
+		evt.event_type = type;
+		strncpy(evt.source_address, source_address.to_string().c_str(), MAX_ADDR);
+		evt.packet_sequence = packet_sequence;
+		if(data.is_valid())
+		{
+			evt.data_size = data->get_buffer_size();
+			memcpy(evt.data, data->get_buffer(), evt.data_size);
+		}
+		else 
+		{
+			evt.data_size = 0;
+		}
+
+		_event_queue.push(evt);
+	}
+	
+	bool tnp_pop_event(tnp_event& evt)
+	{
+		if(_event_queue.empty())
+			return false;
+			
+		evt = _event_queue.back();
+		_event_queue.pop();
+		
+		return true;
+	}
+	
 	bool tnp_get_next_packet(address& source_address, uint8& packet_type, byte_buffer_ptr& data)
 	{
 		packet_stream stream;
@@ -497,6 +527,8 @@ protected:
 		timeout_check_interval = 1500, ///< Interval in milliseconds between checking for connection timeouts.
 		puzzle_solution_timeout = 30000, ///< If the server gives us a puzzle that takes more than 30 seconds, time out.
 	};
+	
+	std::queue<tnp_event> _event_queue;
 	
 public:
 	/// Computes an identity token for the connecting client based on the address of the client and the
@@ -946,12 +978,30 @@ public:
 			send_connect_reject(&the_params, the_address, reason);
 			return;
 		}
+
+		add_pending_connection(conn);
+		tnp_post_event(tnp_event::tnp_connection_requested_event, the_address, 0, reason);
+	}
+	
+	ref_ptr<connection> tnp_accept_connection(const address& the_address, const byte_buffer_ptr& data)
+	{
+		connection* conn = find_pending_connection(the_address);
+		if(!conn)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("Trying to accept a non-pending connection."));
+			return NULL;
+		}
+		
+		conn->get_connection_parameters().connect_data = data;
+		
 		add_connection(conn);
+		remove_pending_connection(conn);
 		conn->set_connection_state(connection::connected);
 		conn->on_connection_established();
 		send_connect_accept(conn);
+		
+		return conn;
 	}
-	
 	
 	/// Sends a connect accept packet to acknowledge the successful acceptance of a connect request.
 	void send_connect_accept(connection *conn)
@@ -1021,8 +1071,21 @@ public:
 		conn->set_connection_state(connection::connected);
 		conn->on_connection_established(); // notify the connection that it has been established
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Accept - connection established."));
+		tnp_post_event(tnp_event::tnp_connection_accepted_event, the_address, 0, error_buffer);
 	}
 	
+	void tnp_reject_connection(const address& the_address, const byte_buffer_ptr& data)
+	{
+		connection* conn = find_pending_connection(the_address);
+		if(!conn)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("Trying to rejected a non-pending connection."));
+			return;
+		}
+		
+		send_connect_reject(&(conn->get_connection_parameters()), the_address, data);
+		remove_pending_connection(conn);
+	}
 	
 	/// Sends a connect rejection to a valid connect request in response to possible error
 	/// conditions (server full, wrong password, etc).
@@ -1074,6 +1137,8 @@ public:
 		conn->set_connection_state(connection::connect_rejected);
 		conn->on_connect_terminated(reason_remote_host_rejected_connection, reason);
 		remove_pending_connection(conn);
+		
+		tnp_post_event(tnp_event::tnp_connection_rejected_event, the_address, 0, reason);
 	}
 	
 	
@@ -1399,6 +1464,8 @@ public:
 		conn->set_connection_state(connection::disconnected);
 		conn->on_connection_terminated(reason_remote_disconnect_packet, reason);
 		remove_connection(conn);
+		
+		tnp_post_event(tnp_event::tnp_connection_disconnected_event, the_address, 0, reason);
 	}
 	
 	/// Handles an error reported while reading a packet from this remote connection.
