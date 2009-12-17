@@ -77,8 +77,7 @@ namespace tnp
 		ConnectionEstablishedEvent,
 		ConnectionPacketEvent,
 		ConnectionPacketNotifyEvent,
-		InterfacePacketEvent,
-		UserBarrier
+		InterfacePacketEvent
 	};
 
 	class connection

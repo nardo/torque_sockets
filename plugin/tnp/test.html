@@ -47,9 +47,14 @@ function pump() {
 		document.output.innerHTML = "Connection rejected from " + event.sourceAddress + ".  It says " + event.data;
 	}
 	
-	if(event.eventType > plugin.tnp.USER_BARRIER)
+	if(event.eventType == plugin.tnp.CONNECTION_DISCONNECTED_EVENT)
 	{
-		document.output.innerHTML += event.sourceAddress + " says " + event.data + "<br/>"
+		document.output.innerHTML += event.sourceAddress + " disconnected, " + event.data + "<br/>";
+	}
+	
+	if(event.eventType == plugin.tnp.CONNECTION_PACKET_EVENT)
+	{
+		document.output.innerHTML += event.sourceAddress + " says " + event.data + "<br/>";
 	}
 }
 

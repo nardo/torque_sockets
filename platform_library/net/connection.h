@@ -121,6 +121,8 @@ class connection : public ref_object
 	
 	/// Returns true if this connection has sent packets that have not yet been acked by the remote host.
 	bool has_unacked_sent_packets() { return _last_send_seq != _highest_acked_seq; }
+	
+	byte_buffer_ptr _packet_data;
 public:
 	connection(random_generator &random_gen)
 	{
@@ -215,7 +217,12 @@ protected:
 	}
 	
 	/// Called to read a subclass's packet data from the packet.
-	virtual void read_packet(bit_stream &bstream) {}
+	virtual void read_packet(bit_stream &bstream) 
+	{
+		byte_buffer_ptr data;
+		core::read(bstream, data);
+		get_interface()->tnp_post_event(tnp_event::tnp_connection_packet_event, get_address(), _last_seq_recvd, data);
+	}
 	
 	/// Called to prepare the connection for packet writing.
 	virtual void prepare_write_packet() {}
@@ -225,7 +232,10 @@ protected:
 	///  this function.  prepare_write_packet should _always_ call the Parent:: function.
 	
 	/// Called to write a subclass's packet data into the packet.Information about what the instance wrote into the packet can be attached to the notify ref_object.
-	virtual void write_packet(bit_stream &bstream, packet_notify *note) {}
+	virtual void write_packet(bit_stream &bstream, packet_notify *note) 
+	{
+		core::write(bstream, _packet_data);
+	}
 	
 	/// Called when the packet associated with the specified notify is known to have been received by the remote host.  Packets are guaranteed to be notified in the order in which they were sent.
 	virtual void packetReceived(packet_notify *note)
@@ -815,6 +825,16 @@ public:
 		}
 		else
 			return _interface->send_to(get_address(), stream);
+	}
+	
+	void tnp_send_data_packet(const byte_buffer_ptr& data)
+	{
+		_packet_data = data;
+		packet_stream ps;
+		write_raw_packet(ps, data_packet);
+		TorqueLogMessageFormatted(LogConnectionProtocol, ("send data %d", _last_send_seq));
+		
+		send_packet(ps);
 	}
 	
 	/// Checks to see if the connection has timed out, possibly sending a ping packet to the remote host.  Returns true if the connection timed out.

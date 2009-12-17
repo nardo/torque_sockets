@@ -140,7 +140,7 @@ void tnp_disconnect(tnp_connection* conn, unsigned int disconnect_data_size,
 	
 	byte_buffer_ptr data = new byte_buffer(disconnect_data, disconnect_data_size);
 	
-	(*conn)->c->get_interface()->tnp_send_packet((*conn)->c, tnp_event::tnp_connection_disconnected_event, data);
+	(*conn)->c->disconnect(data);
 	
 	delete *conn;
 	*conn = NULL;
@@ -149,8 +149,10 @@ void tnp_disconnect(tnp_connection* conn, unsigned int disconnect_data_size,
 void tnp_send_to(tnp_connection conn, unsigned int datagram_size, 
 				unsigned char buffer[tnp_max_datagram_size])
 {
+	assert(conn);
+	
 	byte_buffer_ptr data = new byte_buffer(buffer, datagram_size);
-	conn->c->get_interface()->tnp_send_packet(conn->c, tnp_event::tnp_interface_packet_event + 2, data);
+	conn->c->tnp_send_data_packet(data);
 }
 
 void tnp_get_connection_state(tnp_connection the_connection)

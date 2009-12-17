@@ -1424,6 +1424,8 @@ public:
 		conn->set_connection_state(connection::disconnected);
 		conn->on_connection_terminated(reason_remote_disconnect_packet, reason);
 		remove_connection(conn);
+		
+		tnp_post_event(tnp_event::tnp_connection_disconnected_event, the_address, 0, reason);
 	}
 	
 	/// Handles an error reported while reading a packet from this remote connection.

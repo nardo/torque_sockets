@@ -10,8 +10,7 @@ enum EventTypes
 	ConnectionEstablishedEvent,
 	ConnectionPacketEvent,
 	ConnectionPacketNotifyEvent,
-	InterfacePacketEvent,
-	UserBarrier
+	InterfacePacketEvent
 };
 
 [binding_model=by_value, include="net_api.h"]
