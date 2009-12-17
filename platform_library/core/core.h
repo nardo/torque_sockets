@@ -20,3 +20,6 @@
 #include "core/log.h"
 #include "core/thread.h"
 #include "core/thread_queue.h"
+#include "core/hash.h"
+#include "core/small_block_allocator.h"
+#include "core/indexed_string.h"
