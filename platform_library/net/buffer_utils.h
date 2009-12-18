@@ -190,7 +190,7 @@ static void write_uint64_to_buffer(uint64 value, uint8 *buffer)
 	uint32 top = uint32(value >> 32);
 	uint32 bottom = uint32(value);
 	write_uint32_to_buffer(top, buffer);
-	write_uint32_to_buffer(bottom, buffer);
+	write_uint32_to_buffer(bottom, buffer + 4);
 }
 
 static uint32 read_uint32_from_buffer(const uint8 *buf)
@@ -204,7 +204,7 @@ static uint32 read_uint32_from_buffer(const uint8 *buf)
 static uint64 read_uint64_from_buffer(const uint8 *buf)
 {
 	uint32 top = read_uint32_from_buffer(buf);
-	uint32 bottom = read_uint32_from_buffer(buf);
+	uint32 bottom = read_uint32_from_buffer(buf + 4);
 	return (uint64(top) << 32) | bottom;
 }
 
