@@ -829,6 +829,8 @@ public:
 					break;
 				if(client_puzzle_manager::check_one_solution(solution, the_nonce, remote_nonce, puzzle_difficulty, client_identity))
 					break;
+
+				++solution;
 			}
 			if(!*cancelled)
 			{
