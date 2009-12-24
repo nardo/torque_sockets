@@ -22,39 +22,97 @@ enum connection_constants {
 };
 
 
-typedef struct _torque_opaque_connection_t* torque_connection;
+typedef uint32 torque_connection;
 typedef struct _torque_opaque_socket_t* torque_socket;
 	
 struct torque_socket_event
 {
 	enum torque_socket_event_type
 	{
-		torque_connection_accepted_event,
-		torque_connection_rejected_event,
-		torque_connection_requested_event,
-		torque_connection_timed_out_event,
-		torque_connection_disconnected_event,
-		torque_connection_established_event,
-		torque_connection_packet_event,
-		torque_connection_packet_notify_event,
-		torque_socket_packet_event,
-	} event_type;
-	
-	SOCKADDR source_address; ///< For data packets and connection status events, this holds the source address for the received packet.
-	torque_connection *source_connection; ///< Connection object for this event
-	uint32 packet_sequence; ///< Sequence number for this packet received or delivery notification.
-	bool packet_delivered; ///< For a packet notify event, delivery status flag.
-	uint32 data_size; ///< Size of the associated datagram or status message.
-	uint8 data[torque_max_datagram_size]; ///< Datagram or status message associated with this event.
+		torque_connection_challenge_response_event_type,
+		torque_connection_requested_event_type,
+		torque_connection_accepted_event_type,
+		torque_connection_rejected_event_type,
+		torque_connection_timed_out_event_type,
+		torque_connection_disconnected_event_type,
+		torque_connection_established_event_type,
+		torque_connection_packet_event_type,
+		torque_connection_packet_notify_event_type,
+		torque_socket_packet_event_type,
+	};
+	uint32 event_type;
+};
+
+struct torque_connection_accepted_event : torque_socket_event
+{
+	torque_connection the_connection;
+	uint32 connection_accept_data_size;
+	uint8 connection_accept_data[torque_max_status_datagram_size];
 };
 	
+struct torque_connection_rejected_event : torque_socket_event
+{
+	torque_connection the_connection;
+	uint32 connection_reject_data_size;
+	uint8 connection_reject_data[torque_max_status_datagram_size];
+};
+
+struct torque_connection_requested_event : torque_socket_event
+{
+	SOCKADDR source_address;
+	torque_connection the_connection;
+	uint32 connection_request_data_size;
+	uint8 connection_request_data[torque_max_status_datagram_size];
+};
+
+struct torque_connection_timed_out_event : torque_socket_event
+{
+	torque_connection the_connection;
+};
+
+struct torque_connection_disconnected_event : torque_socket_event
+{
+	torque_connection the_connection;
+	uint32 connection_disconnected_data_size;
+	uint8 connection_disconnected_data[torque_max_status_datagram_size];
+};
+
+struct torque_connection_established_event : torque_socket_event
+{
+	torque_connection the_connection;
+};
+
+struct torque_connection_packet_event : torque_socket_event
+{
+	torque_connection the_connection;
+	uint32 packet_sequence;
+	uint32 data_size;
+	uint32 data[torque_max_datagram_size];
+};
+
+struct torque_connection_packet_notify_event : torque_socket_event
+{
+	torque_connection the_connection;
+	uint32 send_sequence;
+	bool delivered;
+};
+
+struct torque_socket_packet_event : torque_socket_event
+{
+	SOCKADDR source_address;
+	uint32 data_size;
+	uint32 data[torque_max_datagram_size];
+};
+
 torque_socket torque_socket_create(const SOCKADDR *); ///< Create a torque socket and bind it to the specified socket address interface.
 void torque_socket_destroy(torque_socket); ///< Close the specified socket; any open connections on this socket will be closed automatically.
 void torque_socket_seed_entropy(torque_socket, uint8 entropy[32]); ///< Seed random entropy data for this socket (used in the generation of cryptographic keys).
 void torque_socket_read_entropy(torque_socket, uint8 entropy[32]); ///< Read the current entropy state from this socket.
+void torque_socket_set_private_key(torque_socket, uint32 key_data_size, uint8 *the_key); ///< Sets the private/public key pair to be used for this connection; these are formatted as libtomcrypt keys, and currently only ECC is supported.
+void torque_socket_set_challenge_response_data(torque_socket, uint32 challenge_response_data_size, uint8 *challenge_response_data); ///< Sets the data to be sent back upon challenge request along with the client puzzle and public key.
 void torque_socket_allow_incoming_connections(torque_socket, bool allowed); ///< Sets whether or not this connection accepts incoming connections; if not, all incoming connection challenges and requests will be silently ignored.
 bool torque_socket_does_allow_incoming_connections(torque_socket); ///< Returns true if this socket allows incoming connections.
-bool torque_socket_get_next_event(torque_socket, torque_socket_event* the_event); ///< Gets the next event on this socket; returns true if there was an event pending or false if there are no events to be read.
+torque_socket_event *torque_socket_get_next_event(torque_socket); ///< Gets the next event on this socket; returns NULL if there are no events to be read.
 
 torque_connection torque_socket_connect(torque_socket, const SOCKADDR *remote_host, uint32 connect_data_size, uint8 connect_data[tnp_max_status_datagram_size]); ///< open a connection to the remote host
 
