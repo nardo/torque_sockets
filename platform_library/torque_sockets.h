@@ -13,7 +13,6 @@ extern "C" {
 
 /* Opaque forward declares */
 
-struct _torque_opaque_connection_t;
 struct _torque_opaque_socket_t;
 
 enum connection_constants {
@@ -109,20 +108,20 @@ void torque_socket_destroy(torque_socket); ///< Close the specified socket; any 
 void torque_socket_seed_entropy(torque_socket, uint8 entropy[32]); ///< Seed random entropy data for this socket (used in the generation of cryptographic keys).
 void torque_socket_read_entropy(torque_socket, uint8 entropy[32]); ///< Read the current entropy state from this socket.
 void torque_socket_set_private_key(torque_socket, uint32 key_data_size, uint8 *the_key); ///< Sets the private/public key pair to be used for this connection; these are formatted as libtomcrypt keys, and currently only ECC is supported.
-void torque_socket_set_challenge_response_data(torque_socket, uint32 challenge_response_data_size, uint8 *challenge_response_data); ///< Sets the data to be sent back upon challenge request along with the client puzzle and public key.
+void torque_socket_set_challenge_response_data(torque_socket, uint32 challenge_response_data_size, uint8 challenge_response_data[torque_max__status_datagram_size]); ///< Sets the data to be sent back upon challenge request along with the client puzzle and public key.  challenge_response_data_size must be <= torque_max_status_datagram_size
 void torque_socket_allow_incoming_connections(torque_socket, bool allowed); ///< Sets whether or not this connection accepts incoming connections; if not, all incoming connection challenges and requests will be silently ignored.
 bool torque_socket_does_allow_incoming_connections(torque_socket); ///< Returns true if this socket allows incoming connections.
 torque_socket_event *torque_socket_get_next_event(torque_socket); ///< Gets the next event on this socket; returns NULL if there are no events to be read.
 
-torque_connection torque_socket_connect(torque_socket, const SOCKADDR *remote_host, uint32 connect_data_size, uint8 connect_data[tnp_max_status_datagram_size]); ///< open a connection to the remote host
+torque_connection torque_socket_connect(torque_socket, const SOCKADDR *remote_host, uint32 connect_data_size, uint8 connect_data[torque_max__status_datagram_size]); ///< open a connection to the remote host
 
-void torque_connection_accept(torque_connection, uint32 connect_accept_data_size, uint8 connect_accept_data[tnp_max_status_datagram_size]); ///< accept an incoming connection request.
+void torque_connection_accept(torque_connection, uint32 connect_accept_data_size, uint8 connect_accept_data[torque_max__status_datagram_size]); ///< accept an incoming connection request.
+	
+void torque_connection_reject(torque_connection, uint32 reject_data_size, uint8 reject_data[torque_max__status_datagram_size]); ///< reject an incoming connection request.
 
-void torque_connection_reject(torque_connection, uint32 reject_data_size, uint8 reject_data[tnp_max_status_datagram_size]); ///< reject an incoming connection request
 
-void torque_connection_disconnect(torque_connection, uint32 disconnect_data_size, uint8 disconnect_data[tnp_max_status_datagram_size]); ///< Close an open connection.
-
-uint32 torque_connection_send_to(torque_connection, uint32 datagram_size, uint8 buffer[tnp_max_datagram_size]); ///< Send a datagram packet to the remote host on the other side of the connection.  Returns the sequence number of the packet sent.
+void torque_connection_disconnect(torque_connection, uint32 disconnect_data_size, uint8 disconnect_data[torque_max__status_datagram_size]); ///< Close an open connection. 
+uint32 torque_connection_send_to(torque_connection, uint32 datagram_size, uint8 buffer[torque_max_datagram_size]); ///< Send a datagram packet to the remote host on the other side of the connection.  Returns the sequence number of the packet sent.
 	
 void torque_connection_get_state(torque_connection the_connection, torque_connection_state *the_state);
 	
