@@ -39,7 +39,7 @@ torque_socket_event *torque_socket_get_next_event(torque_socket); ///< Gets the 
 torque_connection torque_socket_connect(torque_socket, const SOCKADDR *remote_host, uint32 connect_data_size, uint8 connect_data[torque_max_status_datagram_size]); ///< open a connection to the remote host
 torque_connection torque_connection_connect_arranged(torque_connection middle_man, uint64 remote_client_identity, uint32 connect_data_size, uint8 connect_data[torque_max_status_datagram_size]); ///< Connect to a client connected to the host at middle_man.
 void torque_connection_accept(torque_connection, uint32 connect_accept_data_size, uint8 connect_accept_data[torque_max_status_datagram_size]); ///< accept an incoming connection request.
-void torque_connection_reject(torque_connection, uint32 reject_data_size, uint8 reject_data[torque_max__status_datagram_size]); ///< reject an incoming connection request.
+void torque_connection_reject(torque_connection, uint32 reject_data_size, uint8 reject_data[torque_max_status_datagram_size]); ///< reject an incoming connection request.
 void torque_connection_disconnect(torque_connection, uint32 disconnect_data_size, uint8 disconnect_data[torque_max_status_datagram_size]); ///< Close an open connection. 
 send_to_result torque_connection_send_to(torque_connection, uint32 datagram_size, uint8 buffer[torque_max_datagram_size], uint32 *sequence_number); ///< Send a datagram packet to the remote host on the other side of the connection.  Returns the sequence number of the packet sent.
 
@@ -62,40 +62,47 @@ struct torque_socket_event
 	uint32 event_type;
 };
 	
-struct torque_connection_challenge_response_event : torque_socket_event
+struct torque_connection_challenge_response_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
-	uint32 public_key_size,
+	uint32 public_key_size;
 	uint8 public_key[torque_max_public_key_size];
 	uint32 challenge_response_data_size;
 	uint8 challenge_response_data[torque_max_status_datagram_size]; 
 };
 	
-struct torque_connection_accepted_event : torque_socket_event
+struct torque_connection_accepted_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
 	uint64 client_identity;
 	uint32 connection_accept_data_size;
 	uint8 connection_accept_data[torque_max_status_datagram_size];
 };
 	
-struct torque_connection_rejected_event : torque_socket_event
+struct torque_connection_rejected_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
 	uint32 connection_reject_data_size;
 	uint8 connection_reject_data[torque_max_status_datagram_size];
 };
 
-struct torque_connection_requested_event : torque_socket_event
+struct torque_connection_requested_event
 {
+	uint32 event_type;
 	SOCKADDR source_address;
 	torque_connection the_connection;
+	uint32 public_key_size;
+	uint8 public_key[torque_max_public_key_size];
 	uint32 connection_request_data_size;
 	uint8 connection_request_data[torque_max_status_datagram_size];
 };
 
-struct torque_connection_arranged_connection_request_event : torque_socket_event
+struct torque_connection_arranged_connection_request_event
 {
+	uint32 event_type;
 	uint64 source_client_identity;
 	torque_connection the_connection;
 	torque_connection arranger_connection;
@@ -103,40 +110,46 @@ struct torque_connection_arranged_connection_request_event : torque_socket_event
 	uint8 connection_request_data[torque_max_status_datagram_size];
 };	
 	
-struct torque_connection_timed_out_event : torque_socket_event
+struct torque_connection_timed_out_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
 };
 
-struct torque_connection_disconnected_event : torque_socket_event
+struct torque_connection_disconnected_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
 	uint32 connection_disconnected_data_size;
 	uint8 connection_disconnected_data[torque_max_status_datagram_size];
 };
 
-struct torque_connection_established_event : torque_socket_event
+struct torque_connection_established_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
 };
 
-struct torque_connection_packet_event : torque_socket_event
+struct torque_connection_packet_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
 	uint32 packet_sequence;
 	uint32 data_size;
 	uint32 data[torque_max_datagram_size];
 };
 
-struct torque_connection_packet_notify_event : torque_socket_event
+struct torque_connection_packet_notify_event
 {
+	uint32 event_type;
 	torque_connection the_connection;
 	uint32 send_sequence;
 	bool delivered;
 };
 
-struct torque_socket_packet_event : torque_socket_event
+struct torque_socket_packet_event
 {
+	uint32 event_type;
 	SOCKADDR source_address;
 	uint32 data_size;
 	uint32 data[torque_max_datagram_size];

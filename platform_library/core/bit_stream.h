@@ -18,6 +18,7 @@ class bit_stream
 	virtual void set_bit_position(bit_position pos) { _bit_num = uint32(pos); }
 	virtual bit_position get_stream_bit_size() { return _bit_end; }
 	
+	virtual void uint32 get_next_byte_position() { return (_bit_num + 7) >> 3; }
 	virtual uint32 get_byte_position() { return _bit_num >> 3; }
 	virtual void set_byte_position(uint32 byte_pos) { _bit_num = byte_pos << 3; }
 	virtual uint32 get_stream_byte_size() { return (_bit_end + 7) >> 3; }

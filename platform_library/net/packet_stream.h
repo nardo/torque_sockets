@@ -11,7 +11,7 @@ public:
    /// Sends this packet to the specified address through the specified socket.
    udp_socket::send_to_result send_to(udp_socket &outgoing_socket, const address &the_address)
 	{
-	   return outgoing_socket.send_to(the_address, buffer, get_byte_position());
+	   return outgoing_socket.send_to(the_address, buffer, get_next_byte_position());
 	}
 
    /// Reads a packet into the stream from the specified socket.

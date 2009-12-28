@@ -172,7 +172,7 @@ public:
 	/// Sends a packet to the remote address over this interface's socket.
 	udp_socket::send_to_result send_to(const address &the_address, bit_stream &stream)
 	{
-		return _socket.send_to(the_address, stream.get_buffer(), stream.get_byte_position());
+		return _socket.send_to(the_address, stream.get_buffer(), stream.get_next_byte_position());
 	}
 	
 	
@@ -181,7 +181,7 @@ public:
 	/// This is used to simulate network latency on a LAN or single computer.
 	void send_to_delayed(const address &the_address, bit_stream &stream, uint32 millisecond_delay)
 	{
-		uint32 data_size = stream.get_byte_position();
+		uint32 data_size = stream.get_next_byte_position();
 		
 		// allocate the send packet, with the data size added on
 		delay_send_packet *the_packet = (delay_send_packet *) memory_allocate(sizeof(delay_send_packet) + data_size);
@@ -270,7 +270,7 @@ public:
 			connection_parameters &the_params = conn->get_connection_parameters();
 			core::write(out, the_params._nonce);
 			core::write(out, the_params._server_nonce);
-			uint32 encrypt_pos = out.get_byte_position();
+			uint32 encrypt_pos = out.get_next_byte_position();
 			out.set_byte_position(encrypt_pos);
 			core::write(out, reason_buffer);
 			
@@ -770,7 +770,7 @@ public:
 		core::write(s, the_params._server_nonce);
 		core::write(s, the_params._puzzle_difficulty);
 		core::write(s, the_params._client_identity);
-		byte_buffer_ptr request = new byte_buffer(s.get_buffer(), s.get_byte_position());
+		byte_buffer_ptr request = new byte_buffer(s.get_buffer(), s.get_next_byte_position());
 		
 		the_params._puzzle_request_index = _puzzle_solver.post_request(request);
 	}
@@ -827,7 +827,7 @@ public:
 		uint32 encrypt_pos = 0;
 	
 		core::write(out, the_params._private_key->get_public_key());
-		encrypt_pos = out.get_byte_position();
+		encrypt_pos = out.get_next_byte_position();
 		out.set_byte_position(encrypt_pos);
 		out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
 
@@ -904,7 +904,7 @@ public:
 		the_params._public_key = new asymmetric_key(stream);
 		the_params._private_key = _private_key;
 		
-		uint32 decrypt_pos = stream.get_byte_position();
+		uint32 decrypt_pos = stream.get_next_byte_position();
 		
 		stream.set_byte_position(decrypt_pos);
 		the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
@@ -964,7 +964,7 @@ public:
 		
 		core::write(out, the_params._nonce);
 		core::write(out, the_params._server_nonce);
-		uint32 encrypt_pos = out.get_byte_position();
+		uint32 encrypt_pos = out.get_next_byte_position();
 		out.set_byte_position(encrypt_pos);
 		
 		core::write(out, conn->get_initial_send_sequence());
@@ -985,7 +985,7 @@ public:
 		
 		core::read(stream, nonce);
 		core::read(stream, server_nonce);
-		uint32 decrypt_pos = stream.get_byte_position();
+		uint32 decrypt_pos = stream.get_next_byte_position();
 		stream.set_byte_position(decrypt_pos);
 		
 		connection *conn = find_pending_connection(the_address);
@@ -1100,7 +1100,7 @@ public:
 		else
 			core::write(out, the_params._server_nonce);
 		
-		uint32 encrypt_pos = out.get_byte_position();
+		uint32 encrypt_pos = out.get_next_byte_position();
 		out.set_byte_position(encrypt_pos);
 		
 		if(the_params._is_initiator)
@@ -1196,7 +1196,7 @@ public:
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
 		symmetric_cipher the_cipher(the_params._arranged_secret);
-		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream.get_byte_position(), &the_cipher))
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream.get_next_byte_position(), &the_cipher))
 			return;
 		
 		nonce next_nonce;
@@ -1244,14 +1244,14 @@ public:
 		
 		core::write(out, uint8(arranged_connect_request_packet));
 		core::write(out, the_params._nonce);
-		uint32 encrypt_pos = out.get_byte_position();
+		uint32 encrypt_pos = out.get_next_byte_position();
 		
 		out.set_byte_position(encrypt_pos);
 		
 		core::write(out, the_params._server_nonce);
 		core::write(out, the_params._private_key->get_public_key());
 
-		uint32 inner_encrypt_pos = out.get_byte_position();
+		uint32 inner_encrypt_pos = out.get_next_byte_position();
 		out.set_byte_position(inner_encrypt_pos);
 		out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
 
@@ -1316,10 +1316,10 @@ public:
 		
 		connection_parameters &the_params = conn->get_connection_parameters();
 		symmetric_cipher arraged_secret_cipher(the_params._arranged_secret);
-		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream.get_byte_position(), &arraged_secret_cipher))
+		if(!bit_stream_decrypt_and_check_hash(stream, connection::message_signature_bytes, stream.get_next_byte_position(), &arraged_secret_cipher))
 			return;
 		
-		stream.set_byte_position(stream.get_byte_position());
+		stream.set_byte_position(stream.get_next_byte_position());
 		
 		core::read(stream, server_nonce);
 		if(server_nonce != the_params._server_nonce)
@@ -1330,7 +1330,7 @@ public:
 		the_params._public_key = new asymmetric_key(stream);
 		the_params._private_key = _private_key;
 		
-		uint32 decrypt_pos = stream.get_byte_position();
+		uint32 decrypt_pos = stream.get_next_byte_position();
 		stream.set_byte_position(decrypt_pos);
 		the_params._shared_secret = the_params._private_key->compute_shared_secret_key(the_params._public_key);
 		symmetric_cipher shared_secret_cipher(the_params._shared_secret);
@@ -1387,7 +1387,7 @@ public:
 		if(nonce != the_params._nonce || server_nonce != the_params._server_nonce)
 			return;
 		
-		uint32 decrypt_pos = stream.get_byte_position();
+		uint32 decrypt_pos = stream.get_next_byte_position();
 		stream.set_byte_position(decrypt_pos);
 		
 		symmetric_cipher the_cipher(the_params._shared_secret);

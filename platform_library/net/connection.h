@@ -615,7 +615,7 @@ public:
 			return udp_socket::send_to_success;
 		}
 		
-		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SEND - %d bytes", _address.to_string().c_str(), stream.get_byte_position()));
+		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SEND - %d bytes", _address.to_string().c_str(), stream.get_next_byte_position()));
 		
 		if(_simulated_latency)
 		{

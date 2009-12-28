@@ -1,7 +1,7 @@
 /// Hashes the bit_stream, writing the hash digest into the end of the buffer, and then encrypts with the given cipher
 static void bit_stream_hash_and_encrypt(bit_stream &the_stream, uint32 hash_digest_size, uint32 encrypt_start_offset, symmetric_cipher *the_cipher)
 {
-	uint32 digest_start = the_stream.get_byte_position();
+	uint32 digest_start = the_stream.get_next_byte_position();
 	the_stream.set_byte_position(digest_start);
 	hash_state hash_state;
 	
@@ -17,7 +17,7 @@ static void bit_stream_hash_and_encrypt(bit_stream &the_stream, uint32 hash_dige
 	
 	the_cipher->encrypt(the_stream.get_buffer() + encrypt_start_offset,
 					   the_stream.get_buffer() + encrypt_start_offset,
-					   the_stream.get_byte_position() - encrypt_start_offset);   
+					   the_stream.get_next_byte_position() - encrypt_start_offset);   
 }
 
 
