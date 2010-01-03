@@ -50,6 +50,7 @@ public:
 			i++;
 		}
 		unlock();
+		return found;
 	}
 
 	/// Posts a request to be handled.

@@ -8,7 +8,7 @@ enum memory_storage_kind
 TYPE_INFO_TEMPLATE(pointer_memory_storage_kind, memory_storage_kind, kind, memory_storage_unknown);
 BOOLEAN_TYPE_INFO_TEMPLATE(is_container, false);
 
-#define declare_class_virtual_type_discovery() virtual type_record *get_type_record() { return get_global_type_record(this); }
+#define declare_dynamic_class() virtual type_record *get_type_record() { return get_global_type_record(this); }
 
 
 class type_record;
@@ -129,9 +129,9 @@ template<typename type> struct container_manipulator
 	typedef empty_type key_type;
 	typedef empty_type value_type;
 
-	static bool reserve(type *container, uint32 size, context *the_context) { }
+	static bool reserve(type *container, uint32 size, context *the_context) { return false; }
 	static void insert_key_value(type *container, key_type *key, value_type *value, context *the_context) { }
-	static value_type *insert_key(type *container, key_type *key, context *the_context) { }
+	static value_type *insert_key(type *container, key_type *key, context *the_context) { return 0; }
 	static uint32 size(type *container) { return 0; }
 	
 	static value_type *find_element(type *container, key_type *key) { return 0; }
