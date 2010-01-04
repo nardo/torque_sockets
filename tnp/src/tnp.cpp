@@ -60,7 +60,7 @@ void tnp_read_entropy(tnp_interface, unsigned char entropy[32])
 
 void tnp_allow_incoming_connections(tnp_interface iface, int allowed)
 {
-	assert(iface)
+	assert(iface);
 	
 	iface->i->set_allows_connections(allowed);
 }
@@ -74,7 +74,7 @@ int tnp_does_allow_incoming_connections(tnp_interface iface)
 
 int tnp_get_next_event(tnp_interface iface, tnp_event* the_event)
 {
-	assert(iface)
+	assert(iface);
 	assert(the_event);
 	
 	iface->i->check_incoming_packets();

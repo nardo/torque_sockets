@@ -15,6 +15,7 @@
 #include <mach/mach_init.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <stdlib.h>
 
 #include <sys/ioctl.h>   /* ioctl() */
 #define NO_IPX_SUPPORT

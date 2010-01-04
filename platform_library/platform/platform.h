@@ -60,7 +60,9 @@ static const char *compiler_string = "GNU C Compiler";
 	#endif
 #elif defined(__ppc__) || defined(__powerpc__) || defined(PPC)
 	static const char *cpu_string = "PowerPC";
+	#ifndef BIG_ENDIAN
 	#define BIG_ENDIAN
+	#endif
 	#define CPU_PPC
 
 	#if defined(__GNUC__)

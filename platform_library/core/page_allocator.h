@@ -31,7 +31,6 @@ public:
 		if(!size)
 			return 0;
 
-		void *ret;
 		// align size:
 		size = (size + (alignment - 1)) & ~(alignment - 1);
 		
