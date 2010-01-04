@@ -30,7 +30,7 @@ enum connection_constants {
 	torque_max_public_key_size = 512,
 };
 
-torque_socket torque_socket_create(const SOCKADDR *);
+torque_socket torque_socket_create(SOCKADDR);
 ///< Create a torque socket and bind it to the specified socket address interface.
 
 void torque_socket_destroy(torque_socket);
@@ -63,7 +63,7 @@ int32 torque_socket_does_allow_arranged_connections(torque_socket);
 torque_socket_event *torque_socket_get_next_event(torque_socket);
 ///< Gets the next event on this socket; returns NULL if there are no events to be read.
 
-torque_connection torque_socket_connect(torque_socket, const SOCKADDR *remote_host, uint32 connect_data_size, uint8 connect_data[torque_max_status_datagram_size]);
+torque_connection torque_socket_connect(torque_socket, SOCKADDR remote_host, uint32 connect_data_size, uint8 connect_data[torque_max_status_datagram_size]);
 ///< open a connection to the remote host
 
 torque_connection torque_connection_connect_arranged(torque_connection middle_man, uint64 remote_client_identity, uint32 connect_data_size, uint8 connect_data[torque_max_status_datagram_size]);
