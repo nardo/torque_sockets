@@ -19,8 +19,7 @@ enum send_to_result
 	
 /* Opaque forward declares */
 
-struct _torque_opaque_socket_t;
-typedef struct _torque_opaque_socket_t* torque_socket;
+typedef uint32 torque_socket;
 typedef uint32 torque_connection;
 static const torque_connection invalid_torque_connection = 0;
 struct torque_socket_event;
