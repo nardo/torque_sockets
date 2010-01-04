@@ -49,16 +49,16 @@ void torque_socket_set_private_key(torque_socket, uint32 key_data_size, uint8 *t
 void torque_socket_set_challenge_response_data(torque_socket, uint32 challenge_response_data_size, uint8 challenge_response_data[torque_max_status_datagram_size]);
 ///< Sets the data to be sent back upon challenge request along with the client puzzle and public key.  challenge_response_data_size must be <= torque_max_status_datagram_size
 	
-void torque_socket_allow_incoming_connections(torque_socket, bool allowed);
+void torque_socket_allow_incoming_connections(torque_socket, int32 allowed);
 ///< Sets whether or not this connection accepts incoming connections; if not, all incoming connection challenges and requests will be silently ignored.
 
-bool torque_socket_does_allow_incoming_connections(torque_socket);
+int32 torque_socket_does_allow_incoming_connections(torque_socket);
 ///< Returns true if this socket allows incoming connections.
 
-void torque_socket_allow_arranged_connections(torque_socket, bool allowed);
+void torque_socket_allow_arranged_connections(torque_socket, int32 allowed);
 ///< if true, this socket will arrange connections between hosts connected to this socket.
 
-bool torque_socket_does_allow_arranged_connections(torque_socket);
+int32 torque_socket_does_allow_arranged_connections(torque_socket);
 ///< Returns true if this socket will arrange connections between hosts connected to this socket.	
 
 torque_socket_event *torque_socket_get_next_event(torque_socket);
@@ -183,7 +183,7 @@ struct torque_connection_packet_notify_event
 	uint32 event_type;
 	torque_connection connection;
 	uint32 send_sequence;
-	bool delivered;
+	int32 delivered;
 };
 
 struct torque_socket_packet_event
