@@ -37,6 +37,11 @@ struct address
 		set(address_string, dns_lookup, port);
 	}
 
+	address(const SOCKADDR& socket_address)
+	{
+		from_sockaddr(socket_address);
+	}
+
 	/*address(const address &copy)
 	{
 		_host = copy._host;
