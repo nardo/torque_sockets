@@ -1,0 +1,9 @@
+Import('env')
+
+files = Glob('*.cpp')
+env['CPPPATH'] = ['#/platform_library/', '#/lib/libtommath', '#/lib/libtomcrypt/src/headers', '.']
+env['LIBPATH'] = ['#/lib/libtommath', '#/lib/libtomcrypt']
+env['LIBS'] = ['libtommath', 'libtomcrypt']
+
+ret = env.Build('StaticLibrary', 'tnp', files)
+Return('ret')
