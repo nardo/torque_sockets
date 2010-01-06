@@ -103,7 +103,7 @@ public:
 		socklen_t address_size = sizeof(sockaddr);
 		getsockname(_socket, &sockaddr, &address_size);
 		address ret;
-		ret.from_sockaddr(&sockaddr);
+		ret.from_sockaddr(sockaddr);
 		return ret;
 	}
 
@@ -143,7 +143,7 @@ public:
 		*incoming_packet_size = uint32(bytes_read);
 
 		if(sender_address)
-			sender_address->from_sockaddr(&sender_sockaddr);
+			sender_address->from_sockaddr(sender_sockaddr);
 
 		return packet_received;
 	}

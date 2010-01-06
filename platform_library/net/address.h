@@ -146,12 +146,12 @@ struct address
 		return _host ^ (uint32(_port) << 8);
 	}
 
-	void from_sockaddr(const SOCKADDR *socket_address)
+	void from_sockaddr(const SOCKADDR& socket_address)
 	{
-		if(socket_address->sa_family == AF_INET)
+		if(socket_address.sa_family == AF_INET)
 		{
-			_port = htons(((SOCKADDR_IN *) socket_address)->sin_port);
-			_host = htonl(((SOCKADDR_IN *) socket_address)->sin_addr.s_addr);
+			_port = htons(((SOCKADDR_IN *) &socket_address)->sin_port);
+			_host = htonl(((SOCKADDR_IN *) &socket_address)->sin_addr.s_addr);
 		}
 	}
 
@@ -216,7 +216,7 @@ struct address
 			for(struct ifaddrs *walk = addrs; walk; walk = walk->ifa_next)
 			{
 				address the_address;
-				the_address.from_sockaddr(walk->ifa_addr);
+				the_address.from_sockaddr(*walk->ifa_addr);
 				if(the_address._host != INADDR_ANY && the_address._host != 0x7F000001)
 					address_array.push_back(the_address);
 			}
