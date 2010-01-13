@@ -94,6 +94,11 @@ void torque_socket_destroy(torque_socket socket)
 
 void torque_socket_seed_entropy(torque_socket socket, unsigned char entropy[32])
 {
+	ref_ptr<net::interface>& interface = get_interface_for_socket_(socket);
+	if(interface == NULL)
+		return;
+	
+	interface->random().add_entropy(entropy, 32);
 }
 
 void torque_socket_set_private_key(torque_socket socket, unsigned key_data_size, unsigned char* the_key)
