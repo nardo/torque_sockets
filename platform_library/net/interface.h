@@ -272,7 +272,14 @@ public:
 	}
 	/// Handles all packets that don't fall into the category of connection handshake or game data.
 	virtual void handle_info_packet(const address &address, uint8 packet_type, bit_stream &stream)
-	{}
+	{
+		torque_socket_event event;
+		event.event_type = torque_socket_packet_event_type;
+		event.data_size = stream.get_stream_byte_size();
+		stream.read_bytes(event.data, event.data_size);
+		address.to_sockaddr(&event.source_address);
+		tnp_post_event(event, NULL);
+	}
 	
 	/// Checks all connections on this interface for packet sends, and for timeouts and all valid
 	/// and pending connections.
