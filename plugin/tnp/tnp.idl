@@ -56,6 +56,8 @@ class socket
 	[getter=does_allow_incoming_connections, setter=allow_incoming_connections] bool allow_incoming_connections;
 	[getter=is_introducer, setter=can_be_introducer] bool can_be_introducer;
 	
+	void seed_entropy(std::string entropy);
+	
 	connection connect(std::string address, std::string connect_data);
 	event get_next_event();
 };
