@@ -34,6 +34,12 @@ bool handle_event(const torque::event& event)
 		return true;
 	}
 	
+	if(event.event_type() == torque::event::connection_timed_out_event_type)
+	{
+		printf("Connection timed out\n");
+		return true;
+	}
+
 	printf("Unknown event type\n");
 	return false;
 }
