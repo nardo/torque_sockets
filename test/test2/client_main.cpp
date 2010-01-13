@@ -25,8 +25,6 @@ bool handle_event(torque_socket_event* event)
 	{
 //		printf("Connection accepted from %s\n", evt.source_address);
 		printf("Connection message: %s\n", event->data);
-		const char* msg = "It works!";
-		torque_connection_send_to(my_connection, strlen(msg) + 1, (unsigned char*)msg, NULL);
 		return true;
 	}
 	
@@ -56,12 +54,18 @@ int main(int argc, const char **argv)
 	
 	my_connection = torque_socket_connect(my_socket, (sockaddr*)&server_addy, strlen(msg) + 1, (unsigned char*)msg);
 
+	bool spam = false;
 	while(true)
 	{
 		torque_socket_event* evt = torque_socket_get_next_event(my_socket);
 		if(evt)
 			if(handle_event(evt))
-				break;
+				spam = true;
+		if(spam)
+		{
+			const char* msg = "It works!";
+			torque_connection_send_to(my_connection, strlen(msg) + 1, (unsigned char*)msg, NULL);
+		}
 		sleep(1);
 	}
 
