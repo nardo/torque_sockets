@@ -88,7 +88,6 @@ namespace torque
 		~socket();
 		
 		void seed_entropy(const std::string& entropy);
-		std::string read_entropy();
 		
 		void set_private_key(const std::string& key);
 		

@@ -50,9 +50,6 @@ void torque_socket_destroy(torque_socket);
 void torque_socket_seed_entropy(torque_socket, unsigned char entropy[32]);
 ///< Seed random entropy data for this socket (used in the generation of cryptographic keys).
 
-void torque_socket_read_entropy(torque_socket, unsigned char entropy[32]);
-///< Read the current entropy state from this socket.
-
 void torque_socket_set_private_key(torque_socket, unsigned key_data_size, unsigned char *the_key);
 ///< Sets the private/public key pair to be used for this connection; these are formatted as libtomcrypt keys, and currently only ECC is supported.
 

@@ -96,10 +96,6 @@ void torque_socket_seed_entropy(torque_socket socket, unsigned char entropy[32])
 {
 }
 
-void torque_socket_read_entropy(torque_socket socket, unsigned char entropy[32])
-{
-}
-
 void torque_socket_set_private_key(torque_socket socket, unsigned key_data_size, unsigned char* the_key)
 {
 	ref_ptr<net::interface>& interface = get_interface_for_socket_(socket);
@@ -437,13 +433,6 @@ namespace torque
 	void socket::seed_entropy(const std::string& entropy)
 	{
 		torque_socket_seed_entropy(s, (unsigned char*)entropy.c_str());
-	}
-
-	std::string socket::read_entropy()
-	{
-		unsigned char entropy[32];
-		torque_socket_read_entropy(s, entropy);
-		return (const char*)entropy;
 	}
 
 	void socket::set_private_key(const std::string& key)
