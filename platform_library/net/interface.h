@@ -361,6 +361,11 @@ public:
 				{
 					_connection_list[i]->set_connection_state(connection::timed_out);
 					_connection_list[i]->on_connection_terminated(reason_timed_out, _timed_out_reason_buffer);
+					
+					torque_socket_event event;
+					event.event_type = torque_connection_timed_out_event_type;
+					tnp_post_event(event, _connection_list[i]);
+					
 					remove_connection(_connection_list[i]);
 				}
 				else
