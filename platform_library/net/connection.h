@@ -486,6 +486,12 @@ protected:
 	virtual void handle_notify(uint32 sequence, bool recvd)
 	{
 		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: NOTIFY %d %s", _address.to_string().c_str(), sequence, recvd ? "RECVD" : "DROPPED"));
+
+		torque_socket_event event;
+		event.event_type = torque_connection_packet_notify_event_type;
+		event.delivered = recvd;
+		event.packet_sequence = sequence;
+		get_interface()->tnp_post_event(event, this);
 	}
 	
 	/// Called when a packet is received to stop any timeout action in progress.
