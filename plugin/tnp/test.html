@@ -11,7 +11,7 @@ function sendData()
 
 function acceptConnection()
 {
-	connection = iface.acceptConnection(connectionEvent, document.output.say.value);
+	connection.accept(document.output.say.value);
 	document.output.theButton.disabled = true;
 	document.output.theRButton.disabled = true;
 	document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
@@ -21,40 +21,42 @@ function rejectConnection()
 {
 	document.output.theButton.disabled = true;
 	document.output.theRButton.disabled = true;
-	iface.rejectConnection(connectionEvent, document.output.say.value);
+	connection.reject(document.output.say.value);
 }
 
 function pump() {
 	var event = iface.getNextEvent();
-	if(!event.recv)
+	if(!event.eventType)
 		return;
-
-	if(event.eventType == plugin.tnp.CONNECTION_REQUESTED_EVENT)
+		
+	console.log(event.eventType);
+	
+	if(event.eventType == plugin.torque.event.CONNECTION_REQUESTED_EVENT_TYPE)
 	{
-		connectionEvent = event;
+		connection = event.sourceConnection;
 		var req = "Connection requested from " + event.sourceAddress + ".  It says " + event.data + "<br/>Reply: <input type=\"text\" name=\"say\"/><br/><input type=\"button\" onclick=\"acceptConnection();\" name=\"theButton\" value=\"Accept\"/><input type=\"button\" onclick=\"rejectConnection();\" name=\"theRButton\" value=\"Reject\"/>"
 		document.output.innerHTML = req;
 	}
 	
-	if(event.eventType == plugin.tnp.CONNECTION_ACCEPTED_EVENT)
+	if(event.eventType == plugin.torque.event.CONNECTION_ACCEPTED_EVENT_TYPE)
 	{
-		document.output.innerHTML = "Connection accepted from " + event.sourceAddress + ".  It says " + event.data;
+		document.output.innerHTML = "Connection accepted.  " + event.data;
 		document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
 	}
 	
-	if(event.eventType == plugin.tnp.CONNECTION_REJECTED_EVENT)
+	if(event.eventType == plugin.torque.event.CONNECTION_REJECTED_EVENT_TYPE)
 	{
-		document.output.innerHTML = "Connection rejected from " + event.sourceAddress + ".  It says " + event.data;
+		document.output.innerHTML = "Connection rejected from.  " + event.data;
 	}
 	
-	if(event.eventType == plugin.tnp.CONNECTION_DISCONNECTED_EVENT)
+	if(event.eventType == plugin.torque.event.CONNECTION_DISCONNECTED_EVENT_TYPE)
 	{
-		document.output.innerHTML += event.sourceAddress + " disconnected, " + event.data + "<br/>";
+		document.output.innerHTML += "Connection closed, " + event.data + "<br/>";
 	}
 	
-	if(event.eventType == plugin.tnp.CONNECTION_PACKET_EVENT)
+	if(event.eventType == plugin.torque.event.CONNECTION_PACKET_EVENT_TYPE)
 	{
-		document.output.innerHTML += event.sourceAddress + " says " + event.data + "<br/>";
+		document.output.innerHTML += event.data + "<br/>";
 	}
 }
 
@@ -81,12 +83,12 @@ function init() {
 	isServer = connType == 'Server';
 
 	plugin = document.getElementById("plugin");
-	iface = plugin.tnp.interface(document.params.addy.value);
+	iface = plugin.torque.socket(document.params.addy.value);
 	if (!iface) {
 	alert("no plugin");
 	}
 
-	iface.allowsConnections = isServer;
+	iface.allowIncomingConnections = isServer;
 	
 	setInterval('pump()', 32);
 	

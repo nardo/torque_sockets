@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #endif
 
+#ifndef UINT64
 #if defined(__MSVC__)
 	typedef signed _int64 int64; ///< Signed 64 bit integer
 	typedef unsigned _int64 uint64; ///< Unsigned 64 bit integer
@@ -20,15 +21,15 @@
 	typedef signed long long int64; ///< Signed 64 bit integer
 	typedef unsigned long long uint64; ///< Unsigned 64 bit integer
 #endif
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-	
-/* Opaque forward declares */
 
 typedef int torque_socket;
 typedef int torque_connection;
+static const torque_socket invalid_torque_socket = 0;
 static const torque_connection invalid_torque_connection = 0;
 struct torque_socket_event;
 	
@@ -64,10 +65,10 @@ void torque_socket_allow_incoming_connections(torque_socket, int allowed);
 int torque_socket_does_allow_incoming_connections(torque_socket);
 ///< Returns true if this socket allows incoming connections.
 
-void torque_socket_allow_arranged_connections(torque_socket, int allowed);
+void torque_socket_can_be_introducer(torque_socket, int allowed);
 ///< if true, this socket will arrange connections between hosts connected to this socket.
 
-int torque_socket_does_allow_arranged_connections(torque_socket);
+int torque_socket_is_introducer(torque_socket);
 ///< Returns true if this socket will arrange connections between hosts connected to this socket.	
 
 struct torque_socket_event *torque_socket_get_next_event(torque_socket);
@@ -76,7 +77,7 @@ struct torque_socket_event *torque_socket_get_next_event(torque_socket);
 torque_connection torque_socket_connect(torque_socket, struct sockaddr* remote_host, unsigned connect_data_size, status_response connect_data);
 ///< open a connection to the remote host
 
-torque_connection torque_connection_connect_arranged(torque_connection middle_man, uint64 remote_client_identity, unsigned connect_data_size, status_response connect_data);
+torque_connection torque_connection_introduce_me(torque_connection introducer, uint64 remote_client_identity, unsigned connect_data_size, status_response connect_data);
 ///< Connect to a client connected to the host at middle_man.
 
 void torque_connection_accept(torque_connection, unsigned connect_accept_data_size, status_response connect_accept_data);
@@ -93,7 +94,7 @@ int torque_connection_send_to(torque_connection, unsigned datagram_size, unsigne
 
 enum torque_socket_event_type
 {
-	torque_connection_challenge_response_event_type,
+	torque_connection_challenge_response_event_type = 1,
 	torque_connection_requested_event_type,
 	torque_connection_arranged_connection_request_event_type,
 	torque_connection_accepted_event_type,
@@ -109,9 +110,19 @@ enum torque_socket_event_type
 struct torque_socket_event
 {
 	unsigned event_type;
+	torque_connection connection;
+	torque_connection arranger_connection;
+	uint64 client_identity;
+	unsigned public_key_size;
+	unsigned char public_key[torque_max_public_key_size];
+	unsigned data_size;
+	unsigned char data[torque_max_datagram_size];
+	unsigned packet_sequence;
+	int delivered;
+	struct sockaddr source_address;
 };
-	
-struct torque_connection_challenge_response_event
+
+/*struct torque_connection_challenge_response_event
 {
 	unsigned event_type;
 	torque_connection connection;
@@ -202,7 +213,7 @@ struct torque_socket_packet_event
 	unsigned data_size;
 	unsigned char data[torque_max_datagram_size];
 	struct sockaddr source_address;
-};
+};*/
 
 #ifdef __cplusplus
 }

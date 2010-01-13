@@ -10,6 +10,6 @@ env = Environment(variables=vars)
 
 Export('env')
 
-libs = env.SConscript('tnp/SConscript')
+libs = env.SConscript('platform_library/SConscript')
 env.SConscript('test/test2/SConscript', 'libs')
 env.SConscript('plugin/tnp/SConscript', 'libs')

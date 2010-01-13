@@ -8,7 +8,6 @@
  */
 
 #include "plugin.h"
-#include "net_api.h"
 #include <string>
 #include <string.h>
 #include <stdio.h>

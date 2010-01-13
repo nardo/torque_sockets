@@ -198,31 +198,21 @@ public:
 		*list = the_packet;
 	}
 	
-	void tnp_post_event(int32 type, const address& source_address, uint32 packet_sequence, const byte_buffer_ptr& data)
+	void tnp_post_event(const torque_socket_event& data, const ref_ptr<net::connection>& source_conn)
 	{
-		tnp_event evt;
-		evt.event_type = type;
-		strncpy(evt.source_address, source_address.to_string().c_str(), MAX_ADDR);
-		evt.packet_sequence = packet_sequence;
-		if(data.is_valid())
-		{
-			evt.data_size = data->get_buffer_size();
-			memcpy(evt.data, data->get_buffer(), evt.data_size);
-		}
-		else 
-		{
-			evt.data_size = 0;
-		}
+		torque_socket_event_ex evt;
+		evt.data = data;
+		evt.conn = source_conn;
 
 		_event_queue.push(evt);
 	}
 	
-	bool tnp_pop_event(tnp_event& evt)
+	bool tnp_pop_event(torque_socket_event_ex& evt)
 	{
 		if(_event_queue.empty())
 			return false;
 			
-		evt = _event_queue.back();
+		evt = _event_queue.front();
 		_event_queue.pop();
 		
 		return true;
@@ -442,6 +432,7 @@ protected:
 	///  validated the connection.
 	
 	ref_ptr<asymmetric_key> _private_key; ///< The private key used by this interface for secure key exchange.
+	zone_allocator _allocator;
 	client_puzzle_manager _puzzle_manager; ///< The ref_object that tracks the current client puzzle difficulty, current puzzle and solutions for this interface.
 	
 	/// @name NetInterfaceSocket Socket
@@ -458,7 +449,8 @@ protected:
 	byte_buffer_ptr _reconnecting_reason_buffer;
 	byte_buffer_ptr _shutdown_reason_buffer;
 	byte_buffer_ptr _timed_out_reason_buffer;
-	zone_allocator _allocator;
+
+	byte_buffer_ptr _challenge_response_buffer;
 	
 	/// @}
 	
@@ -496,7 +488,7 @@ protected:
 		puzzle_solution_timeout = 30000, ///< If the server gives us a puzzle that takes more than 30 seconds, time out.
 	};
 	
-	std::queue<tnp_event> _event_queue;
+	std::queue<torque_socket_event_ex> _event_queue;
 	
 public:
 	/// Computes an identity token for the connecting client based on the address of the client and the
@@ -666,7 +658,6 @@ public:
 	/// Sends a connect challenge request on behalf of the connection to the remote host.
 	void send_connect_challenge_request(connection *the_connection)
 	{
-   	printf("sent a request\n");
 		TorqueLogMessageFormatted(LogNetInterface, ("Sending Connect Challenge Request to %s", the_connection->get_address().to_string().c_str()));
 		packet_stream out;
 		core::write(out, uint8(connect_challenge_request_packet));
@@ -692,6 +683,10 @@ public:
 		send_connect_challenge_response(addr, client_nonce);
 	}
 	
+	void set_challenge_response_data(byte_buffer_ptr data)
+	{
+		_challenge_response_buffer = data;
+	}
 	
 	/// Sends a connect challenge request to the specified address.  This can happen as a result
 	/// of receiving a connect challenge request, or during an "arranged" connection for the non-initiator
@@ -711,6 +706,7 @@ public:
 		core::write(out, server_nonce);
 		core::write(out, difficulty);
 		core::write(out, _private_key->get_public_key());
+		core::write(out, _challenge_response_buffer);
 
 		TorqueLogMessageFormatted(LogNetInterface, ("Sending Challenge Response: %8x", identity_token));
 		
@@ -722,7 +718,6 @@ public:
 	/// a connection this interface has pending.
 	void handle_connect_challenge_response(const address &the_address, bit_stream &stream)
 	{
-   	printf("handle_connect_challenge_response\n");
 		connection *conn = find_pending_connection(the_address);
 		if(!conn || conn->get_connection_state() != connection::awaiting_challenge_response)
 			return;
@@ -759,10 +754,24 @@ public:
 		_random_generator.random_buffer(the_params._symmetric_key, symmetric_cipher::key_size);
 
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Challenge Response: %8x", the_params._client_identity ));
-		
+
+		byte_buffer_ptr response_data;
+		core::read(stream, response_data);
+
+		torque_socket_event event;
+		event.event_type = torque_connection_challenge_response_event_type;
+
+		event.public_key_size = the_params._public_key->get_public_key()->get_buffer_size();
+		memcpy(event.public_key, the_params._public_key->get_public_key()->get_buffer(), event.public_key_size);
+
+		event.data_size = response_data->get_buffer_size();
+		memcpy(event.data, response_data->get_buffer(), event.data_size);
+
+		tnp_post_event(event, conn);
+
 		conn->set_connection_state(connection::computing_puzzle_solution);
 		conn->_connect_send_count = 0;
-		
+
 		the_params._puzzle_solution = 0;
 		conn->_connect_last_send_time = get_process_start_time();
 		packet_stream s;
@@ -950,16 +959,26 @@ public:
 		}
 
 		add_pending_connection(conn);
-		tnp_post_event(tnp_event::tnp_connection_requested_event, the_address, 0, reason);
+
+		torque_socket_event event;
+		event.event_type = torque_connection_requested_event_type;
+
+		event.public_key_size = the_params._public_key->get_public_key()->get_buffer_size();
+		memcpy(event.public_key, the_params._public_key->get_public_key()->get_buffer(), event.public_key_size);
+
+		event.data_size = reason->get_buffer_size();
+		memcpy(event.data, reason->get_buffer(), event.data_size);
+
+		tnp_post_event(event, the_connection);
 	}
 	
-	ref_ptr<connection> tnp_accept_connection(const address& the_address, const byte_buffer_ptr& data)
+	void tnp_accept_connection(const ref_ptr<connection>& conn, const byte_buffer_ptr& data)
 	{
-		connection* conn = find_pending_connection(the_address);
-		if(!conn)
+		connection* c = find_pending_connection(conn->get_address());
+		if(!c)
 		{
 			TorqueLogMessageFormatted(LogNetInterface, ("Trying to accept a non-pending connection."));
-			return NULL;
+			return;
 		}
 		
 		conn->get_connection_parameters().connect_data = data;
@@ -969,8 +988,6 @@ public:
 		conn->set_connection_state(connection::connected);
 		conn->on_connection_established();
 		send_connect_accept(conn);
-		
-		return conn;
 	}
 	
 	/// Sends a connect accept packet to acknowledge the successful acceptance of a connect request.
@@ -1041,7 +1058,14 @@ public:
 		conn->set_connection_state(connection::connected);
 		conn->on_connection_established(); // notify the connection that it has been established
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Accept - connection established."));
-		tnp_post_event(tnp_event::tnp_connection_accepted_event, the_address, 0, error_buffer);
+
+		torque_socket_event event;
+		event.event_type = torque_connection_accepted_event_type;
+		event.client_identity = nonce;
+		event.data_size = error_buffer->get_buffer_size();
+		memcpy(event.data, error_buffer->get_buffer(), event.data_size);
+
+		tnp_post_event(event, conn);
 	}
 	
 	void tnp_reject_connection(const address& the_address, const byte_buffer_ptr& data)
@@ -1107,8 +1131,13 @@ public:
 		conn->set_connection_state(connection::connect_rejected);
 		conn->on_connect_terminated(reason_remote_host_rejected_connection, reason);
 		remove_pending_connection(conn);
-		
-		tnp_post_event(tnp_event::tnp_connection_rejected_event, the_address, 0, reason);
+
+		torque_socket_event event;
+		event.event_type = torque_connection_rejected_event_type;
+		event.data_size = reason->get_buffer_size();
+		memcpy(event.data, reason->get_buffer(), event.data_size);
+
+		tnp_post_event(event, conn);
 	}
 	
 	
@@ -1434,8 +1463,13 @@ public:
 		conn->set_connection_state(connection::disconnected);
 		conn->on_connection_terminated(reason_remote_disconnect_packet, reason);
 		remove_connection(conn);
-		
-		tnp_post_event(tnp_event::tnp_connection_disconnected_event, the_address, 0, reason);
+
+		torque_socket_event event;
+		event.event_type = torque_connection_disconnected_event_type;
+		event.data_size = reason->get_buffer_size();
+		memcpy(event.data, reason->get_buffer(), event.data_size);
+
+		tnp_post_event(event, conn);
 	}
 	
 	/// Handles an error reported while reading a packet from this remote connection.

@@ -211,7 +211,14 @@ protected:
 	{
 		byte_buffer_ptr data;
 		core::read(bstream, data);
-		get_interface()->tnp_post_event(tnp_event::tnp_connection_packet_event, get_address(), _last_seq_recvd, data);
+
+		torque_socket_event event;
+		event.event_type = torque_connection_packet_event_type;
+		event.packet_sequence = _last_seq_recvd;
+		event.data_size = data->get_buffer_size();
+		memcpy(event.data, data->get_buffer(), event.data_size);
+
+		get_interface()->tnp_post_event(event, this);
 	}
 	
 	
@@ -635,14 +642,14 @@ public:
 			return _interface->send_to(get_address(), stream);
 	}
 	
-	void tnp_send_data_packet(const byte_buffer_ptr& data)
+	std::pair<udp_socket::send_to_result, uint32> tnp_send_data_packet(const byte_buffer_ptr& data)
 	{
 		_packet_data = data;
 		packet_stream ps;
 		write_raw_packet(ps, data_packet);
 		TorqueLogMessageFormatted(LogConnectionProtocol, ("send data %d", _last_send_seq));
 		
-		send_packet(ps);
+		return std::make_pair(send_packet(ps), _last_send_seq);
 	}
 	
 	/// Checks to see if the connection has timed out, possibly sending a ping packet to the remote host.  Returns true if the connection timed out.

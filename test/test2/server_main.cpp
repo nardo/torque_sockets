@@ -1,24 +1,37 @@
 // Copyright GarageGames.  See /license/info.txt in this distribution for licensing terms.
 
-#include "net_api.h"
+#include "torque_sockets_cpp.h"
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
-tnp_interface my_interface;
-tnp_connection my_connection;
-
-bool handle_event(tnp_event& evt)
+bool handle_event(const torque::event& event)
 {
-	if (evt.event_type == tnp_event::tnp_connection_requested_event)
+	if (event.event_type() == torque::event::connection_requested_event_type)
 	{
-		printf("Connection requested from %s\n", evt.source_address);
-		printf("Connection message: %s\n", evt.data);
-		const char* msg = "Hello Mr. Client";
-		my_connection = tnp_accept_connection(my_interface, &evt, strlen(msg) + 1, (unsigned char*)msg);
+//		printf("Connection requested from %s\n", evt.source_address);
+		printf("Connection message: %s\n", event.data().c_str());
+		torque::connection my_connection = event.source_connection();
+		std::string msg = "Hello Mr. Client";
+		my_connection.accept(msg);
 		return false;
+	}
+	
+	if(event.event_type() == torque::event::connection_packet_event_type)
+	{
+		printf("Connection data: %s\n", event.data().c_str());
+		return false;
+	}
+	
+	if (event.event_type() == torque::event::connection_disconnected_event_type)
+	{
+		printf("Disconnection message: %s\n", event.data().c_str());
+		return true;
 	}
 	
 	printf("Unknown event type\n");
@@ -26,23 +39,25 @@ bool handle_event(tnp_event& evt)
 }
 
 int main(int argc, const char **argv)
-{
-	my_interface = tnp_create_interface("localhost:31337");
-	tnp_allow_incoming_connections(my_interface, true);
+{	
+	torque::socket my_socket("localhost:31337");
+	my_socket.allow_incoming_connections(true);
+	my_socket.set_challenge_response_data("Welcome to the test server.");
 
 	while(true)
 	{
-		tnp_event evt;
-		if (tnp_get_next_event(my_interface, &evt))
+		torque::event evt = my_socket.get_next_event();
+		bool end = false;
+		while(evt.event_type())
 		{
-			if(!handle_event(evt))
-				break;
+			if(handle_event(evt))
+				end = true;
+			evt = my_socket.get_next_event();
 		}
-		
+		if(end)
+			break;
 		sleep(1);
 	}
-	
-	tnp_destroy_interface(&my_interface);
 
 	return 0;
 }
