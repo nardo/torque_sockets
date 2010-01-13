@@ -292,7 +292,8 @@ public:
 #else
 	static time get_current()
 	{
-		
+		Nanoseconds durTime = AbsoluteToNanoseconds(UpTime());
+		return *(uint64*)&durTime/1000000;
 	}
 #endif
 };
