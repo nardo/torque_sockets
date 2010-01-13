@@ -180,6 +180,9 @@ void torque_connection_accept(torque_connection conn, unsigned connect_accept_da
 	byte_buffer_ptr data = new byte_buffer(connect_accept_data, connect_accept_data_size);
 
 	connection->get_interface()->tnp_accept_connection(connection, data);
+	torque_socket_event event;
+	event.event_type = torque_connection_established_event_type;
+	connection->get_interface()->tnp_post_event(event, connection);
 }
 
 void torque_connection_reject(torque_connection conn, unsigned connect_reject_data_size, status_response connect_reject_data)
