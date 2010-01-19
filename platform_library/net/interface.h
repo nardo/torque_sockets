@@ -426,15 +426,15 @@ protected:
 	
 	enum packet_type
 	{
-		connect_challenge_request_packet = 0, ///< Initial packet of the two-phase connect process
-		connect_challenge_response_packet = 1, ///< Response packet to the ChallengeRequest containing client identity, a client puzzle, and possibly the server's public key.
-		connect_request_packet = 2, ///< A connect request packet, including all puzzle solution data and connection initiation data.
-		connect_reject_packet = 3, ///< A packet sent to notify a host that a connect_request was rejected.
-		connect_accept_packet = 4, ///< A packet sent to notify a host that a connection was accepted.
-		disconnect_packet = 5, ///< A packet sent to notify a host that the specified connection has terminated.
-		punch_packet = 6, ///< A packet sent in order to create a hole in a firewall or NAT so packets from the remote host can be received.
-		arranged_connect_request_packet = 7, ///< A connection request for an "arranged" connection.
-		first_valid_info_packet_id  = 8, ///< The first valid ID for a interface subclass's info packets.
+		connect_challenge_request_packet, ///< Initial packet of the two-phase connect process
+		connect_challenge_response_packet, ///< Response packet to the ChallengeRequest containing client identity, a client puzzle, and possibly the server's public key.
+		connect_request_packet, ///< A connect request packet, including all puzzle solution data and connection initiation data.
+		connect_reject_packet, ///< A packet sent to notify a host that a connect_request was rejected.
+		connect_accept_packet, ///< A packet sent to notify a host that a connection was accepted.
+		disconnect_packet, ///< A packet sent to notify a host that the specified connection has terminated.
+		punch_packet, ///< A packet sent in order to create a hole in a firewall or NAT so packets from the remote host can be received.
+		arranged_connect_request_packet, ///< A connection request for an "arranged" connection.
+		first_valid_info_packet_id, ///< The first valid ID for a interface subclass's info packets.
 	};
 	
 	array<ref_ptr<connection> > _connection_list; ///< List of all the connections that are in a connected state on this interface.
