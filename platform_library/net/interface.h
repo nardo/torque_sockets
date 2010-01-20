@@ -121,6 +121,7 @@ public:
 
 		// Supply our own (small) unique private key for the time being.
 		_private_key = new asymmetric_key(16, _random_generator);
+		_challenge_response_buffer = new byte_buffer();
 	}
 	
 	~interface()
