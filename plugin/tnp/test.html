@@ -34,13 +34,13 @@ function pump() {
 	if(event.eventType == plugin.torque.event.CONNECTION_REQUESTED_EVENT_TYPE)
 	{
 		connection = event.sourceConnection;
-		var req = "Connection requested from " + event.sourceAddress + ".  It says " + event.data + "<br/>Reply: <input type=\"text\" name=\"say\"/><br/><input type=\"button\" onclick=\"acceptConnection();\" name=\"theButton\" value=\"Accept\"/><input type=\"button\" onclick=\"rejectConnection();\" name=\"theRButton\" value=\"Reject\"/>"
+		var req = "Connection requested from " + event.sourceAddress + ", id " + event.clientIdentity + ".  It says " + event.data + "<br/>Reply: <input type=\"text\" name=\"say\"/><br/><input type=\"button\" onclick=\"acceptConnection();\" name=\"theButton\" value=\"Accept\"/><input type=\"button\" onclick=\"rejectConnection();\" name=\"theRButton\" value=\"Reject\"/>"
 		document.output.innerHTML = req;
 	}
 	
 	if(event.eventType == plugin.torque.event.CONNECTION_ACCEPTED_EVENT_TYPE)
 	{
-		document.output.innerHTML = "Connection accepted.  " + event.data;
+		document.output.innerHTML = "Connection accepted from " + event.clientIdentity + ".  " + event.data;
 		document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
 	}
 	
