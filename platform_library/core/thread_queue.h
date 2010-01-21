@@ -65,6 +65,7 @@ public:
 		record->cancelled = false;
 		record->progress = 0;
 		_process_list.push_back(record);
+		_semaphore.increment();
 		unlock();
 		return index;
 	}
