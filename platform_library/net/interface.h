@@ -370,10 +370,6 @@ public:
 					_connection_list[i]->set_connection_state(connection::timed_out);
 					_connection_list[i]->on_connection_terminated(reason_timed_out, _timed_out_reason_buffer);
 					
-					torque_socket_event event;
-					event.event_type = torque_connection_timed_out_event_type;
-					tnp_post_event(event, _connection_list[i]);
-					
 					remove_connection(_connection_list[i]);
 				}
 				else
@@ -1564,13 +1560,6 @@ public:
 		conn->set_connection_state(connection::disconnected);
 		conn->on_connection_terminated(reason_remote_disconnect_packet, reason);
 		remove_connection(conn);
-
-		torque_socket_event event;
-		event.event_type = torque_connection_disconnected_event_type;
-		event.data_size = reason->get_buffer_size();
-		memcpy(event.data, reason->get_buffer(), event.data_size);
-
-		tnp_post_event(event, conn);
 	}
 	
 	/// Handles an error reported while reading a packet from this remote connection.

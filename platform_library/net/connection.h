@@ -136,11 +136,22 @@ protected:
 	/// Called when a pending connection is terminated
 	virtual void on_connect_terminated(interface::termination_reason reason, byte_buffer_ptr &reject_buffer)
 	{
+		on_connection_terminated(reason, reject_buffer);
 	}
 	
 	/// Called when this established connection is terminated for any reason
-	virtual void on_connection_terminated(interface::termination_reason, byte_buffer_ptr &reason_buffer)
+	virtual void on_connection_terminated(interface::termination_reason reason, byte_buffer_ptr &reason_buffer)
 	{
+		torque_socket_event event;
+		if(reason != interface::reason_timed_out)
+			event.event_type = torque_connection_disconnected_event_type;
+		else
+			event.event_type = torque_connection_timed_out_event_type;
+
+		event.data_size = reason_buffer->get_buffer_size();
+		memcpy(event.data, reason_buffer->get_buffer(), event.data_size);
+
+		get_interface()->tnp_post_event(event, this);
 	}
 	
 	/// Called when the connection is successfully established with the remote host.
