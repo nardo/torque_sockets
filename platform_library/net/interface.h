@@ -1074,7 +1074,7 @@ public:
 
 		torque_socket_event event;
 		event.event_type = torque_connection_accepted_event_type;
-		event.client_identity = nonce;
+		event.client_identity = the_params._client_identity;
 		event.data_size = error_buffer->get_buffer_size();
 		memcpy(event.data, error_buffer->get_buffer(), event.data_size);
 

@@ -13,16 +13,6 @@
 #include <sys/socket.h>
 #endif
 
-#ifndef UINT64
-#if defined(__MSVC__)
-	typedef signed _int64 int64; ///< Signed 64 bit integer
-	typedef unsigned _int64 uint64; ///< Unsigned 64 bit integer
-#else
-	typedef signed long long int64; ///< Signed 64 bit integer
-	typedef unsigned long long uint64; ///< Unsigned 64 bit integer
-#endif
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -74,7 +64,7 @@ struct torque_socket_event *torque_socket_get_next_event(torque_socket);
 torque_connection torque_socket_connect(torque_socket, struct sockaddr* remote_host, unsigned connect_data_size, status_response connect_data);
 ///< open a connection to the remote host
 
-torque_connection torque_connection_introduce_me(torque_connection introducer, uint64 remote_client_identity, unsigned connect_data_size, status_response connect_data);
+torque_connection torque_connection_introduce_me(torque_connection introducer, unsigned remote_client_identity, unsigned connect_data_size, status_response connect_data);
 ///< Connect to a client connected to the host at middle_man.
 
 void torque_connection_accept(torque_connection, unsigned connect_accept_data_size, status_response connect_accept_data);
@@ -109,7 +99,7 @@ struct torque_socket_event
 	unsigned event_type;
 	torque_connection connection;
 	torque_connection arranger_connection;
-	uint64 client_identity;
+	unsigned client_identity;
 	unsigned public_key_size;
 	unsigned char public_key[torque_max_public_key_size];
 	unsigned data_size;

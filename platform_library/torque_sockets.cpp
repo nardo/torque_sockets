@@ -162,11 +162,13 @@ torque_connection torque_socket_connect(torque_socket socket, struct sockaddr* r
 	return connections.size();
 }
 
-torque_connection torque_connection_introduce_me(torque_connection introducer, uint64 remote_client_identity, unsigned connect_data_size, status_response connect_data)
+torque_connection torque_connection_introduce_me(torque_connection introducer, unsigned remote_client_identity, unsigned connect_data_size, status_response connect_data)
 {
 	ref_ptr<net::connection> connection = get_connection_for_connection_(introducer);
 	if(connection == NULL)
 		return 0;
+
+	connection->get_interface()->request_introduction(connection, remote_client_identity);
 
 	return 0;
 }
@@ -355,7 +357,7 @@ namespace torque
 	std::string event::client_identity() const
 	{
 		static char buffer[64];
-		snprintf(buffer, sizeof(buffer), "%llu", e->e.client_identity);
+		snprintf(buffer, sizeof(buffer), "%u", e->e.client_identity);
 		return buffer;
 	}
 
@@ -395,8 +397,8 @@ namespace torque
 
 	connection connection::introduce_me(const std::string& remote_client, const std::string& connect_data)
 	{
-		uint64 remote_id = 0;
-		sscanf(remote_client.c_str(), "%llu", &remote_id);
+		unsigned remote_id = 0;
+		sscanf(remote_client.c_str(), "%u", &remote_id);
 		torque_connection ret = torque_connection_introduce_me(c, remote_id, connect_data.size() + 1, (unsigned char*)connect_data.c_str());
 		return connection(ret);
 	}
