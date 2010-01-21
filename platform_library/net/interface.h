@@ -890,7 +890,10 @@ public:
 		core::read(stream, the_params._client_identity);
 		
 		if(the_params._client_identity != compute_client_identity_token(the_address, the_params._nonce))
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("Client identity disagreement, params say %i, I say %i", the_params._client_identity, compute_client_identity_token(the_address, the_params._nonce)));
 			return;
+		}
 		
 		core::read(stream, the_params._puzzle_difficulty);
 		core::read(stream, the_params._puzzle_solution);
