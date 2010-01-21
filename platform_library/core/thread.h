@@ -13,7 +13,7 @@ public:
 		#ifdef PLATFORM_WIN32
 			_semaphore = CreateSemaphore(NULL, initial_count, maximum_count, NULL);
 		#else
-			sem_init(&_semaphore, 0, initial_count);
+			MPCreateSemaphore(maximum_count, initial_count, &_semaphore);
 		#endif
 	}
 	~semaphore()
@@ -21,7 +21,7 @@ public:
 		#ifdef PLATFORM_WIN32
 			CloseHandle(_semaphore);
 		#else
-			sem_destroy(&_semaphore);
+			MPDeleteSemaphore(_semaphore);
 		#endif
 	}
 
@@ -33,7 +33,7 @@ public:
 		#ifdef PLATFORM_WIN32
 			WaitForSingleObject(_semaphore, INFINITE);
 		#else
-			sem_wait(&_semaphore);
+			MPWaitOnSemaphore(_semaphore, kDurationForever);
 		#endif
 	}
 	/// Increments the semaphore's internal count.  This will wake
@@ -44,7 +44,7 @@ public:
 			ReleaseSemaphore(_semaphore, count, NULL);
 		#else
 			for(uint32 i = 0; i < count; i++)
-				sem_post(&_semaphore);
+				MPSignalSemaphore(_semaphore);
 		#endif
 	}
 
@@ -52,7 +52,7 @@ private:
 	#ifdef PLATFORM_WIN32
 		HANDLE _semaphore;
 	#else
-		sem_t _semaphore;
+		MPSemaphoreID _semaphore;
 	#endif
 };
 
