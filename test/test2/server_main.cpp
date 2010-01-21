@@ -103,16 +103,23 @@ int main(int argc, const char **argv)
 	std::string address;
 	std::cin >> address;
 	
-	std::string connect = "";
-	std::cout << "Connect? ";
-	std::cin >> connect;
-	bool do_connect = false;
-	if(connect[0] == 'y')
+	std::vector<std::string> connect_addrs;
+	bool do_connect;
+	do 
 	{
-		std::cout << "Connect to: ";
+		std::cout << "Connect? ";
+		std::string connect;
 		std::cin >> connect;
-		do_connect = true;
-	}
+		if(connect[0] == 'y')
+		{
+			do_connect = true;
+			std::cout << "Connect to: ";
+			std::cin >> connect;
+			connect_addrs.push_back(connect);
+		}
+		else
+			do_connect = false;
+	} while (do_connect);
 	
 	std::string nonce = "";
 	std::cout << "Introduce me? ";
@@ -126,8 +133,10 @@ int main(int argc, const char **argv)
 	}
 	
 	harness h(address);
-	if(do_connect)
-		h.connect(connect);
+	for(std::vector<std::string>::iterator i = connect_addrs.begin(); i != connect_addrs.end(); ++i)
+	{
+		h.connect(*i);
+	}
 	if(do_intro)
 		h.do_intro(nonce);
 
