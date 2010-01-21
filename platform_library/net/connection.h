@@ -157,6 +157,9 @@ protected:
 	/// Called when the connection is successfully established with the remote host.
 	virtual void on_connection_established()
 	{
+		torque_socket_event event;
+		event.event_type = torque_connection_established_event_type;
+		get_interface()->tnp_post_event(event, this);
 	}
 	
 	/// Validates that the given public key is valid for this connection.  If this
