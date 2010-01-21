@@ -23,7 +23,10 @@ public:
 			page *prev = _current_page->prev;
 			_allocator->deallocate_pages(_current_page,_current_page->page_count);
 			_current_page = prev;
-		}	
+		}
+
+		_current_offset = zone_allocator::page_size;
+		_current_page_size = zone_allocator::page_size;
 	}
 	
 	void *allocate(uint32 size)
