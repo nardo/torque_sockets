@@ -435,6 +435,8 @@ protected:
 		disconnect_packet, ///< A packet sent to notify a host that the specified connection has terminated.
 		punch_packet, ///< A packet sent in order to create a hole in a firewall or NAT so packets from the remote host can be received.
 		arranged_connect_request_packet, ///< A connection request for an "arranged" connection.
+		introduction_request_packet, ///< A connection request to be introduced to a different connection.
+		send_punch_packet, ///< A request to send a punch packet to another address
 		first_valid_info_packet_id, ///< The first valid ID for a interface subclass's info packets.
 	};
 	
@@ -1168,6 +1170,89 @@ public:
 		send_punch_packets(conn);
 	}
 	
+	void request_introduction(connection* conn, uint32 identity)
+	{
+		TorqueLogMessageFormatted(LogNetInterface, ("Sending Introduction Request to %s", conn->get_address().to_string().c_str()));
+		packet_stream out;
+		core::write(out, uint8(introduction_request_packet));
+		core::write(out, identity);
+		out.send_to(_socket, conn->get_address());
+	}
+	
+	void handle_introduction_request(const address& addr, bit_stream& stream)
+	{
+		TorqueLogMessageFormatted(LogNetInterface, ("Received Introduction Request from %s", addr.to_string().c_str()));
+		uint32 identity;
+		core::read(stream, identity);
+		connection* remote_conn = NULL;
+		for(int32 i = 0; i < _connection_list.size(); ++i)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("Checking connection with identity %u", _connection_list[i]->get_connection_parameters()._client_identity));
+			if(_connection_list[i]->get_connection_parameters()._client_identity == identity)
+			{
+				remote_conn = _connection_list[i];
+				break;
+			}
+		}
+		
+		if(!remote_conn)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("No connection found with identity %u", identity));
+			return;
+		}
+		
+		TorqueLogMessageFormatted(LogNetInterface, ("Sending Punch Request to %s", remote_conn->get_address().to_string().c_str()));
+		packet_stream out;
+		bool initiator = false;
+		core::write(out, uint8(send_punch_packet));
+		core::write(out, addr);
+		core::write(out, initiator);
+		out.send_to(_socket, remote_conn->get_address());
+		
+		
+		TorqueLogMessageFormatted(LogNetInterface, ("Sending Punch Request to %s", addr.to_string().c_str()));
+		packet_stream ret;
+		initiator = true;
+		core::write(ret, uint8(send_punch_packet));
+		core::write(ret, remote_conn->get_address());
+		core::write(ret, initiator);
+		ret.send_to(_socket, addr);
+	}
+	
+	void handle_send_punch_packet(const address& addr, bit_stream& stream)
+	{
+		TorqueLogMessageFormatted(LogNetInterface, ("Received request to send punch packets from %s", addr.to_string().c_str()));
+		
+		address remote_address;
+		core::read(stream, remote_address);
+		TorqueLogMessageFormatted(LogNetInterface, ("Sending punch packets to %s", remote_address.to_string().c_str()));
+		
+		bool initiator;
+		core::read(stream, initiator);
+		
+		// This packet is going to the client we are attempting to connect to,
+		// so if we are the initiator then it is not.
+		initiator = !initiator;
+		
+		packet_stream out;
+		core::write(out, uint8(punch_packet));
+		core::write(out, initiator);
+		out.send_to(_socket, remote_address);
+	}
+	
+	void handle_punch_packet(const address& addr, bit_stream& stream)
+	{
+		TorqueLogMessageFormatted(LogNetInterface, ("Received punch packet from %s", addr.to_string().c_str()));
+		
+		bool initiator;
+		core::read(stream, initiator);
+		if(initiator)
+		{
+			connection* c = new connection(random());
+			c->connect(this, addr, new byte_buffer((uint8*)"", 1));
+		}
+	}
+	
 	/// Sends punch packets to each address in the possible connection address list.
 	void send_punch_packets(connection *conn)
 	{
@@ -1548,11 +1633,17 @@ public:
 						handle_disconnect(the_address, packet_stream);
 						break;
 					case punch_packet:
-						handle_punch(the_address, packet_stream);
+						//handle_punch(the_address, packet_stream);
+						handle_punch_packet(the_address, packet_stream);
 						break;
 					case arranged_connect_request_packet:
 						handle_arranged_connect_request(the_address, packet_stream);
 						break;
+					case introduction_request_packet:
+						handle_introduction_request(the_address, packet_stream);
+						break;
+					case send_punch_packet:
+						handle_send_punch_packet(the_address, packet_stream);
 				}
 			}
 		}
