@@ -9,6 +9,7 @@ namespace core
 
 };
 
+#include <memory>
 #include <queue>
 
 using namespace core;
