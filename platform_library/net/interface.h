@@ -305,40 +305,17 @@ public:
 			{
 				connection *pending = _pending_connections[i];
 				
-				if(pending->get_connection_state() == connection::awaiting_challenge_response &&
-				   get_process_start_time() > pending->_connect_last_send_time + 
-				   time(challenge_retry_time))
+				if(pending->outstanding_request())
 				{
-					if(pending->_connect_send_count > challenge_retry_count)
+					if(!pending->retry_request())
 					{
 						pending->set_connection_state(connection::connect_timed_out);
 						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
 						remove_pending_connection(pending);
-						continue;
-					}
-					else
-						send_connect_challenge_request(pending);
-				}
-				else if(pending->get_connection_state() == connection::awaiting_connect_response &&
-						get_process_start_time() > pending->_connect_last_send_time + 
-						time(connect_retry_time))
-				{
-					if(pending->_connect_send_count > connect_retry_count)
-					{
-						pending->set_connection_state(connection::connect_timed_out);
-						pending->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
-						remove_pending_connection(pending);
-						continue;
-					}
-					else
-					{
-						if(pending->get_connection_parameters()._is_arranged)
-							send_arranged_connect_request(pending);
-						else
-							send_connect_request(pending);
 					}
 				}
-				else if(pending->get_connection_state() == connection::sending_punch_packets &&
+				
+				if(pending->get_connection_state() == connection::sending_punch_packets &&
 						get_process_start_time() > pending->_connect_last_send_time + time(punch_retry_time))
 				{
 					if(pending->_connect_send_count > punch_retry_count)
@@ -365,6 +342,16 @@ public:
 			
 			for(uint32 i = 0; i < _connection_list.size();)
 			{
+				if(_connection_list[i]->outstanding_request())
+				{
+					if(!_connection_list[i]->retry_request())
+					{
+						_connection_list[i]->set_connection_state(connection::connect_timed_out);
+						_connection_list[i]->on_connect_terminated(reason_timed_out, _timed_out_reason_buffer);
+						remove_connection(_connection_list[i]);
+					}
+				}
+				
 				if(_connection_list[i]->check_timeout(get_process_start_time()))
 				{
 					_connection_list[i]->set_connection_state(connection::timed_out);
@@ -674,9 +661,7 @@ public:
 		core::write(out, uint8(connect_challenge_request_packet));
 		connection_parameters &params = the_connection->get_connection_parameters();
 		core::write(out, params._nonce);
-		the_connection->_connect_send_count++;
-		the_connection->_connect_last_send_time = get_process_start_time();
-		out.send_to(_socket, the_connection->get_address());
+		the_connection->submit_request(out);
 	}
 	
 	
@@ -780,6 +765,7 @@ public:
 
 		tnp_post_event(event, conn);
 
+		conn->clear_request();
 		conn->set_connection_state(connection::computing_puzzle_solution);
 		conn->_connect_send_count = 0;
 
@@ -864,10 +850,7 @@ public:
 		symmetric_cipher the_cipher(the_params._shared_secret);
 		bit_stream_hash_and_encrypt(out, connection::message_signature_bytes, encrypt_pos, &the_cipher);      
 		
-		conn->_connect_send_count++;
-		conn->_connect_last_send_time = get_process_start_time();
-		
-		out.send_to(_socket, conn->get_address());
+		conn->submit_request(out);
 	}
 	
 	
@@ -1069,6 +1052,7 @@ public:
 		add_connection(conn); // first, add it as a regular connection
 		remove_pending_connection(conn); // remove from the pending connection list
 		
+		conn->clear_request();
 		conn->set_connection_state(connection::connected);
 		conn->on_connection_established(); // notify the connection that it has been established
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Connect Accept - connection established."));
@@ -1142,6 +1126,7 @@ public:
 			return;
 		}
 		
+		conn->clear_request();
 		conn->set_connection_state(connection::connect_rejected);
 		conn->on_connect_terminated(reason_remote_host_rejected_connection, reason);
 		remove_pending_connection(conn);
