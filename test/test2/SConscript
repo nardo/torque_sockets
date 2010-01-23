@@ -1,8 +1,8 @@
 Import('env')
 Import('libs')
 
-env['LIBPATH'] = ['#/tnp', '#/lib/libtommath', '#/lib/libtomcrypt']
-env['CPPPATH'] = ['#/tnp/include']
+env['LIBPATH'] = ['#/platform_library', '#/lib/libtommath', '#/lib/libtomcrypt']
+env['CPPPATH'] = ['#/platform_library']
 
 server_files = Glob('server_*.cpp')
 env.Build('Program', 'server', server_files, LIBS_CFG=libs[1])

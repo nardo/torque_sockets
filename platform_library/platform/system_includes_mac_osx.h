@@ -17,6 +17,8 @@
 #include <semaphore.h>
 #include <stdlib.h>
 
+#include <CoreServices/CoreServices.h>
+
 #include <sys/ioctl.h>   /* ioctl() */
 #define NO_IPX_SUPPORT
 typedef sockaddr_in SOCKADDR_IN;

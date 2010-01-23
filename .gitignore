@@ -8,4 +8,10 @@ tnp/build
 test/test2/build
 test/test2/client*
 test/test2/server*
+parser.out
+plugin/tnp/build
+plugin/tnp/glue
+plugin/tnp/torque*
+platform_library/build
+platform_library/libtnp*
 
