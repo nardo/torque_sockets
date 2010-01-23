@@ -31,3 +31,4 @@
 #include "core/dictionary.h"
 #include "core/static_to_indexed_string_map.h"
 #include "core/type_database.h"
+#include "core/functor.h"

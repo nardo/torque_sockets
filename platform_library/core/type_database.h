@@ -22,7 +22,7 @@ class type_database
 				return;
 			}
 		}
-		function->dispatch(arguments, return_value);
+		function->dispatch(0, arguments, return_value);
 	}
 public:
 	hash_table_flat<indexed_string, function_record *> _function_table;
@@ -32,6 +32,7 @@ public:
 		function_record *rec = new function_record_decl<signature>(func_address);
 		_function_table.insert(name, rec);
 	}
+	
 	function_record *find_function(static_string static_name)
 	{
 		indexed_string name = static_to_indexed_string(static_name);
@@ -71,6 +72,7 @@ public:
 		indexed_string name;
 		type_rep *parent_class;
 		dictionary<field_rep> fields;
+
 		type_record *type;
 	};
 	static_to_indexed_string_map _string_remapper;
@@ -145,18 +147,17 @@ public:
 		_add_type(the_type);
 	}
 	
-	void begin_class(static_string class_name, static_string super_class_name, type_record *class_type)
+	void begin_class(static_string class_name, type_record *class_type, type_record *super_class_type)
 	{
-		printf("beginning class %s - parent = %s\n", class_name, super_class_name);
+		printf("beginning class %s\n", class_name);
 		assert(_current_class == 0);
-		indexed_string super_class_string = static_to_indexed_string(super_class_name);
 		
 		
 		type_rep *the_class = new type_rep;
 		the_class->name = static_to_indexed_string(class_name);
 		the_class->type = class_type;
 		the_class->kind = type_compound;
-		dictionary<type_rep *>::pointer parent_p = _class_table.find(super_class_string);
+		hash_table_flat<const type_record *, type_rep *>::pointer parent_p = _type_record_lookup_rep_table.find(super_class_type);
 		
 		if(parent_p)
 			the_class->parent_class = *parent_p.value();
@@ -166,7 +167,7 @@ public:
 		_current_class = the_class;
 		_add_type(the_class);
 	}
-	
+
 	void add_public_slot(static_string slot_name, uint32 slot_offset, type_record *type)
 	{
 		assert(_current_class != 0);
@@ -179,6 +180,14 @@ public:
 		_current_class->fields.insert(name, the_field);
 	}
 	
+	template<typename signature> void add_method(static_string static_name, signature the_method)
+	{
+		assert(_current_class != 0);
+		indexed_string name = static_to_indexed_string(static_name);
+		//function_record *rec = new function_record_decl<signature>(func_address);
+		//_function_table.insert(name, rec);		
+	}
+
 	void end_class()
 	{
 		assert(_current_class != 0);
@@ -328,4 +337,19 @@ public:
 		return true;
 	}
 };
+
+#define class_begin_registrar(registration_function_name, class_name, super_class_name) \
+static void registration_function_name(type_database *registry) \
+{ \
+	registry->begin_class(#class_name, get_global_type_record<class_name>(), get_global_type_record<super_class_name>());
+
+#define slot_public(class_name, slot_name) \
+	registry->add_public_slot(#slot_name, (uint32) &((class_name *) 0)->slot_name, get_global_type_record(&((class_name *) 0)->slot_name);
+
+#define method(class_name, method_name) \
+	registry->add_method(#method_name, &class_name::method_name);
+
+#define class_end_registrar() \
+	registry->end_class(); \
+}
 

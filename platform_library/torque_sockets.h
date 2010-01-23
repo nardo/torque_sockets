@@ -29,6 +29,7 @@ enum connection_constants {
 	torque_max_datagram_size = 1480,
 	torque_max_status_datagram_size = 512,
 	torque_max_public_key_size = 512,
+	torque_packet_window_size = 31,
 };
 
 torque_socket torque_socket_create(const SOCKADDR *);
