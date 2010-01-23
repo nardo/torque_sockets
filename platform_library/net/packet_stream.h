@@ -8,6 +8,16 @@ class packet_stream : public bit_stream
 public:
    /// Constructor assigns the internal buffer to the bit_stream.
    packet_stream(uint32 target_packet_size = udp_socket::max_datagram_size) : bit_stream(buffer, udp_socket::max_datagram_size) {}
+	packet_stream(const packet_stream& other) : bit_stream(other)
+	{
+		memcpy(buffer, other.buffer, sizeof(buffer));
+	}
+	
+	packet_stream& operator=(const packet_stream& other)
+	{
+		memcpy(buffer, other.buffer, sizeof(buffer));
+	}
+	
    /// Sends this packet to the specified address through the specified socket.
    udp_socket::send_to_result send_to(udp_socket &outgoing_socket, const address &the_address)
 	{
