@@ -643,9 +643,12 @@ public:
 	
 	
 	/// Begins the connection handshaking process for a connection.  Called from connection::connect()
-	void start_connection(connection *the_connection)
+	void start_connection(const ref_ptr<connection>& the_connection)
 	{
 		assert(the_connection->get_connection_state() == connection::not_connected); // Cannot start unless it is in the not_connected state.
+		
+		if(find_pending_connection(the_connection->get_address()))
+			remove_pending_connection(the_connection);
 		
 		add_pending_connection(the_connection);
 		the_connection->_connect_send_count = 0;
@@ -674,6 +677,16 @@ public:
 		
 		if(!_allow_connections)
 			return;
+		
+		// In the case of an arranged connection we will already have a pending
+		// connenection for this address.  Clear its request and remove it
+		// from our list, to be recreated later.
+		connection* conn = find_pending_connection(addr);
+		if(conn)
+		{
+			conn->clear_request();
+			remove_pending_connection(conn);
+		}
 		nonce client_nonce;
 		core::read(stream, client_nonce);
 		send_connect_challenge_response(addr, client_nonce);
@@ -1157,11 +1170,18 @@ public:
 		packet_stream out;
 		core::write(out, uint8(introduction_request_packet));
 		core::write(out, identity);
-		out.send_to(_socket, conn->get_address());
+		conn->submit_request(out);
 	}
 	
 	void handle_introduction_request(const address& addr, bit_stream& stream)
 	{
+		connection* our_conn = find_connection(addr);
+		if(!our_conn)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("Failed to find connection"));
+			return;
+		}
+				
 		TorqueLogMessageFormatted(LogNetInterface, ("Received Introduction Request from %s", addr.to_string().c_str()));
 		uint32 identity;
 		core::read(stream, identity);
@@ -1197,12 +1217,21 @@ public:
 		core::write(ret, uint8(send_punch_packet));
 		core::write(ret, remote_conn->get_address());
 		core::write(ret, initiator);
-		ret.send_to(_socket, addr);
+		ret.send_to(_socket, our_conn->get_address());
 	}
 	
 	void handle_send_punch_packet(const address& addr, bit_stream& stream)
 	{
 		TorqueLogMessageFormatted(LogNetInterface, ("Received request to send punch packets from %s", addr.to_string().c_str()));
+		
+		connection* our_conn = find_connection(addr);
+		if(!our_conn)
+		{
+			TorqueLogMessageFormatted(LogNetInterface, ("handle_send_punch_packet: No connection"));
+			return;
+		}
+		
+		our_conn->clear_request();
 		
 		address remote_address;
 		core::read(stream, remote_address);
@@ -1211,6 +1240,12 @@ public:
 		bool initiator;
 		core::read(stream, initiator);
 		
+		ref_ptr<connection> conn = new connection(random());
+		
+		conn->set_address(remote_address);
+		conn->set_interface(this);
+		add_pending_connection(conn);
+		
 		// This packet is going to the client we are attempting to connect to,
 		// so if we are the initiator then it is not.
 		initiator = !initiator;
@@ -1218,7 +1253,7 @@ public:
 		packet_stream out;
 		core::write(out, uint8(punch_packet));
 		core::write(out, initiator);
-		out.send_to(_socket, remote_address);
+		conn->submit_request(out);
 	}
 	
 	void handle_punch_packet(const address& addr, bit_stream& stream)
@@ -1229,8 +1264,14 @@ public:
 		core::read(stream, initiator);
 		if(initiator)
 		{
-			connection* c = new connection(random());
-			c->connect(this, addr, new byte_buffer((uint8*)"", 1));
+			connection* conn = find_pending_connection(addr);
+			if(!conn)
+			{
+				TorqueLogMessageFormatted(LogNetInterface, ("No pending connection for %s", addr.to_string().c_str()));
+				return;
+			}
+			conn->clear_request();
+			conn->connect(this, addr, new byte_buffer((uint8*)"", 1));
 		}
 	}
 	
