@@ -108,6 +108,27 @@ class connection : public ref_object
 	bool has_unacked_sent_packets() { return _last_send_seq != _highest_acked_seq; }
 	
 	byte_buffer_ptr _packet_data;
+	
+	struct request
+	{
+		packet_stream data;
+		address addr;
+		int32 retry_count;
+		time last_retry_time;
+		
+		request(const packet_stream& data_, const address& addr_) : data(data_), addr(addr_), retry_count(0), last_retry_time(0)
+		{
+		}
+	};
+	
+	enum request_constants
+	{
+		max_request_retry_count = 5,
+		request_retry_time = 2500
+	};
+	
+	std::auto_ptr<request> _current_request;
+	
 public:
 	connection(random_generator &random_gen)
 	{
@@ -568,6 +589,44 @@ public:
 		if(_last_send_seq - _highest_acked_seq >= (max_packet_window_size - 2))
 			return true;
 		return false;
+	}
+	
+	void submit_request(const packet_stream& data)
+	{
+		_current_request.reset(new request(data, get_address()));
+		_current_request->data.send_to(get_interface()->get_socket(), _current_request->addr);
+		_current_request->last_retry_time = get_interface()->get_process_start_time();
+		_current_request->retry_count++;
+	}
+	
+	void clear_request()
+	{
+		_current_request.reset(NULL);
+	}
+	
+	bool outstanding_request()
+	{
+		return _current_request.get() != NULL;
+	}
+	
+	bool retry_request()
+	{
+		// Shouldn't even be called in this case...
+		if(_current_request.get() == NULL)
+			return true;
+
+		// If we've exceeded our retry count, give up
+		if(_current_request->retry_count > max_request_retry_count)
+			return false;
+		
+		// If we need to wait a bit longer, don't give up, but don't resend just yet.
+		if(get_interface()->get_process_start_time() < _current_request->last_retry_time + time(request_retry_time))
+			return true;
+
+		_current_request->data.send_to(get_interface()->get_socket(), _current_request->addr);
+		_current_request->last_retry_time = get_interface()->get_process_start_time();
+		_current_request->retry_count++;
+		return true;		
 	}
 
 	//----------------------------------------------------------------
