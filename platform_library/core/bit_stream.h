@@ -17,6 +17,13 @@ class bit_stream
 	virtual bit_position get_bit_position() { return _bit_num; }
 	virtual void set_bit_position(bit_position pos) { _bit_num = uint32(pos); }
 	virtual bit_position get_stream_bit_size() { return _bit_end; }
+	bit_position get_bit_space_available() {
+		return get_stream_bit_size() - get_bit_position();
+	}
+	bool is_full()
+	{
+		return _bit_num == _bit_end;
+	}
 	
 	virtual uint32 get_next_byte_position() { return (_bit_num + 7) >> 3; }
 	virtual uint32 get_byte_position() { return _bit_num >> 3; }
