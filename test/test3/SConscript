@@ -1,0 +1,11 @@
+Import('env')
+Import('libs')
+
+env['LIBPATH'] = ['#/platform_library', '#/lib/libtommath', '#/lib/libtomcrypt', '#/lib']
+env['CPPPATH'] = ['#/platform_library']
+
+server_files = Glob('server_*.cpp')
+env.Build('Program', 'server', server_files, LIBS_CFG=libs[1])
+
+client_files = Glob('client_*.cpp')
+env.Build('Program', 'client', client_files, LIBS='socket_client_DEBUG')
