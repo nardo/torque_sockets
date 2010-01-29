@@ -32,6 +32,11 @@ enum connection_constants {
 
 typedef unsigned char status_response[torque_max_status_datagram_size];
 
+#ifndef TORQUE_SOCKETS_STANDALONE
+void init_server(const char* server_address);
+void init_client(const char* client_address, const char* server_address);
+#endif
+
 torque_socket torque_socket_create(struct sockaddr*);
 ///< Create a torque socket and bind it to the specified socket address interface.
 

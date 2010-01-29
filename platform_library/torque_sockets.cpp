@@ -56,7 +56,7 @@ static inline ref_ptr<net::interface>& get_interface_for_socket_(torque_socket s
 static inline ref_ptr<net::connection>& get_connection_for_connection_(torque_connection connection)
 {
 	int idx = get_idx_for_connection_(connection);
-	assert(idx != -1)
+	assert(idx != -1);
 	return connections[idx];
 }
 
@@ -84,7 +84,7 @@ torque_socket torque_socket_create(struct sockaddr* socket_address)
 
 void torque_socket_destroy(torque_socket socket)
 {
-	assert(socket > 0)
+	assert(socket > 0);
 	if(socket <= 0)
 		return;
 	if(socket > interfaces.size())

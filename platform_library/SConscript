@@ -1,12 +1,16 @@
 Import('env')
 
-files = Glob('*.cpp')
-env['CPPPATH'] = ['#/platform_library/', '#/lib/libtommath', '#/lib/libtomcrypt/src/headers', '.']
-env['LIBPATH'] = ['#/lib/libtommath', '#/lib/libtomcrypt']
-env['LIBS'] = ['libtommath', 'libtomcrypt']
+files = ['torque_sockets.cpp', 'torque_socket_server.cpp']
+env['CPPPATH'] = ['#/platform_library/', '#/lib/libtommath', '#/lib/libtomcrypt/src/headers', '.', '#/lib']
+env['LIBPATH'] = ['#/lib/libtommath', '#/lib/libtomcrypt', '#/lib']
+env['LIBS'] = ['libtommath', 'libtomcrypt', 'google_nacl_imc']
 
 if env['PLATFORM'] == 'darwin':
 	env.Append(LINKFLAGS='-framework CoreServices')
 
-ret = env.Build('StaticLibrary', 'tnp', files)
+ret = env.Build('StaticLibrary', 'socket_server', files)
+
+files = ['torque_socket_client.cpp']
+env.Build('StaticLibrary', 'socket_client', files)
+
 Return('ret')
