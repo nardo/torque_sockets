@@ -6,6 +6,7 @@
 
 namespace torque
 {
+	void init_nacl_server(const std::string& addr);
 	class socket;
 	class connection;
 	class event

@@ -334,3 +334,13 @@ void init_server(const char* server_address)
 
 	runner.start();
 }
+
+#include <string>
+
+namespace torque
+{
+	void init_nacl_server(const std::string& addr)
+	{
+		init_server(addr.c_str());
+	}
+}
