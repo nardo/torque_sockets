@@ -85,6 +85,27 @@ void torque_connection_disconnect(torque_connection, unsigned disconnect_data_si
 int torque_connection_send_to(torque_connection, unsigned datagram_size, unsigned char buffer[torque_max_datagram_size], unsigned *sequence_number);
 ///< Send a datagram packet to the remote host on the other side of the connection.  Returns the sequence number of the packet sent.
 
+enum torque_socket_rpc_functions
+{
+	torque_socket_create_rpc,
+	torque_socket_destroy_rpc,
+	torque_socket_seed_entropy_rpc,
+	torque_socket_set_private_key_rpc,
+	torque_socket_set_challenge_response_data_rpc,
+	torque_socket_allow_incoming_connections_rpc,
+	torque_socket_does_allow_incoming_connections_rpc,
+	torque_socket_can_be_introducer_rpc,
+	torque_socket_is_introducer_rpc,
+	torque_socket_get_next_event_rpc,
+	torque_socket_connect_rpc,
+	torque_connection_introduce_me_rpc,
+	torque_connection_accept_rpc,
+	torque_connection_reject_rpc,
+	torque_connection_disconnect_rpc,
+	torque_connection_send_to_rpc,
+	torque_max_rpc
+};
+
 enum torque_socket_event_type
 {
 	torque_connection_challenge_response_event_type = 1,
