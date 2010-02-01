@@ -60,15 +60,15 @@ static inline ref_ptr<net::connection>& get_connection_for_connection_(torque_co
 	return connections[idx];
 }
 
-torque_socket torque_socket_create(struct sockaddr* socket_address)
+torque_socket torque_socket_create(const char* socket_address)
 {
 	ltc_mp = ltm_desc;
 	assert(socket_address);
 	
-	if(!socket_address)
+	if(!socket_address || socket_address[0] == '\0')
 		return 0;
 
-	ref_ptr<net::interface> interface(new net::interface(*socket_address));
+	ref_ptr<net::interface> interface(new net::interface(socket_address));
 	for(int i = 0; i < interfaces.size(); ++i)
 	{
 		if(interfaces[i] == NULL)
@@ -135,11 +135,11 @@ int torque_socket_is_introducer(torque_socket socket)
 	return 0;
 }
 
-torque_connection torque_socket_connect(torque_socket socket, struct sockaddr* remote_host, unsigned connect_data_size, status_response connect_data)
+torque_connection torque_socket_connect(torque_socket socket, const char* remote_host, unsigned connect_data_size, status_response connect_data)
 {
 	assert(remote_host);
 
-	if(!remote_host)
+	if(!remote_host || remote_host[0] == '\0')
 		return 0;
 
 	ref_ptr<net::interface>& interface = get_interface_for_socket_(socket);
@@ -148,7 +148,7 @@ torque_connection torque_socket_connect(torque_socket socket, struct sockaddr* r
 
 	ref_ptr<net::connection> c(new net::connection(interface->random()));
 	byte_buffer_ptr data = new byte_buffer(connect_data, connect_data_size);
-	c->connect(interface, *remote_host, data);
+	c->connect(interface, remote_host, data);
 
 	for(int i = 0; i < connections.size(); ++i)
 	{
@@ -254,7 +254,7 @@ static inline void fill_connection_(torque_socket_event& event, net::torque_sock
 	event.connection = get_connection_for_event_(evt);
 	if(event.event_type == torque_connection_requested_event_type || event.event_type == torque_socket_packet_event_type)
 	{
-		evt.conn->get_address().to_sockaddr(&event.source_address);
+		strncpy(event.source_address, evt.conn->get_address().to_string().c_str(), sizeof(event.source_address));
 	}
 }
 
@@ -427,10 +427,7 @@ namespace torque
 
 	socket::socket(const std::string& address)
 	{
-		net::address addr(address.c_str());
-		sockaddr sock;
-		addr.to_sockaddr(&sock);
-		s = torque_socket_create(&sock);
+		s = torque_socket_create(address.c_str());
 	}
 
 	socket::~socket()
@@ -475,11 +472,7 @@ namespace torque
 
 	connection socket::connect(const std::string& address, const std::string& connect_data)
 	{
-		net::address addr(address.c_str());
-		sockaddr sock;
-		addr.to_sockaddr(&sock);
-
-		torque_connection c = torque_socket_connect(s, &sock, connect_data.size() + 1, (unsigned char*)connect_data.c_str());
+		torque_connection c = torque_socket_connect(s, address.c_str(), connect_data.size() + 1, (unsigned char*)connect_data.c_str());
 
 		return connection(c);
 	}

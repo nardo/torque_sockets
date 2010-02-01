@@ -2,9 +2,6 @@
 
 #include "torque_sockets.h"
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,25 +31,12 @@ bool handle_event(torque_socket_event* event)
 
 int main(int argc, const char **argv)
 {
-	sockaddr_in ip4addr;
-	memset(&ip4addr, 0, sizeof(ip4addr));
-	
-	ip4addr.sin_family = AF_INET;
-	ip4addr.sin_port = htons(31338);
-	inet_pton(AF_INET, "127.0.0.1", &ip4addr.sin_addr);
-	my_socket = torque_socket_create((sockaddr*)&ip4addr);
+	my_socket = torque_socket_create("localhost:31338");
 	torque_socket_allow_incoming_connections(my_socket, false);
 	
 	const char* msg = "Hello Mr. Server";
 	
-	sockaddr_in server_addy;
-	memset(&server_addy, 0, sizeof(server_addy));
-	
-	server_addy.sin_family = AF_INET;
-	server_addy.sin_port = htons(31337);
-	inet_pton(AF_INET, "127.0.0.1", &server_addy.sin_addr);
-	
-	my_connection = torque_socket_connect(my_socket, (sockaddr*)&server_addy, strlen(msg) + 1, (unsigned char*)msg);
+	my_connection = torque_socket_connect(my_socket, "localhost:31337", strlen(msg) + 1, (unsigned char*)msg);
 
 	bool spam = false;
 	while(true)

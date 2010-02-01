@@ -37,7 +37,7 @@ void init_server(const char* server_address);
 void init_client(const char* client_address, const char* server_address);
 #endif
 
-torque_socket torque_socket_create(struct sockaddr*);
+torque_socket torque_socket_create(const char*);
 ///< Create a torque socket and bind it to the specified socket address interface.
 
 void torque_socket_destroy(torque_socket);
@@ -67,7 +67,7 @@ int torque_socket_is_introducer(torque_socket);
 struct torque_socket_event *torque_socket_get_next_event(torque_socket);
 ///< Gets the next event on this socket; returns NULL if there are no events to be read.
 
-torque_connection torque_socket_connect(torque_socket, struct sockaddr* remote_host, unsigned connect_data_size, status_response connect_data);
+torque_connection torque_socket_connect(torque_socket, const char* remote_host, unsigned connect_data_size, status_response connect_data);
 ///< open a connection to the remote host
 
 torque_connection torque_connection_introduce_me(torque_connection introducer, unsigned remote_client_identity, unsigned connect_data_size, status_response connect_data);
@@ -112,7 +112,7 @@ struct torque_socket_event
 	unsigned char data[torque_max_datagram_size];
 	unsigned packet_sequence;
 	int delivered;
-	struct sockaddr source_address;
+	char source_address[64];
 };
 
 /*struct torque_connection_challenge_response_event
