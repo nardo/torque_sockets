@@ -48,6 +48,12 @@ void init_client(const char* client_addr, const char* server_addr)
 	nacl::Close(client_sockets.pair[1]);
 }
 
+void close_client()
+{
+	nacl::Close(client_sockets.pair[0]);
+	nacl::Close(client_sockets.g_front);
+}
+
 void send_rpc(core::bit_stream& buf)
 {
 	nacl::MessageHeader header;
