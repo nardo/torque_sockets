@@ -76,7 +76,7 @@ public:
 	}
 };
 
-string format_string(const char *fmt, ...)
+inline string format_string(const char *fmt, ...)
 {
 	formatted_string_buffer buf;
 	

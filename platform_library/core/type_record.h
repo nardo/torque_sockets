@@ -12,7 +12,7 @@ BOOLEAN_TYPE_INFO_TEMPLATE(is_container, false);
 
 
 class type_record;
-template<> uint32 hash(const type_record *record) { return uint32(record); }
+template<> inline uint32 hash(const type_record *record) { return uint32(record); }
 
 template<typename type> type_record *get_global_type_record();
 
@@ -246,7 +246,7 @@ template<class type_name> type_record *get_global_type_record( type_name const *
 #define TYPE_TEST(type, name) type name; printf("%08x - %s: size = %d, is_numeric = %d\n", \
 	get_global_type_record(&name), #type, get_global_type_record(&name)->size, get_global_type_record(&name)->is_numeric)
 	
-void test_type_record()
+static void test_type_record()
 {
 	TYPE_TEST(int, i1);
 	TYPE_TEST(int *, i2);
