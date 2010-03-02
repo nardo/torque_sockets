@@ -204,7 +204,7 @@ public:
 	T* get_pointer() { return static_cast<T*>(_object); }
 };
 
-ref_object::~ref_object()
+inline ref_object::~ref_object()
 {
 	assert(_ref_count == 0);
 	safe_object_ref *walk = _first_object_ref;

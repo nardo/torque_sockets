@@ -50,7 +50,7 @@ hellor_osx_subst['release'] = {'FILE_DESC':'Torque Network Platform Plugin', 'FI
 hellor_osx_subst['release'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Network Platform'})
 
 TOOL_SUBST(env)
-env.Append(CPPPATH=['../inc', '#/tnp/include', '#/platform_library', '.'], LIBPATH=['#/tnp', '#/lib/libtommath', '#/lib/libtomcrypt'])
+env.Append(CPPPATH=['../inc', '#/tnp/include', '#/platform_library', '.'], LIBPATH=['#/tnp', '#/lib/libtommath', '#/lib/libtomcrypt', '#/lib'])
 
 # Determine which platform we're on.
 isLinux = env['PLATFORM'] == 'posix' or env['PLATFORM'] == 'linux'

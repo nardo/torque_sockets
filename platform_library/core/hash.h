@@ -42,7 +42,7 @@ template <typename type> inline uint32 hash(const type *x)
 numeric_hash_overload(int)
 numeric_hash_overload(uint32)
 
-template<> uint32 hash(const char *x) { return uint32(x); }
+template<> inline uint32 hash(const char *x) { return uint32(x); }
 //template<class type> uint32 hash(const type *x) { return uint32(x); }
 template<class table> class hash_table_tester
 {

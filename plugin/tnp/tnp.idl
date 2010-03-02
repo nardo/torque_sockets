@@ -1,5 +1,7 @@
 namespace torque {
 
+void init_nacl_server(std::string addr);
+
 [binding_model=by_value, include="torque_sockets_cpp.h"]
 class event
 {	
