@@ -25,7 +25,6 @@ class type_database
 		function->dispatch(0, arguments, return_value);
 	}
 public:
-	hash_table_flat<indexed_string, function_record *> _function_table;
 	template<typename signature> void add_function(static_string static_name, signature func_address)
 	{
 		indexed_string name = static_to_indexed_string(static_name);
@@ -52,12 +51,20 @@ public:
 		_call_function(func, call_decl.get_signature(), return_value, args);
 	}
 	
+	typedef bool (*write_function_type)(bit_stream &the_stream, const void *the_value);
+	typedef bool (*read_function_type)(bit_stream &the_stream, void *the_value);
+	
+	struct type_rep;
 	// type_database contains the class tree
 	struct field_rep
 	{
 		indexed_string name;
 		type_record *type;
 		uint32 offset;
+		type_rep *compound_type;
+		write_function_type write_function;
+		read_function_type read_function;
+		uint32 state_index;
 	};
 	
 	enum type_kind
@@ -72,22 +79,62 @@ public:
 		indexed_string name;
 		type_rep *parent_class;
 		dictionary<field_rep> fields;
-
+		uint32 max_state_index;
+		uint32 class_index;
+		
+		// stat tracking fields
+		uint32 initial_update_count;
+		uint32 total_update_count;
+		uint32 initial_update_bit_total;
+		uint32 total_update_bit_total;
+		
 		type_record *type;
+		bool write(bit_stream &stream, void *instance)
+		{
+			for(dictionary<field_rep>::pointer p = fields.first(); p; ++p)
+			{
+				field_rep *val = p.value();
+				uint8 *field_p = ((uint8 *) instance) + val->offset;
+				
+				if(val->compound_type)
+				{
+					if(!val->compound_type->write(stream, (void *) field_p))
+						return false;
+				}
+				else
+				{
+					if(!val->write_function(stream, (const void *) field_p))
+						return false;					
+				}
+			}
+			return true;
+		}
+		bool read(bit_stream &stream, void *instance)
+		{
+			for(dictionary<field_rep>::pointer p = fields.first(); p; ++p)
+			{
+				field_rep *val = p.value();
+				uint8 *field_p = ((uint8 *) instance) + val->offset;
+				
+				if(val->compound_type)
+				{
+					if(!val->compound_type->read(stream, (void *) field_p))
+						return false;
+				}
+				else
+				{
+					if(!val->read_function(stream, (void *) field_p))
+						return false;					
+				}
+			}
+			return true;
+		}
 	};
-	static_to_indexed_string_map _string_remapper;
-	
 	indexed_string static_to_indexed_string(static_string s)
 	{
 		return _string_remapper.get(s);
 	}
 	
-	context *_context;
-	
-	hash_table_flat<const type_record *, type_rep *> _type_record_lookup_rep_table;
-	
-	dictionary<type_rep *> _class_table;
-	type_rep *_current_class;
 	void _add_type(type_rep *the_type)
 	{
 		// make sure another type with this name hasn't been registered.
@@ -98,12 +145,6 @@ public:
 		_type_record_lookup_rep_table.insert(the_type->type, the_type);
 	}
 public:
-	type_database(context *the_context) : _string_remapper(the_context->get_string_table())
-	{
-		_context = the_context;
-		_current_class = 0;
-	}
-	
 	type_rep *find_type(indexed_string &type_name)
 	{
 		dictionary<type_rep *>::pointer p = _class_table.find(type_name);
@@ -146,29 +187,41 @@ public:
 		the_type->type = the_type_record;
 		_add_type(the_type);
 	}
-	
-	void begin_class(static_string class_name, type_record *class_type, type_record *super_class_type)
+
+	void begin_class(static_string class_name, type_record *class_type, type_record *super_class_type, bool indexed)
 	{
 		printf("beginning class %s\n", class_name);
 		assert(_current_class == 0);
 		
-		
 		type_rep *the_class = new type_rep;
+		the_class->max_state_index = 0;
+		
+		if(indexed)
+		{
+			the_class->class_index = _indexed_class_list.size();
+			_indexed_class_list.push_back(the_class);			
+		}
+		else
+			the_class->class_index = 0xFFFFFFFF;
+		
 		the_class->name = static_to_indexed_string(class_name);
 		the_class->type = class_type;
 		the_class->kind = type_compound;
 		hash_table_flat<const type_record *, type_rep *>::pointer parent_p = _type_record_lookup_rep_table.find(super_class_type);
 		
 		if(parent_p)
-			the_class->parent_class = *parent_p.value();
+		{
+			the_class->parent_class = *parent_p.value();			
+			the_class->max_state_index = the_class->parent_class->max_state_index;
+		}
 		else
 			the_class->parent_class = 0;
 		
 		_current_class = the_class;
 		_add_type(the_class);
 	}
-
-	void add_public_slot(static_string slot_name, uint32 slot_offset, type_record *type)
+	
+	void add_public_slot(static_string slot_name, uint32 slot_offset, type_record *type, type_rep *compound_type, write_function_type write_function, read_function_type read_function, uint32 state_index)
 	{
 		assert(_current_class != 0);
 		printf("  -adding field %s - offset = %d, type = %08x\n", slot_name, slot_offset, type);
@@ -177,7 +230,36 @@ public:
 		the_field.name = name;
 		the_field.offset = slot_offset;
 		the_field.type = type;
+		the_field.compound_type = compound_type;
+		the_field.write_function = write_function;
+		the_field.read_function = read_function;
+		the_field.state_index = state_index;
+		if(state_index >= _current_class->max_state_index)
+			_current_class->max_state_index = state_index + 1;
+		
 		_current_class->fields.insert(name, the_field);
+	}
+	
+	template<typename type> void add_public_slot(static_string slot_name, type *slot_type_and_offset, uint32 state_index)
+	{
+		uint32 offset = uint32(slot_type_and_offset);
+		
+		type_record *type_rec = get_global_type_record<type>();
+		
+		bool (*write_fn)(bit_stream &str, const type &var) = &core::write;
+		bool (*read_fn)(bit_stream &str, type &var) = &core::read;
+		
+		add_public_slot(slot_name, offset, get_global_type_record<type>(), 0, (write_function_type) write_fn, (read_function_type) read_fn, state_index);
+	}
+	
+	template<typename type> void add_compound_slot(static_string slot_name, type *slot_type_and_offset, uint32 state_index)
+	{
+		uint32 offset = uint32(slot_type_and_offset);
+		
+		type_record *type_rec = get_global_type_record<type>();
+		type_rep *compound_type = find_type(type_rec);
+
+		add_public_slot(slot_name, offset, get_global_type_record<type>(), compound_type, 0, 0, state_index);
 	}
 	
 	template<typename signature> void add_method(static_string static_name, signature the_method)
@@ -275,8 +357,6 @@ public:
 		typedef bool (*conversion_fn_type)(void *dest_ptr, void *source_ptr, context *the_context);
 		conversion_fn_type conversion_function;
 	};
-	hash_table_array<uint32, type_conversion_info> _conversion_table;
-
 	static uint32 get_type_conversion_key(type_record *source_type, type_record *dest_type)
 	{
 		return (* ((uint32 *) &dest_type) << 8) ^ *((uint32 *) &source_type);
@@ -336,20 +416,45 @@ public:
 		bool lossless = i->conversion_function(dest, source, _context);
 		return true;
 	}
+	uint32 get_indexed_class_count()
+	{
+		return _indexed_class_list.size();
+	}
+	type_rep *get_indexed_class(uint32 class_index)
+	{
+		return _indexed_class_list[class_index];
+	}
+	type_database(context *the_context) : _string_remapper(the_context->get_string_table())
+	{
+		_context = the_context;
+		_current_class = 0;
+	}
+private:
+	static_to_indexed_string_map _string_remapper;
+	hash_table_flat<indexed_string, function_record *> _function_table;
+	context *_context;
+	
+	hash_table_flat<const type_record *, type_rep *> _type_record_lookup_rep_table;
+	
+	array<type_rep *> _indexed_class_list;
+	dictionary<type_rep *> _class_table;
+	type_rep *_current_class;
+	
+	
+	hash_table_array<uint32, type_conversion_info> _conversion_table;
 };
 
-#define class_begin_registrar(registration_function_name, class_name, super_class_name) \
-static void registration_function_name(type_database *registry) \
-{ \
-	registry->begin_class(#class_name, get_global_type_record<class_name>(), get_global_type_record<super_class_name>());
+#define tnl_begin_class(registry, class_name, super_class_name, indexed) \
+	registry.begin_class(#class_name, core::get_global_type_record<class_name>(), core::get_global_type_record<super_class_name>(), indexed);
 
-#define slot_public(class_name, slot_name) \
-	registry->add_public_slot(#slot_name, (uint32) &((class_name *) 0)->slot_name, get_global_type_record(&((class_name *) 0)->slot_name);
+#define tnl_slot(registry, class_name, slot_name, state_group) \
+	registry.add_public_slot(#slot_name, &((class_name *) 0)->slot_name, state_group);
 
-#define method(class_name, method_name) \
-	registry->add_method(#method_name, &class_name::method_name);
+#define tnl_compound_slot(registry, class_name, slot_name, state_group) \
+	registry.add_compound_slot(#slot_name, &((class_name *) 0)->slot_name, state_group);
 
-#define class_end_registrar() \
-	registry->end_class(); \
-}
+#define tnl_method(registry, class_name, method_name) \
+	registry.add_method(#method_name, &class_name::method_name);
 
+#define tnl_end_class(registry) \
+	registry.end_class();

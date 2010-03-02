@@ -62,6 +62,9 @@ int torque_socket_is_introducer(torque_socket);
 struct torque_socket_event *torque_socket_get_next_event(torque_socket);
 ///< Gets the next event on this socket; returns NULL if there are no events to be read.
 
+int torque_socket_send_to(torque_socket, struct sockaddr* remote_host, unsigned data_size, status_response data);
+///< sends an unconnected datagram to the remote_host from the specified socket.  This function is not available for security reasons in the plugin version of the API.
+	
 torque_connection torque_socket_connect(torque_socket, struct sockaddr* remote_host, unsigned connect_data_size, status_response connect_data);
 ///< open a connection to the remote host
 

@@ -23,3 +23,4 @@ inline uint32 get_next_power_of_2(uint32 value)
 	return is_power_of_2(value) ? value : (1 << (get_binary_log(value) + 1));
 }
 
+#define bit(x) (1 << (x))

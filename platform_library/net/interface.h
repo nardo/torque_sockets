@@ -396,7 +396,6 @@ public:
 		return _random_generator;
 	}
 	
-protected:
 	/// packet_type is encoded as the first byte of each packet.
 	///
 	/// Subclasses of interface can add custom, non-connected data
@@ -407,7 +406,7 @@ protected:
 	/// (i.e. the first unsigned byte is greater than 127), are
 	/// assumed to be connected protocol packets, and are dispatched to
 	/// the appropriate connection for further processing.
-	
+public:
 	enum packet_type
 	{
 		connect_challenge_request_packet, ///< Initial packet of the two-phase connect process
@@ -422,7 +421,7 @@ protected:
 		send_punch_packet, ///< A request to send a punch packet to another address
 		first_valid_info_packet_id, ///< The first valid ID for a interface subclass's info packets.
 	};
-	
+protected:
 	array<ref_ptr<connection> > _connection_list; ///< List of all the connections that are in a connected state on this interface.
 	array<connection *> _connection_hash_table; ///< A resizable hash table for all connected connections.  This is a flat hash table (no buckets).
 	
