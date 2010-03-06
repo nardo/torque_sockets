@@ -278,7 +278,7 @@ public:
 		event.event_type = torque_socket_packet_event_type;
 		event.data_size = stream.get_stream_byte_size();
 		stream.read_bytes(event.data, event.data_size);
-		strncpy(event.source_address, address.to_string().c_str(), sizeof(event.source_address));
+		address.to_sockaddr(&event.source_address);
 		tnp_post_event(event, NULL);
 	}
 	
