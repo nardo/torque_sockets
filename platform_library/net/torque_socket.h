@@ -770,7 +770,7 @@ protected:
 		out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
 
 		core::write(out, conn->get_initial_send_sequence());
-		conn->write_connect_request(out);
+		core::write(out, the_params.connect_data);
 		
 		// if we're using crypto on this connection,
 		// then write a hash of everything we wrote into the packet
@@ -871,12 +871,8 @@ protected:
 		
 		conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		
-		byte_buffer_ptr reason;
-		if(!conn->read_connect_request(stream, reason))
-		{
-			send_connect_reject(&the_params, the_address, reason);
-			return;
-		}
+		byte_buffer_ptr connect_request_data;
+		core::read(stream, connect_request_data);
 
 		add_pending_connection(conn);
 
@@ -891,9 +887,9 @@ protected:
 		memcpy(event->public_key, the_params._public_key->get_public_key()->get_buffer(), event->public_key_size);
 
 		event->connection = conn->get_connection_index();
-		event->data_size = reason->get_buffer_size();
+		event->data_size = connect_request_data->get_buffer_size();
 		event->data = _allocate_queue_data(event->data_size);
-		memcpy(event->data, reason->get_buffer(), event->data_size);
+		memcpy(event->data, connect_request_data->get_buffer(), event->data_size);
 	}
 	
 	/// Sends a connect accept packet to acknowledge the successful acceptance of a connect request.
@@ -911,7 +907,7 @@ protected:
 		out.set_byte_position(encrypt_pos);
 		
 		core::write(out, conn->get_initial_send_sequence());
-		conn->write_connect_accept(out);
+		core::write(out, the_params.connect_data);
 		
 		out.write_bytes(the_params._init_vector, symmetric_cipher::key_size);
 		symmetric_cipher the_cipher(the_params._shared_secret);
@@ -947,12 +943,8 @@ protected:
 		core::read(stream, recv_sequence);
 		conn->set_initial_recv_sequence(recv_sequence);
 		
-		byte_buffer_ptr error_buffer;
-		if(!conn->read_connect_accept(stream, error_buffer))
-		{
-			remove_pending_connection(conn);
-			return;
-		}
+		byte_buffer_ptr connect_accept_data;
+		core::read(stream, connect_accept_data);
 
 		stream.read_bytes(the_params._init_vector, symmetric_cipher::key_size);
 		conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
@@ -968,9 +960,9 @@ protected:
 		event->event_type = torque_connection_accepted_event_type;
 		event->connection = conn->get_connection_index();
 		event->client_identity = the_params._client_identity;
-		event->data_size = error_buffer->get_buffer_size();
+		event->data_size = connect_accept_data->get_buffer_size();
 		event->data = _allocate_queue_data(event->data_size);
-		memcpy(event->data, error_buffer->get_buffer(), event->data_size);
+		memcpy(event->data, connect_accept_data->get_buffer(), event->data_size);
 	
 		post_connection_event(conn, torque_connection_established_event_type, 0);
 	}
@@ -1036,7 +1028,6 @@ protected:
 	/// Begins the connection handshaking process for an arranged connection.
 	void start_arranged_connection(torque_connection *conn)
 	{
-		
 		conn->set_connection_state(torque_connection::sending_punch_packets);
 		add_pending_connection(conn);
 		conn->_connect_send_count = 0;
@@ -1323,7 +1314,7 @@ protected:
 		out.write_bytes(the_params._symmetric_key, symmetric_cipher::key_size);
 
 		core::write(out, conn->get_initial_send_sequence());
-		conn->write_connect_request(out);
+		core::write(out, the_params.connect_data);
 		
 		symmetric_cipher shared_secret_cipher(the_params._shared_secret);
 		bit_stream_hash_and_encrypt(out, torque_connection::message_signature_bytes, inner_encrypt_pos, &shared_secret_cipher);
@@ -1421,7 +1412,11 @@ protected:
 
 		conn->set_symmetric_cipher(new symmetric_cipher(the_params._symmetric_key, the_params._init_vector));
 		
-		byte_buffer_ptr reason;
+		byte_buffer_ptr connect_request_data;
+		core::read(stream, connect_request_data);
+		
+		// this is wrong now, FIXME -- should post a connect request event
+		/*
 		if(!conn->read_connect_request(stream, reason))
 		{
 			send_connect_reject(&the_params, the_address, reason);
@@ -1432,7 +1427,7 @@ protected:
 		remove_pending_connection(conn);
 		conn->set_connection_state(torque_connection::connected);
 		post_connection_event(conn, torque_connection_established_event_type, 0);
-		send_connect_accept(conn);
+		send_connect_accept(conn);*/
 	}
 	
 	

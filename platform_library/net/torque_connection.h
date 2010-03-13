@@ -31,14 +31,8 @@ struct connection_parameters
 	}
 };
 
-//----------------------------------------------------------------------------
-/// TNP network torque_connection class.
-///
-/// torque_connection is the base class for the connection classes in TNL. It implements a
-/// notification protocol on the unreliable packet transport of UDP (via the TNL::Net layer).
-/// connection manages the flow of packets over the network, and calls its subclasses
-/// to read and write packet data, as well as handle packet delivery notification.
-///
+/// torque_connection class that manages an individual data connection in torque sockets. It implements a notification protocol on the unreliable packet transport of UDP.  torque_connection manages the flow of packets over the network, and posts torque_socket_event events to the torque_socket event queue for data packets and packet delivery notification.
+
 class torque_connection : public ref_object
 {
 public:
@@ -54,17 +48,17 @@ public:
 		// these values should be set to align to a byte boundary, otherwise
 		// bits will just be wasted.
 		
-		max_packet_window_size_shift = 5,                            ///< Packet window size is 2^max_packet_window_size_shift.
-		max_packet_window_size = (1 << max_packet_window_size_shift),   ///< Maximum number of packets in the packet window.
-		packet_window_mask = max_packet_window_size - 1,              ///< Mask for accessing the packet window.
-		max_ack_mask_size = 1 << (max_packet_window_size_shift - 5),    ///< Each ack word can ack 32 packets.
-		max_ack_byte_count = max_ack_mask_size << 2,                   ///< The maximum number of ack bytes sent in each packet.
-		sequence_number_bit_size = 11,                              ///< Bit size of the send and sequence number.
+		max_packet_window_size_shift = 5, ///< Packet window size is 2^max_packet_window_size_shift.
+		max_packet_window_size = (1 << max_packet_window_size_shift), ///< Maximum number of packets in the packet window.
+		packet_window_mask = max_packet_window_size - 1, ///< Mask for accessing the packet window.
+		max_ack_mask_size = 1 << (max_packet_window_size_shift - 5), ///< Each ack word can ack 32 packets.
+		max_ack_byte_count = max_ack_mask_size << 2, ///< The maximum number of ack bytes sent in each packet.
+		sequence_number_bit_size = 11, ///< Bit size of the send and sequence number.
 		sequence_number_window_size = (1 << sequence_number_bit_size), ///< Size of the send sequence number window.
-		sequence_number_mask = -sequence_number_window_size,          ///< Mask used to reconstruct the full send sequence number of the packet from the partial sequence number sent.
-		ack_sequence_number_bit_size = 10,                           ///< Bit size of the ack receive sequence number.
+		sequence_number_mask = -sequence_number_window_size, ///< Mask used to reconstruct the full send sequence number of the packet from the partial sequence number sent.
+		ack_sequence_number_bit_size = 10, ///< Bit size of the ack receive sequence number.
 		ack_sequence_number_window_size = (1 << ack_sequence_number_bit_size), ///< Size of the ack receive sequence number window.
-		ack_sequence_number_mask = -ack_sequence_number_window_size,          ///< Mask used to reconstruct the full ack receive sequence number of the packet from the partial sequence number sent.
+		ack_sequence_number_mask = -ack_sequence_number_window_size, ///< Mask used to reconstruct the full ack receive sequence number of the packet from the partial sequence number sent.
 		
 		packet_header_bit_size = 3 + ack_sequence_number_bit_size + sequence_number_bit_size, ///< Size, in bits, of the packet header sequence number section
 		packet_header_byte_size = (packet_header_bit_size + 7) >> 3, ///< Size, in bytes, of the packet header sequence number information
@@ -118,36 +112,6 @@ public:
 		request_retry_time = 2500
 	};
 	
-protected:
-	/// Fills the connect request packet with additional custom data (from a subclass).
-	virtual void write_connect_request(bit_stream &stream)
-	{
-		core::write(stream, _connection_parameters.connect_data);
-	}
-	
-	/// Called after this torque_connection instance is created on a non-initiating host (server).
-	///
-	/// Reads data sent by the write_connect_request method and returns true if the torque_connection is accepted
-	/// or false if it's not.  The error_string pointer should be filled if the connection is rejected.
-	virtual bool read_connect_request(bit_stream &stream, byte_buffer_ptr &reason_buf)
-	{
-		core::read(stream, reason_buf);
-		return true;
-	}
-	
-	/// Writes any data needed to start the connection on the accept packet.
-	virtual void write_connect_accept(bit_stream &stream)
-	{
-		core::write(stream, _connection_parameters.connect_data);;
-	}
-	
-	/// Reads out the extra data read by write_connect_accept and returns true if it is processed properly.
-	virtual bool read_connect_accept(bit_stream &stream, byte_buffer_ptr &error_buffer)
-	{
-		core::read(stream, error_buffer);
-		return true;
-	}
-public:
 protected:
 	/// Reads a raw packet from a bit_stream, as dispatched from torque_socket.
 	bool read_raw_packet(bit_stream &bstream)

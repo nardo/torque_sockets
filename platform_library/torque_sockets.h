@@ -38,7 +38,7 @@ void init_client(const char* client_address, const char* server_address);
 void close_client();
 #endif
 
-torque_socket torque_socket_create(const char*);
+torque_socket torque_socket_create(struct sockaddr*);
 ///< Create a torque socket and bind it to the specified socket address interface.
 
 void torque_socket_destroy(torque_socket);
@@ -50,40 +50,37 @@ void torque_socket_seed_entropy(torque_socket, unsigned char entropy[32]);
 void torque_socket_set_private_key(torque_socket, unsigned key_data_size, unsigned char *the_key);
 ///< Sets the private/public key pair to be used for this connection; these are formatted as libtomcrypt keys, and currently only ECC is supported.
 
-void torque_socket_set_challenge_response_data(torque_socket, unsigned challenge_response_data_size, status_response challenge_response_data);
+void torque_socket_set_challenge_response_data(torque_socket, unsigned challenge_response_data_size, unsigned char *challenge_response_data);
 ///< Sets the data to be sent back upon challenge request along with the client puzzle and public key.  challenge_response_data_size must be <= torque_max_status_datagram_size
 	
-void torque_socket_allow_incoming_connections(torque_socket, int allowed);
+void torque_socket_allow_incoming_connections(torque_socket, int allowed, ?from_domains?);
 ///< Sets whether or not this connection accepts incoming connections; if not, all incoming connection challenges and requests will be silently ignored.
-
+	
 int torque_socket_does_allow_incoming_connections(torque_socket);
 ///< Returns true if this socket allows incoming connections.
 
-void torque_socket_can_be_introducer(torque_socket, int allowed);
-///< if true, this socket will arrange connections between hosts connected to this socket.
-
-int torque_socket_is_introducer(torque_socket);
-///< Returns true if this socket will arrange connections between hosts connected to this socket.	
+void torque_socket_introduce(torque_socket, torque_connection, torque_connection, unsigned connection_token);
+///< This is called on the middleman of an introduced connection and will allow this host to broker a connection start between the remote hosts at either connection point.
+	
+torque_connection torque_connection_connect_introduced(torque_connection introducer, unsigned remote_client_identity, unsigned connection_token, unsigned connect_data_size, unsigned char *connect_data);
+///< Connect to a client connected to the host at middle_man.
 
 struct torque_socket_event *torque_socket_get_next_event(torque_socket);
 ///< Gets the next event on this socket; returns NULL if there are no events to be read.
 
-int torque_socket_send_to(torque_socket, struct sockaddr* remote_host, unsigned data_size, status_response data);
+int torque_socket_send_to(torque_socket, struct sockaddr* remote_host, unsigned data_size, unsigned char *data);
 ///< sends an unconnected datagram to the remote_host from the specified socket.  This function is not available for security reasons in the plugin version of the API.
 	
-torque_connection torque_socket_connect(torque_socket, struct sockaddr* remote_host, unsigned connect_data_size, status_response connect_data);
+torque_connection torque_socket_connect(torque_socket, struct sockaddr* remote_host, unsigned connect_data_size, unsigned char *connect_data);
 ///< open a connection to the remote host
 
-torque_connection torque_connection_introduce_me(torque_connection introducer, unsigned remote_client_identity, unsigned connect_data_size, status_response connect_data);
-///< Connect to a client connected to the host at middle_man.
-
-void torque_connection_accept(torque_connection, unsigned connect_accept_data_size, status_response connect_accept_data);
+void torque_connection_accept(torque_connection, unsigned connect_accept_data_size, unsigned char *connect_accept_data);
 ///< accept an incoming connection request.
 
-void torque_connection_reject(torque_connection, unsigned reject_data_size, status_response reject_data);
+void torque_connection_reject(torque_connection, unsigned reject_data_size, unsigned char *reject_data);
 ///< reject an incoming connection request.
 
-void torque_connection_disconnect(torque_connection, unsigned disconnect_data_size, status_response disconnect_data);
+void torque_connection_disconnect(torque_connection, unsigned disconnect_data_size, unsigned char *disconnect_data);
 ///< Close an open connection. 
 
 int torque_connection_send_to(torque_connection, unsigned datagram_size, unsigned char buffer[torque_max_datagram_size], unsigned *sequence_number);
@@ -131,107 +128,15 @@ struct torque_socket_event
 	torque_connection connection;
 	torque_connection arranger_connection;
 	unsigned client_identity;
+	unsigned connection_token;
 	unsigned public_key_size;
-	unsigned char public_key[torque_max_public_key_size];
+	unsigned char *public_key;
 	unsigned data_size;
-	unsigned char data[torque_max_datagram_size];
+	unsigned char *data;
 	unsigned packet_sequence;
 	int delivered;
-	char source_address[64];
+	sockaddr source_address;
 };
-
-/*struct torque_connection_challenge_response_event
-{
-	unsigned event_type;
-	torque_connection connection;
-	unsigned public_key_size;
-	unsigned char public_key[torque_max_public_key_size];
-	unsigned challenge_response_data_size;
-	status_response challenge_response_data;
-};
-	
-struct torque_connection_accepted_event
-{
-	unsigned event_type;
-	torque_connection connection;
-	uint64 client_identity;
-	unsigned connection_accept_data_size;
-	status_response connection_accept_data;
-};
-	
-struct torque_connection_rejected_event
-{
-	unsigned event_type;
-	torque_connection connection;
-	unsigned connection_reject_data_size;
-	status_response connection_reject_data;
-};
-
-struct torque_connection_requested_event
-{
-	unsigned event_type;
-	torque_connection connection;
-	unsigned public_key_size;
-	unsigned char public_key[torque_max_public_key_size];
-	unsigned connection_request_data_size;
-	status_response connection_request_data;
-	struct sockaddr source_address;
-};
-
-struct torque_connection_arranged_connection_request_event
-{
-	unsigned event_type;
-	uint64 source_client_identity;
-	torque_connection connection;
-	torque_connection arranger_connection;
-	unsigned connection_request_data_size;
-	status_response connection_request_data;
-};	
-	
-struct torque_connection_timed_out_event
-{
-	unsigned event_type;
-	torque_connection connection;
-};
-
-struct torque_connection_disconnected_event
-{
-	unsigned event_type;
-	torque_connection connection;
-	unsigned connection_disconnected_data_size;
-	status_response connection_disconnected_data;
-};
-
-struct torque_connection_established_event
-{
-	unsigned event_type;
-	torque_connection connection;
-};
-
-struct torque_connection_packet_event
-{
-	unsigned event_type;
-	torque_connection connection;
-	unsigned packet_sequence;
-	unsigned data_size;
-	unsigned char data[torque_max_datagram_size];
-};
-
-struct torque_connection_packet_notify_event
-{
-	unsigned event_type;
-	torque_connection connection;
-	unsigned send_sequence;
-	int delivered;
-};
-
-struct torque_socket_packet_event
-{
-	unsigned event_type;
-	unsigned data_size;
-	unsigned char data[torque_max_datagram_size];
-	struct sockaddr source_address;
-};*/
 
 #ifdef __cplusplus
 }
