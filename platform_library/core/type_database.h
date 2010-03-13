@@ -190,7 +190,7 @@ public:
 
 	void begin_class(static_string class_name, type_record *class_type, type_record *super_class_type, bool indexed)
 	{
-		printf("beginning class %s\n", class_name);
+		printf("beginning class %s - type = %08x, super = %08x\n", class_name, class_type, super_class_type);
 		assert(_current_class == 0);
 		
 		type_rep *the_class = new type_rep;

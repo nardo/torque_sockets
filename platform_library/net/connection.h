@@ -32,21 +32,17 @@ struct connection_parameters
 };
 
 //----------------------------------------------------------------------------
-/// TNP network connection class.
+/// TNP network torque_connection class.
 ///
-/// connection is the base class for the connection classes in TNL. It implements a
+/// torque_connection is the base class for the connection classes in TNL. It implements a
 /// notification protocol on the unreliable packet transport of UDP (via the TNL::Net layer).
 /// connection manages the flow of packets over the network, and calls its subclasses
 /// to read and write packet data, as well as handle packet delivery notification.
 ///
-/// Because string data can easily soak up network bandwidth, for
-/// efficiency connection implements an optional networked string table.
-/// Users can then notify the connection of strings it references often, such as player names,
-/// and transmit only a tag, instead of the whole string.
-///
-class connection : public ref_object
+class torque_connection : public ref_object
 {
-	friend class interface;
+public:
+	friend class torque_socket;
 	/// Constants controlling the data representation of each packet header
 	enum connection_constants {
 		// NOTE - IMPORTANT!
@@ -76,18 +72,21 @@ class connection : public ref_object
 		
 		message_signature_bytes = 5, ///< Special data bytes written into the end of the packet to guarantee data consistency
 	};
-	uint32 _last_seq_recvd_at_send[max_packet_window_size]; ///< The sequence number of the last packet received from the remote host when we sent the packet with sequence X & packet_window_mask.
-	uint32 _last_seq_recvd;                            ///< The sequence number of the most recently received packet from the remote host.
-	uint32 _highest_acked_seq;                         ///< The highest sequence number the remote side has acknowledged.
-	uint32 _last_send_seq;                             ///< The sequence number of the last packet sent.
-	uint32 _ack_mask[max_ack_mask_size];                 ///< long string of bits, each acking a packet sent by the remote host.
-	///< The bit associated with _last_seq_recvd is the low bit of the 0'th word of _ack_mask.
-	uint32 _last_recv_ack_ack; ///< The highest sequence this side knows the other side has received an ACK or NACK for.
+	/// Connection state flags for a connection instance.
+	enum connection_state {
+		not_connected=0, ///< Initial state of a connection instance - not connected.
+		awaiting_challenge_response, ///< We've sent a challenge request, awaiting the response.
+		sending_punch_packets, ///< The state of a pending arranged connection when both sides haven't heard from the other yet
+		computing_puzzle_solution, ///< We've received a challenge response, and are in the process of computing a solution to its puzzle.
+		awaiting_connect_response, ///< We've received a challenge response and sent a connect request.
+		connect_timed_out, ///< The connection timed out during the connection process.
+		connect_rejected, ///< The connection was rejected.
+		connected, ///< We've accepted a connect request, or we've received a connect response accept.
+		disconnected, ///< The connection has been disconnected.
+		timed_out, ///< The connection timed out.
+		state_count,
+	};
 	
-	uint32 _initial_send_seq; ///< The first _last_send_seq for this side of the connection.
-	uint32 _initial_recv_seq; ///< The first _last_seq_recvd (the first _last_send_seq for the remote host).
-	time _highest_acked_send_time; ///< The send time of the highest packet sequence acked by the remote host.  Used in the computation of round trip time.
-	/// Two-bit identifier for each connected packet.
 	enum net_packet_type
 	{
 		data_packet, ///< Standard data packet.  Each data packet sent increments the current packet sequence number (_last_send_seq).
@@ -101,14 +100,6 @@ class connection : public ref_object
 		default_ping_timeout = 5000,  ///< Default milliseconds to wait before sending a ping packet.
 		default_ping_retry_count = 5, ///< Default number of unacknowledged pings to send before timing out.
 	};
-	time _ping_timeout; ///< time to wait before sending a ping packet.
-	uint32 _ping_retry_count; ///< Number of unacknowledged pings to send before timing out.
-	
-	/// Returns true if this connection has sent packets that have not yet been acked by the remote host.
-	bool has_unacked_sent_packets() { return _last_send_seq != _highest_acked_seq; }
-	
-	byte_buffer_ptr _packet_data;
-	
 	struct request
 	{
 		packet_stream data;
@@ -127,77 +118,16 @@ class connection : public ref_object
 		request_retry_time = 2500
 	};
 	
-	std::auto_ptr<request> _current_request;
-	
-public:
-	connection(random_generator &random_gen)
-	{
-		_initial_send_seq = random_gen.random_integer();
-		random_gen.random_buffer((uint8 *) &_connection_parameters._nonce, sizeof(nonce));
-		
-		_simulated_latency = 0;
-		_simulated_packet_loss = 0;
-		
-		_last_ping_send_time = time(0);
-		_connection_state = not_connected;
-		
-		_ping_send_count = 0;
-		
-		_last_seq_recvd = 0;
-		_highest_acked_seq = _initial_send_seq;
-		_last_send_seq = _initial_send_seq; // start sending at _initial_send_seq + 1
-		_ack_mask[0] = 0;
-		_last_recv_ack_ack = 0;
-		
-		_ping_timeout = time(default_ping_timeout);
-		_ping_retry_count = default_ping_retry_count;
-	}
-	
 protected:
-	/// Called when a pending connection is terminated
-	virtual void on_connect_terminated(interface::termination_reason reason, byte_buffer_ptr &reject_buffer)
-	{
-		on_connection_terminated(reason, reject_buffer);
-	}
-	
-	/// Called when this established connection is terminated for any reason
-	virtual void on_connection_terminated(interface::termination_reason reason, byte_buffer_ptr &reason_buffer)
-	{
-		torque_socket_event event;
-		if(reason != interface::reason_timed_out)
-			event.event_type = torque_connection_disconnected_event_type;
-		else
-			event.event_type = torque_connection_timed_out_event_type;
-
-		event.data_size = reason_buffer->get_buffer_size();
-		memcpy(event.data, reason_buffer->get_buffer(), event.data_size);
-
-		get_interface()->tnp_post_event(event, this);
-	}
-	
-	/// Called when the connection is successfully established with the remote host.
-	virtual void on_connection_established()
-	{
-		torque_socket_event event;
-		event.event_type = torque_connection_established_event_type;
-		get_interface()->tnp_post_event(event, this);
-	}
-	
-	/// Validates that the given public key is valid for this connection.  If this
-	/// host requires a valid certificate for the communication, this function
-	/// should always return false.  It will only be called if the remote side
-	/// of the connection did not provide a certificate.
-	virtual bool validate_public_key(asymmetric_key *the_key, bool is_initiator) { return true; }
-	
 	/// Fills the connect request packet with additional custom data (from a subclass).
 	virtual void write_connect_request(bit_stream &stream)
 	{
 		core::write(stream, _connection_parameters.connect_data);
 	}
 	
-	/// Called after this connection instance is created on a non-initiating host (server).
+	/// Called after this torque_connection instance is created on a non-initiating host (server).
 	///
-	/// Reads data sent by the write_connect_request method and returns true if the connection is accepted
+	/// Reads data sent by the write_connect_request method and returns true if the torque_connection is accepted
 	/// or false if it's not.  The error_string pointer should be filled if the connection is rejected.
 	virtual bool read_connect_request(bit_stream &stream, byte_buffer_ptr &reason_buf)
 	{
@@ -218,68 +148,65 @@ protected:
 		return true;
 	}
 public:
-	/// Returns the next send sequence that will be sent by this side.
-	uint32 get_next_send_sequence() { return _last_send_seq + 1; }
-	
-	/// Returns the sequence of the last packet sent by this connection, or
-	/// the current packet's send sequence if called from within write_packet().
-	uint32 get_last_send_sequence() { return _last_send_seq; }
-	
 protected:
-	/// Reads a raw packet from a bit_stream, as dispatched from interface.
-	void read_raw_packet(bit_stream &bstream)
+	/// Reads a raw packet from a bit_stream, as dispatched from torque_socket.
+	bool read_raw_packet(bit_stream &bstream)
 	{
-		if(_simulated_packet_loss && _interface->random().random_unit_float() < _simulated_packet_loss)
+		if(_simulated_packet_loss && _torque_socket->random().random_unit_float() < _simulated_packet_loss)
 		{
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: RECVDROP - %d", _address.to_string().c_str(), get_last_send_sequence()));
-			return;
+			TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: RECVDROP - %d", _connection_index, get_last_send_sequence()));
+			return false;
 		}
-		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: RECV bytes", _address.to_string().c_str()));
+		TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: RECV bytes", _connection_index));
 		
 		if(read_packet_header(bstream))
 		{
-			read_packet(bstream);
+			torque_socket_event *event = _torque_socket->_allocate_queued_event();
+			event->event_type = torque_connection_packet_event_type;
+			event->packet_sequence = get_last_received_sequence();
+			event->connection = get_connection_index();
+			event->data_size = bstream.get_stream_byte_size() - bstream.get_byte_position();
+			event->data = _torque_socket->_allocate_queue_data(event->data_size);
+			memcpy(event->data, bstream.get_buffer() + bstream.get_byte_position(), event->data_size);
+			return true;
 		}
+		return false;
 	}
 	
-	virtual void read_packet(bit_stream &bstream)
+	/// Sends a packet that was written into a bit_stream to the remote host, or the _remote_connection on this host.
+	void send_packet(net_packet_type packet_type, bit_stream *data, uint32 *sequence = 0)
 	{
-		byte_buffer_ptr data;
-		core::read(bstream, data);
-
-		torque_socket_event event;
-		event.event_type = torque_connection_packet_event_type;
-		event.packet_sequence = _last_seq_recvd;
-		event.data_size = data->get_buffer_size();
-		memcpy(event.data, data->get_buffer(), event.data_size);
-
-		get_interface()->tnp_post_event(event, this);
-	}
-	
-	
-	/// Writes a full packet of the specified type into the bit_stream
-	void write_raw_packet(bit_stream &bstream, net_packet_type packet_type)
-	{
-		write_packet_header(bstream, packet_type);
+		packet_stream ps;
+		write_packet_header(ps, packet_type);
 		if(packet_type == data_packet)
 		{
-			int32 start = bstream.get_bit_position();
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: START", _address.to_string().c_str()) );
-			write_packet(bstream);
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: END - %llu bits", _address.to_string().c_str(), bstream.get_bit_position() - start) );
+			int32 start = ps.get_bit_position();
+			TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: START", _connection_index) );
+			ps.write_bytes(data->get_buffer(), data->get_next_byte_position());
+			TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: END - %llu bits", _connection_index, ps.get_bit_position() - start) );			
 		}
 		if(!_symmetric_cipher.is_null())
 		{
 			_symmetric_cipher->setup_counter(_last_send_seq, _last_seq_recvd, packet_type, 0);
-			bit_stream_hash_and_encrypt(bstream, message_signature_bytes, packet_header_byte_size, _symmetric_cipher);
+			bit_stream_hash_and_encrypt(ps, message_signature_bytes, packet_header_byte_size, _symmetric_cipher);
 		}
+		if(_simulated_packet_loss && _torque_socket->random().random_unit_float() < _simulated_packet_loss)
+		{
+			TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: SENDDROP - %d", _connection_index, get_last_send_sequence()));
+		}
+		
+		TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: SEND - %d bytes", _connection_index, ps.get_next_byte_position()));
+		
+		if(_simulated_latency)
+		{
+			_torque_socket->send_to_delayed(get_address(), ps, _simulated_latency);
+		}
+		else
+			_torque_socket->send_to(get_address(), ps);
+		if(sequence)
+			*sequence = _last_send_seq;
 	}
-	
-	virtual void write_packet(bit_stream &stream)
-	{
-		core::write(stream, _packet_data);
-	}
-	
+
 	/// Writes the notify protocol's packet header into the bit_stream.
 	void write_packet_header(bit_stream &stream, net_packet_type packet_type)
 	{
@@ -305,6 +232,7 @@ protected:
 		for(uint32 i = 0; i < word_count; i++)
 			stream.write_integer(_ack_mask[i], i == word_count - 1 ?
 								  (ack_byte_count - (i * 4)) * 8 : 32);
+		stream.advance_to_next_byte();
 		
 		// if we're resending this header, we can't advance the
 		// sequence recieved (in case this packet drops and the prev one
@@ -410,7 +338,8 @@ protected:
 		
 		for(uint32 i = 0; i < pk_ack_word_count; i++)
 			pk_ack_mask[i] = pstream.read_integer(i == pk_ack_word_count - 1 ? (pk_ack_byte_count - (i * 4)) * 8 : 32);
-		
+		pstream.advance_to_next_byte();
+
 		//if(is_network_connection())
 		//{
 		//   TorqueLogMessageFormatted(LogBlah, ("RCV: mHA: %08x  pkHA: %08x  mLSQ: %08x  pkSN: %08x  pkLS: %08x  pkAM: %08x",
@@ -467,8 +396,10 @@ protected:
 			bool packet_transmit_success = (pk_ack_mask[ack_mask_word] & (1 << ack_mask_bit)) != 0;
 			TorqueLogMessageFormatted(LogConnectionProtocol, ("Ack %d %d", notify_index, packet_transmit_success));
 			
-			handle_notify(notify_index, packet_transmit_success);
-			
+			torque_socket_event *event = _torque_socket->post_connection_event(this, torque_connection_packet_notify_event_type, 0);
+			event->delivered = packet_transmit_success;
+			event->packet_sequence = notify_index;
+						
 			if(packet_transmit_success)
 				_last_recv_ack_ack = _last_seq_recvd_at_send[notify_index & packet_window_mask];
 		}
@@ -500,33 +431,15 @@ protected:
 	/// Sends a ping packet to the remote host, to determine if it is still alive and what its packet window status is.
 	void send_ping_packet()
 	{
-		packet_stream ps;
-		write_raw_packet(ps, ping_packet);
+		send_packet(ping_packet, 0);
 		TorqueLogMessageFormatted(LogConnectionProtocol, ("send ping %d", _last_send_seq));
-		
-		send_packet(ps);
 	}
 	
 	/// Sends an ack packet to the remote host, in response to receiving a ping packet.
 	void send_ack_packet()
 	{
-		packet_stream ps;
-		write_raw_packet(ps, ack_packet);
+		send_packet(ack_packet, 0);
 		TorqueLogMessageFormatted(LogConnectionProtocol, ("send ack %d", _last_send_seq));
-		
-		send_packet(ps);
-	}
-	
-	/// Dispatches a notify when a packet is ACK'd or NACK'd.
-	virtual void handle_notify(uint32 sequence, bool recvd)
-	{
-		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: NOTIFY %d %s", _address.to_string().c_str(), sequence, recvd ? "RECVD" : "DROPPED"));
-
-		torque_socket_event event;
-		event.event_type = torque_connection_packet_notify_event_type;
-		event.delivered = recvd;
-		event.packet_sequence = sequence;
-		get_interface()->tnp_post_event(event, this);
 	}
 	
 	/// Called when a packet is received to stop any timeout action in progress.
@@ -544,43 +457,43 @@ public:
 	}
 	
 	/// Returns the initial sequence number of packets sent from the remote host.
-	uint32 get_initial_recv_sequence() { return _initial_recv_seq; }
+	uint32 get_initial_recv_sequence()
+	{
+		return _initial_recv_seq;
+	}
 	
 	/// Returns the initial sequence number of packets sent to the remote host.
-	uint32 get_initial_send_sequence() { return _initial_send_seq; }
-	
-	/// Connect to a server through a given network interface.
-	void connect(interface *connection_interface, const address &address, const byte_buffer_ptr& data)
+	uint32 get_initial_send_sequence()
 	{
-		_connection_parameters._is_initiator = true;
-		_connection_parameters.connect_data = data;
-		
-		set_address(address);
-		set_interface(connection_interface);
-		_interface->start_connection(this);
-	}
-		
-	/// Connects to a remote host that is also connecting to this connection (negotiated by a third party)
-	void connect_arranged(interface *connection_interface, const array<address> &possible_addresses, nonce &my_nonce, nonce &remote_nonce, byte_buffer_ptr shared_secret, bool is_initiator)
-	{
-		_connection_parameters._possible_addresses = possible_addresses;
-		_connection_parameters._is_initiator = is_initiator;
-		_connection_parameters._is_arranged = true;
-		_connection_parameters._nonce = my_nonce;
-		_connection_parameters._server_nonce = remote_nonce;
-		_connection_parameters._arranged_secret = shared_secret;
-		
-		set_interface(connection_interface);
-		_interface->start_arranged_connection(this);   
+		return _initial_send_seq;
 	}
 	
-	/// Sends a disconnect packet to notify the remote host that this side is terminating the connection for the specified reason.
-	/// This will remove the connection from its interface, and may have the side
-	/// effect that the connection is deleted, if there are no other objects with RefPtrs
-	/// to the connection.
-	void disconnect(byte_buffer_ptr &reason)
+	/// Returns true if this torque_connection has sent packets that have not yet been acked by the remote host.
+	bool has_unacked_sent_packets()
 	{
-		_interface->disconnect(this, interface::reason_self_disconnect, reason);
+		return _last_send_seq != _highest_acked_seq;
+	}
+	
+	uint32 get_last_received_sequence()
+	{
+		return _last_seq_recvd;
+	}
+	/// Returns the next send sequence that will be sent by this side.
+	uint32 get_next_send_sequence()
+	{
+		return _last_send_seq + 1;
+	}
+	
+	/// Returns the sequence of the last packet sent by this torque_connection, or
+	/// the current packet's send sequence if called from within write_packet().
+	uint32 get_last_send_sequence()
+	{
+		return _last_send_seq;
+	}
+	
+	uint32 get_connection_index()
+	{
+		return _connection_index;
 	}
 	
 	/// Returns true if the packet send window is full and no more data packets can be sent.
@@ -594,8 +507,8 @@ public:
 	void submit_request(const packet_stream& data)
 	{
 		_current_request.reset(new request(data, get_address()));
-		_current_request->data.send_to(get_interface()->get_socket(), _current_request->addr);
-		_current_request->last_retry_time = get_interface()->get_process_start_time();
+		_current_request->data.send_to(get_torque_socket()->get_socket(), _current_request->addr);
+		_current_request->last_retry_time = get_torque_socket()->get_process_start_time();
 		_current_request->retry_count++;
 	}
 	
@@ -620,11 +533,11 @@ public:
 			return false;
 		
 		// If we need to wait a bit longer, don't give up, but don't resend just yet.
-		if(get_interface()->get_process_start_time() < _current_request->last_retry_time + time(request_retry_time))
+		if(get_torque_socket()->get_process_start_time() < _current_request->last_retry_time + time(request_retry_time))
 			return true;
 
-		_current_request->data.send_to(get_interface()->get_socket(), _current_request->addr);
-		_current_request->last_retry_time = get_interface()->get_process_start_time();
+		_current_request->data.send_to(get_torque_socket()->get_socket(), _current_request->addr);
+		_current_request->last_retry_time = get_torque_socket()->get_process_start_time();
 		_current_request->retry_count++;
 		return true;		
 	}
@@ -632,62 +545,49 @@ public:
 	//----------------------------------------------------------------
 	// Connection functions
 	//----------------------------------------------------------------
-	
-private:
-	time _last_update_time; ///< The last time a packet was sent from this instance.
-	uint32 _simulated_latency; ///< Amount of additional time this connection delays its packet sends to simulate latency in the connection
-	float32 _simulated_packet_loss; ///< Function to simulate packet loss on a network
-	
-	address _address; ///< The network address of the host this instance is connected to.
-	
-	// timeout management stuff:
-	uint32 _ping_send_count; ///< Number of unacknowledged ping packets sent to the remote host
-	time _last_ping_send_time; ///< Last time a ping packet was sent from this connection
-	
-protected:
-	connection_parameters _connection_parameters;
 public:
-	connection_parameters &get_connection_parameters() { return _connection_parameters; }
-	
-	/// returns true if this ref_object initiated the connection with the remote host
-	bool is_initiator() { return _connection_parameters._is_initiator; }
-	
-	uint32 _connect_send_count;    ///< Number of challenge or connect requests sent to the remote host.
-	time _connect_last_send_time; ///< The send time of the last challenge or connect request.
-	
-protected:
-	safe_ptr<interface> _interface;             ///< The interface of which this connection is a member.
-public:
-	/// Sets the interface this connection will communicate through.
-    void set_interface(interface *my_interface)
+	connection_parameters &get_connection_parameters()
 	{
-		_interface = my_interface;
+		return _connection_parameters;
 	}
 	
-	/// Returns the interface this connection communicates through.
-	interface *get_interface()
+	/// returns true if this ref_object initiated the torque_connection with the remote host
+	bool is_initiator()
 	{
-		return _interface;
+		return _connection_parameters._is_initiator;
 	}
 	
-protected:
-	/// The helper ref_object that performs symmetric encryption on packets
-	ref_ptr<symmetric_cipher> _symmetric_cipher;
-public:
+	/// Sets the torque_socket this torque_connection will communicate through.
+	void set_torque_socket(torque_socket *my_torque_socket)
+	{
+		_torque_socket = my_torque_socket;
+	}
+	
+	/// Returns the torque_socket this torque_connection communicates through.
+	torque_socket *get_torque_socket()
+	{
+		return _torque_socket;
+	}
+	
 	/// Sets the symmetric_cipher this connection will use for encryption
 	void set_symmetric_cipher(symmetric_cipher *the_cipher)
 	{
 		_symmetric_cipher = the_cipher;
 	}
 	
-public:
 	/// Sets the ping/timeout characteristics for a fixed-rate connection.  Total timeout is msPerPing * ping_retry_count.
 	void set_ping_timeouts(time time_per_ping, uint32 ping_retry_count)
-	{ _ping_retry_count = ping_retry_count; _ping_timeout = time_per_ping; }
+	{
+		_ping_retry_count = ping_retry_count;
+		_ping_timeout = time_per_ping;
+	}
 	
 	/// Simulates a network situation with a percentage random packet loss and a connection one way latency as specified.
 	void set_simulated_net_params(float32 packet_loss, uint32 latency)
-	{ _simulated_packet_loss = packet_loss; _simulated_latency = latency; }
+	{
+		_simulated_packet_loss = packet_loss;
+		_simulated_latency = latency;
+	}
 	
 	/// Returns the remote address of the host we're connected or trying to connect to.
 	const address &get_address()
@@ -700,38 +600,8 @@ public:
 	{
 		_address = the_address;
 	}
-	
-	/// Sends a packet that was written into a bit_stream to the remote host, or the _remote_connection on this host.
-	udp_socket::send_to_result send_packet(bit_stream &stream)
-	{
-		if(_simulated_packet_loss && _interface->random().random_unit_float() < _simulated_packet_loss)
-		{
-			TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SENDDROP - %d", _address.to_string().c_str(), get_last_send_sequence()));
-			return udp_socket::send_to_success;
-		}
 		
-		TorqueLogMessageFormatted(LogNetConnection, ("connection %s: SEND - %d bytes", _address.to_string().c_str(), stream.get_next_byte_position()));
-		
-		if(_simulated_latency)
-		{
-			_interface->send_to_delayed(get_address(), stream, _simulated_latency);
-			return udp_socket::send_to_success;
-		}
-		else
-			return _interface->send_to(get_address(), stream);
-	}
-	
-	std::pair<udp_socket::send_to_result, uint32> tnp_send_data_packet(const byte_buffer_ptr& data)
-	{
-		_packet_data = data;
-		packet_stream ps;
-		write_raw_packet(ps, data_packet);
-		TorqueLogMessageFormatted(LogConnectionProtocol, ("send data %d", _last_send_seq));
-		
-		return std::make_pair(send_packet(ps), _last_send_seq);
-	}
-	
-	/// Checks to see if the connection has timed out, possibly sending a ping packet to the remote host.  Returns true if the connection timed out.
+	/// Checks to see if the torque_connection has timed out, possibly sending a ping packet to the remote host.  Returns true if the torque_connection timed out.
 	bool check_timeout(time current_time)
 	{
 		if(_last_ping_send_time.get_milliseconds() == 0)
@@ -750,24 +620,6 @@ public:
 		}
 		return false;
 	}
-	
-	/// Connection state flags for a connection instance.
-	enum connection_state {
-		not_connected=0, ///< Initial state of a connection instance - not connected.
-		awaiting_challenge_response, ///< We've sent a challenge request, awaiting the response.
-		sending_punch_packets, ///< The state of a pending arranged connection when both sides haven't heard from the other yet
-		computing_puzzle_solution, ///< We've received a challenge response, and are in the process of computing a solution to its puzzle.
-		awaiting_connect_response, ///< We've received a challenge response and sent a connect request.
-		connect_timed_out, ///< The connection timed out during the connection process.
-		connect_rejected, ///< The connection was rejected.
-		connected, ///< We've accepted a connect request, or we've received a connect response accept.
-		disconnected, ///< The connection has been disconnected.
-		timed_out, ///< The connection timed out.
-		state_count,
-	};
-	
-	connection_state _connection_state; ///< Current state of this connection.
-	
 	/// Sets the current connection state of this connection.
 	void set_connection_state(connection_state state) { _connection_state = state; }
 	
@@ -777,4 +629,69 @@ public:
 	/// Returns true if the connection handshaking has completed successfully.
 	bool is_established() { return _connection_state == connected; }
 	
+	torque_connection(random_generator &random_gen, uint32 connection_index)
+	{
+		_connection_index = connection_index;
+		_initial_send_seq = random_gen.random_integer();
+		random_gen.random_buffer((uint8 *) &_connection_parameters._nonce, sizeof(nonce));
+		
+		_simulated_latency = 0;
+		_simulated_packet_loss = 0;
+		
+		_last_ping_send_time = time(0);
+		_connection_state = not_connected;
+		
+		_ping_send_count = 0;
+		
+		_last_seq_recvd = 0;
+		_highest_acked_seq = _initial_send_seq;
+		_last_send_seq = _initial_send_seq; // start sending at _initial_send_seq + 1
+		_ack_mask[0] = 0;
+		_last_recv_ack_ack = 0;
+		
+		_ping_timeout = time(default_ping_timeout);
+		_ping_retry_count = default_ping_retry_count;
+	}
+	
+protected:	
+	connection_state _connection_state; ///< Current state of this connection.
+	
+	uint32 _last_seq_recvd_at_send[max_packet_window_size]; ///< The sequence number of the last packet received from the remote host when we sent the packet with sequence X & packet_window_mask.
+	uint32 _last_seq_recvd; ///< The sequence number of the most recently received packet from the remote host.
+	uint32 _highest_acked_seq; ///< The highest sequence number the remote side has acknowledged.
+	uint32 _last_send_seq; ///< The sequence number of the last packet sent.
+	uint32 _ack_mask[max_ack_mask_size]; ///< long string of bits, each acking a packet sent by the remote host.
+	///< The bit associated with _last_seq_recvd is the low bit of the 0'th word of _ack_mask.
+	uint32 _last_recv_ack_ack; ///< The highest sequence this side knows the other side has received an ACK or NACK for.
+	
+	uint32 _initial_send_seq; ///< The first _last_send_seq for this side of the torque_connection.
+	uint32 _initial_recv_seq; ///< The first _last_seq_recvd (the first _last_send_seq for the remote host).
+	time _highest_acked_send_time; ///< The send time of the highest packet sequence acked by the remote host.  Used in the computation of round trip time.
+	/// Two-bit identifier for each connected packet.
+	time _ping_timeout; ///< time to wait before sending a ping packet.
+	uint32 _ping_retry_count; ///< Number of unacknowledged pings to send before timing out.
+	
+	byte_buffer_ptr _packet_data;
+	
+	std::auto_ptr<request> _current_request;
+	uint32 _connection_index;
+
+	/// The helper ref_object that performs symmetric encryption on packets
+	ref_ptr<symmetric_cipher> _symmetric_cipher;
+	
+	time _last_update_time; ///< The last time a packet was sent from this instance.
+	uint32 _simulated_latency; ///< Amount of additional time this connection delays its packet sends to simulate latency in the connection
+	float32 _simulated_packet_loss; ///< Function to simulate packet loss on a network
+	
+	address _address; ///< The network address of the host this instance is connected to.
+	
+	// timeout management stuff:
+	uint32 _ping_send_count; ///< Number of unacknowledged ping packets sent to the remote host
+	time _last_ping_send_time; ///< Last time a ping packet was sent from this connection
+	
+	connection_parameters _connection_parameters;
+	uint32 _connect_send_count;    ///< Number of challenge or connect requests sent to the remote host.
+	time _connect_last_send_time; ///< The send time of the last challenge or connect request.
+	
+	safe_ptr<torque_socket> _torque_socket;             ///< The torque_socket of which this torque_connection is a member.
 };

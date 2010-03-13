@@ -1,7 +1,5 @@
 // Copyright GarageGames.  See /license/info.txt in this distribution for licensing terms.
 
-#include "net/tnp_event.h"
-
 #include "net/random_generator.h"
 #include "net/symmetric_cipher.h"
 #include "net/asymmetric_key.h"

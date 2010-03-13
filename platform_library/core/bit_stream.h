@@ -25,6 +25,9 @@ class bit_stream
 		return _bit_num == _bit_end;
 	}
 	
+	void advance_to_next_byte() {
+		_bit_num = ((_bit_num + 7) >> 3) << 3;
+	}
 	virtual uint32 get_next_byte_position() { return (_bit_num + 7) >> 3; }
 	virtual uint32 get_byte_position() { return _bit_num >> 3; }
 	virtual void set_byte_position(uint32 byte_pos) { _bit_num = byte_pos << 3; }

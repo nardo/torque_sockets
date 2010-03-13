@@ -1,6 +1,6 @@
 extern void logprintf(const char *format, ...);
 
-#define TorqueLogMessage(logType, message)  { printf message ; }
-#define TorqueLogMessageFormatted(logType, message) { printf message; printf("\n"); }
+#define TorqueLogMessage(logType, message)  { logprintf message ; }
+#define TorqueLogMessageFormatted(logType, message) { logprintf message; }
 #define TorqueLogEnable(logType, enabled) { }
 #define TorqueLogBlock(logType, code) { }
