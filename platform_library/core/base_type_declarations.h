@@ -68,7 +68,6 @@ public:
 	{
 		return _offset_value + range_min;
 	}
-private:
 	uint32 _offset_value;
 };
 
@@ -84,10 +83,33 @@ public:
 		assert(enum_value < enum_count);
 		_enum_value = enum_value;
 	}
-	operator uint32()
+	operator uint32() const
 	{
 		return _enum_value;
 	}
+
 private:
 	uint32 _enum_value;
 };
+
+/// Floating point 0...1 value with specific bit precision.
+///
+/// When a unit_float<X> is written into a stream, it will use X bits.
+template<uint32 bit_count> struct unit_float
+{
+   float32 value;
+   unit_float(float32 val=0) { value = val; }
+   operator float32() const { return value; }
+};
+
+/// Floating point -1...1 value with specific bit precision.
+///
+/// When a signed_unit_float<X> is written into a stream, it will use X bits.
+template<uint32 bit_count> struct signed_unit_float
+{
+   float32 value;
+   signed_unit_float(float32 val=0) { value = val; }
+   operator float32() const { return value; }
+};
+
+
