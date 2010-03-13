@@ -140,6 +140,8 @@ protected:
 		torque_socket_event *event;
 		event_queue_entry *next_event;
 	};
+	
+	/// Structure used to track packets that are delayed in sending for simulating a high-latency connection.  The delay_send_packet is allocated as sizeof(delay_send_packet) + packet_size;
 	struct delay_send_packet
 	{
 		delay_send_packet *next_packet; ///< The next packet in the list of delayed packets.
@@ -191,9 +193,6 @@ protected:
 		}
 		return event;
 	}
-	
-	/// Structure used to track packets that are delayed in sending for simulating a high-latency connection.  The delay_send_packet is allocated as sizeof(delay_send_packet) + packet_size;
-	
 	
 	/// Returns the address of the first network torque_socket in the list that the socket on this torque_socket is bound to.
 	address get_first_bound_interface_address()
@@ -787,10 +786,7 @@ protected:
 	
 	/// Handles a connection request from a remote host.
 	///
-	/// This will verify the validity of the connection token, as well as any solution
-	/// to a client puzzle this torque_socket sent to the remote host.  If those tests
-	/// pass, it will construct a local connection instance to handle the rest of the
-	/// connection negotiation.
+	/// This will verify the validity of the connection token, as well as any solution to a client puzzle this torque_socket sent to the remote host.  If those tests  pass, it will construct a local connection instance to handle the rest of the connection negotiation.
 	void handle_connect_request(const address &the_address, bit_stream &stream)
 	{
 		if(!_allow_connections)
@@ -810,11 +806,7 @@ protected:
 		core::read(stream, the_params._puzzle_difficulty);
 		core::read(stream, the_params._puzzle_solution);
 		
-		// see if the connection is in the main connection table.
-		// If the connection is in the connection table and it has
-		// the same initiatorSequence, we'll just resend the connect
-		// acceptance packet, assuming that the last time we sent it
-		// it was dropped.
+		// see if the connection is in the main connection table.  If the connection is in the connection table and it has the same initiatorSequence, we'll just resend the connect acceptance packet, assuming that the last time we sent it it was dropped.
 		torque_connection *connect = find_connection(the_address);
 		if(connect)
 		{
@@ -928,8 +920,7 @@ protected:
 		out.send_to(_socket, conn->get_address());
 	}
 	
-	/// Handles a connect accept packet, putting the connection associated with the
-	/// remote host (if there is one) into an active state.
+	/// Handles a connect accept packet, putting the connection associated with the remote host (if there is one) into an active state.
 	void handle_connect_accept(const address &the_address, bit_stream &stream)
 	{
 		nonce nonce, server_nonce;
@@ -984,8 +975,7 @@ protected:
 		post_connection_event(conn, torque_connection_established_event_type, 0);
 	}
 	
-	/// Sends a connect rejection to a valid connect request in response to possible error
-	/// conditions (server full, wrong password, etc).
+	/// Sends a connect rejection to a valid connect request in response to possible error conditions (server full, wrong password, etc).
 	void send_connect_reject(connection_parameters *the_params, const address &the_address, const byte_buffer_ptr &reason)
 	{
 		packet_stream out;
@@ -997,8 +987,7 @@ protected:
 	}
 	
 	
-	/// Handles a connect rejection packet by notifying the connection ref_object
-	/// that the connection was rejected.
+	/// Handles a connect rejection packet by notifying the connection ref_object that the connection was rejected.
 	void handle_connect_reject(const address &the_address, bit_stream &stream)
 	{
 		nonce the_nonce;
