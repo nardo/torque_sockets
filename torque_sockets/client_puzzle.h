@@ -1,3 +1,40 @@
+class puzzle_solver : public thread_queue
+{
+public:
+	puzzle_solver() : thread_queue(1) { }
+	void process_request(const byte_buffer_ptr &the_request, byte_buffer_ptr &the_response, bool *cancelled, float *progress)
+	{
+		nonce the_nonce;
+		nonce remote_nonce;
+		uint32 puzzle_difficulty;
+		uint32 client_identity;
+		bit_stream s(the_request->get_buffer(), the_request->get_buffer_size());
+		core::read(s, the_nonce);
+		core::read(s, remote_nonce);
+		core::read(s, puzzle_difficulty);
+		core::read(s, client_identity);
+		uint32 solution = 0;
+		time start = time::get_current();
+		for(;;)
+		{
+			if(*cancelled)
+				break;
+			if(client_puzzle_manager::check_one_solution(solution, the_nonce, remote_nonce, puzzle_difficulty, client_identity))
+				break;
+			
+			++solution;
+		}
+		if(!*cancelled)
+		{
+			byte_buffer_ptr response = new byte_buffer(sizeof(solution));
+			bit_stream s(response->get_buffer(), response->get_buffer_size());
+			core::write(s, solution);
+			the_response = response;
+			TorqueLogMessageFormatted(LogNettorque_socket, ("Client puzzle solved in %lli ms.", (time::get_current() - start).get_milliseconds()));
+		}
+	}
+};
+
 /// The client_puzzle_manager class issues, solves and validates client
 /// puzzles for connection authentication.
 class client_puzzle_manager
