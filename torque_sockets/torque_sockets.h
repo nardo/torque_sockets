@@ -1,5 +1,6 @@
 // Copyright GarageGames.  See /license/info.txt in this distribution for licensing terms.
 
+#include "torque_sockets/nonce.h"
 #include "torque_sockets/random_generator.h"
 #include "torque_sockets/symmetric_cipher.h"
 #include "torque_sockets/asymmetric_key.h"
@@ -9,7 +10,6 @@
 #include "torque_sockets/udp_socket.h"
 #include "torque_sockets/sockets.h"
 #include "torque_sockets/packet_stream.h"
-#include "torque_sockets/nonce.h"
 #include "torque_sockets/client_puzzle.h"
 #include "torque_sockets/torque_socket.h"
 #include "torque_sockets/torque_connection.h"

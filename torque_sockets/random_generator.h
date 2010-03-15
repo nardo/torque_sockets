@@ -40,6 +40,12 @@ public:
 		random_buffer(buffer, sizeof(buffer));
 		return (uint32(buffer[0]) << 24) | (uint32(buffer[1]) << 16) | (uint32(buffer[2]) << 8) | uint32(buffer[3]);
 	}
+
+	nonce random_nonce()
+	{
+		nonce the_nonce;
+		random_buffer((uint8 *) &the_nonce, sizeof(the_nonce));
+	}
 	
 	uint32 random_in_range(uint32 range_start, uint32 range_end)
 	{
