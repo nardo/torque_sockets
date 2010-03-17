@@ -11,5 +11,6 @@
 #include "torque_sockets/sockets.h"
 #include "torque_sockets/packet_stream.h"
 #include "torque_sockets/client_puzzle.h"
+#include "pending_connection.h"
 #include "torque_sockets/torque_socket.h"
 #include "torque_sockets/torque_connection.h"

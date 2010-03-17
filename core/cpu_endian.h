@@ -42,3 +42,8 @@ template<class type> inline void host_to_big_endian(type& value) { }
 template<class type> inline void little_endian_to_host(type& value) { endian_swap(value); }
 template<class type> inline void big_endian_to_host(type& value) { }
 #endif
+
+inline uint32 buffer_to_uint32(uint8 buffer[4])
+{
+	return (uint32(buffer[0]) << 24) | (uint32(buffer[1]) << 16) | (uint32(buffer[2]) << 8) | buffer[3];
+}

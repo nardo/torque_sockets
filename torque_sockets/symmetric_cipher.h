@@ -15,8 +15,10 @@ class symmetric_cipher : public ref_object
 		int n_r;
 	};
 	uint32 _counter[block_size >> 2];
-	uint32 _init_vector[block_size];
+	
+	uint8 _init_vector[block_size];
 	uint8 _pad[block_size];
+	
 	key _symmetric_key;
 	uint32 _pad_len;
 	public:
@@ -47,14 +49,18 @@ class symmetric_cipher : public ref_object
 		rijndael_ecb_encrypt((uint8 *) _counter, _pad, (symmetric_key *) &_symmetric_key);
 		_pad_len = 0;
 	}
-
+	void get_init_vector(uint8 iv[block_size])
+	{
+		memcpy(iv, _init_vector, block_size);
+	}
 
 	void setup_counter(uint32 counter_value1, uint32 counter_value2, uint32 counter_value3, uint32 counter_value4)
 	{
+		uint8 *iv_walk = _init_vector;
 		for(uint32 i = 0; i < 4; i++)
 		{
-			_counter[i] = _init_vector[i];
-			little_endian_to_host(_counter[i]);
+			_counter[i] = buffer_to_uint32(iv_walk);
+			iv_walk += 4;
 		}
 		_counter[0] += counter_value1;
 		_counter[1] += counter_value2;

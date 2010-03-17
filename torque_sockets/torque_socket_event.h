@@ -5,13 +5,14 @@
 typedef unsigned torque_connection_id;
 static const torque_connection_id invalid_torque_connection = 0;
 	
-enum connection_constants {
-	torque_max_datagram_size = 1480,
-	torque_max_status_datagram_size = 512,
-	torque_max_public_key_size = 512,
-	torque_packet_window_size = 31,
+enum torque_sockets_constants {
+	torque_sockets_max_datagram_size = 1480,
+	torque_sockets_max_status_datagram_size = 511,
+	torque_sockets_max_public_key_size = 512,
+	torque_sockets_packet_window_size = 31,
+	torque_sockets_info_packet_first_byte_min = 32,
+	torque_sockets_info_packet_first_byte_max = 127,
 };
-
 enum torque_socket_event_type
 {
 	torque_connection_challenge_response_event_type = 1,

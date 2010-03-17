@@ -19,11 +19,16 @@ template<class key_type, class value_type> class hash_table_flat
 	
 	pointer first() { pointer p; _get_first(p); return p; }
 	
-	void remove(const key_type &key)
+	bool remove(const key_type &key)
 	{
 		pointer p = find(key);
 		if(p)
+		{
 			p.remove();
+			return true;
+		}
+		else
+			return false;
 	}
 	
 	class pointer

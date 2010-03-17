@@ -1,8 +1,11 @@
 /// torque_connection class that manages an individual data connection in torque sockets. It implements a notification protocol on the unreliable packet transport of UDP.  torque_connection manages the flow of packets over the network, and posts torque_socket_event events to the torque_socket event queue for data packets and packet delivery notification.
 
-class torque_connection : public ref_object
+class torque_connection
 {
 public:
+	torque_connection *_next; ///< next connection in the doubly-linked list of connections on a socket.
+	torque_connection *_prev; ///< previous connection in the doubly-linked list of connections on a socket.
+	
 	friend class torque_socket;
 	/// Constants controlling the data representation of each packet header
 	enum connection_constants {
@@ -286,7 +289,7 @@ protected:
 			bool packet_transmit_success = (pk_ack_mask[ack_mask_word] & (1 << ack_mask_bit)) != 0;
 			TorqueLogMessageFormatted(LogConnectionProtocol, ("Ack %d %d", notify_index, packet_transmit_success));
 			
-			torque_socket_event *event = _torque_socket->post_connection_event(this, torque_connection_packet_notify_event_type, 0);
+			torque_socket_event *event = _torque_socket->_post_connection_event(_connection_index, torque_connection_packet_notify_event_type, 0);
 			event->delivered = packet_transmit_success;
 			event->packet_sequence = notify_index;
 						
@@ -393,11 +396,6 @@ public:
 	// Connection functions
 	//----------------------------------------------------------------
 public:
-	connection_parameters &get_connection_parameters()
-	{
-		return _connection_parameters;
-	}
-	
 	/// Sets the torque_socket this torque_connection will communicate through.
 	void set_torque_socket(torque_socket *the_torque_socket)
 	{
@@ -416,6 +414,11 @@ public:
 		_symmetric_cipher = the_cipher;
 	}
 	
+	ref_ptr<symmetric_cipher> get_symmetric_cipher()
+	{
+		return _symmetric_cipher;
+	}
+
 	byte_buffer_ptr &get_shared_secret()
 	{
 		return _shared_secret;
@@ -505,8 +508,6 @@ public:
 		_simulated_packet_loss = 0;
 		
 		_last_ping_send_time = time(0);
-		_connection_state = not_connected;
-		
 		_ping_send_count = 0;
 		
 		_last_seq_recvd = 0;
