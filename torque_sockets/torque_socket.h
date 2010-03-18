@@ -237,6 +237,7 @@ protected:
 		event->public_key = _allocate_queue_data(event->public_key_size);
 		memcpy(event->public_key, conn->_public_key->get_public_key()->get_buffer(), event->public_key_size);
 
+		event->connection = conn->_connection_index;
 		event->data_size = response_data->get_buffer_size();
 		event->data = _allocate_queue_data(event->data_size);
 		
@@ -244,6 +245,7 @@ protected:
 		conn->set_state(pending_connection::awaiting_local_challenge_accept);
 		conn->_state_send_retry_count = 0;
 		conn->_state_send_retry_interval = introduction_timeout;
+		conn->_state_last_send_time = get_process_start_time();
 	}
 	
 	/// Sends a connect request on behalf of a pending connection.
@@ -342,7 +344,7 @@ protected:
 			return;
 		
 		if(!pending)
-			pending = new pending_connection(pending_connection::connection_host, pending->get_initiator_nonce(), _random_generator.random_integer(), _next_connection_index++);
+			pending = new pending_connection(pending_connection::connection_host, initiator_nonce, _random_generator.random_integer(), _next_connection_index++);
 		
 		// now read the first part of the connection's symmetric key
 		stream.read_bytes(pending->_symmetric_key, symmetric_cipher::key_size);
@@ -428,14 +430,17 @@ protected:
 
 		uint32 recv_sequence;
 		core::read(stream, recv_sequence);
-		pending->set_initial_recv_sequence(recv_sequence);
 		
 		uint8 init_vector[symmetric_cipher::block_size];
 		
 		stream.read_bytes(init_vector, symmetric_cipher::block_size);
 		symmetric_cipher *cipher = new symmetric_cipher(pending->_symmetric_key, init_vector);
 		
-		torque_connection *the_connection = new torque_connection(pending->get_initiator_nonce(), pending->get_initial_send_sequence(), pending->get_initial_send_sequence(), true);
+		torque_connection *the_connection = new torque_connection(pending->get_initiator_nonce(), pending->get_initial_send_sequence(), pending->_connection_index, true);
+		the_connection->set_initial_recv_sequence(recv_sequence);
+		the_connection->set_address(pending->get_address());
+		the_connection->_host_nonce = pending->_host_nonce;
+		the_connection->set_torque_socket(this);
 		_remove_pending_connection(pending); // remove the pending connection
 
 		_add_connection(the_connection); // first, add it as a regular connection
@@ -566,9 +571,13 @@ protected:
 		if(packet_stream.get_buffer()[0] & 0x80) // it's a protocol packet...
 		{
 			// if the MSB of the first byte is set, it's a protocol data packet so pass it to the appropriate connection.
+			logprintf("got data packet");
 			torque_connection *conn = _find_connection(the_address);
 			if(conn)
+			{
+				logprintf("got data packet on conn");
 				conn->read_raw_packet(packet_stream);
+			}
 		}
 		else
 		{
@@ -746,6 +755,9 @@ protected:
 						walk = &pending->_next;
 					}
 				}
+				else
+					walk = &pending->_next;
+
 			}
 			for(torque_connection *connection_walk = _connection_list; connection_walk;)
 			{
@@ -789,7 +801,12 @@ protected:
 	/// looks up a connected connection on this torque_socket
 	torque_connection *_find_connection(const address &remote_address)
 	{
+		// TESTING -- this isn't right.
+		if(_connection_list)
+			return _connection_list;
+		
 		hash_table_flat<address, torque_connection *>::pointer p = _connection_address_lookup_table.find(remote_address);
+		logprintf("finding connection for %s", remote_address.to_string().c_str());
 		if(p)
 			*(p.value());
 		return 0;
@@ -827,6 +844,7 @@ protected:
 			{
 				*walk = the_connection->_next;
 				delete the_connection;
+				return;
 			}
 	}
 	
@@ -847,7 +865,8 @@ protected:
 		_connection_list = the_connection;
 		
 		_connection_id_lookup_table.insert(the_connection->_connection_index, the_connection);
-		_connection_address_lookup_table.insert(the_connection->get_address());
+		logprintf("inserting connection %d at %s", the_connection->_connection_index, the_connection->get_address().to_string().c_str());
+		_connection_address_lookup_table.insert(the_connection->get_address(), the_connection);
 	}
 	
 	void _remove_connection(torque_connection *the_connection)
@@ -915,9 +934,11 @@ public:
 		new_connection->_address = remote_host;
 		new_connection->_state_send_retry_count = challenge_retry_count;
 		new_connection->_state_send_retry_interval = challenge_retry_time;
+		new_connection->_state_last_send_time = get_process_start_time();
 		
 		_add_pending_connection(new_connection);
 		_send_challenge_request(new_connection);
+		return new_connection->_connection_index;
 	}
 	
 	/// This is called on the middleman of an introduced connection and will allow this host to broker a connection start between the remote hosts at either connection point.
@@ -961,6 +982,7 @@ public:
 		core::write(s, conn->get_host_nonce());
 		core::write(s, conn->_puzzle_difficulty);
 		core::write(s, conn->_client_identity);
+		logprintf("Attempting to solve a client puzzle.");
 		byte_buffer_ptr request = new byte_buffer(s.get_buffer(), s.get_next_byte_position());		
 		conn->_puzzle_request_index = _puzzle_solver.post_request(request);
 	}
@@ -976,6 +998,11 @@ public:
 		}
 		torque_connection *new_connection = new torque_connection(pending->_initiator_nonce, pending->_initial_send_sequence, pending->_connection_index, false);
 		new_connection->set_torque_socket(this);
+		new_connection->set_symmetric_cipher(pending->get_symmetric_cipher());
+		new_connection->set_shared_secret(pending->get_shared_secret());
+		new_connection->set_initial_recv_sequence(pending->_initial_recv_sequence);
+		new_connection->_host_nonce = pending->_host_nonce;
+		new_connection->set_address(pending->get_address());
 		
 		_remove_pending_connection(pending);
 		_add_connection(new_connection);
@@ -1035,10 +1062,9 @@ public:
 	/// Sends a packet to the remote address over this torque_socket's socket.
 	udp_socket::send_to_result send_to(const address &the_address, bit_stream &stream)
 	{
-		ref_ptr<byte_buffer> send_buf = buffer_encode_base_16(stream.get_buffer(), stream.get_next_byte_position());
 		string addr_string = the_address.to_string();
 		
-		logprintf("send: %s %s", addr_string.c_str(), send_buf->get_buffer());
+		logprintf("send: %s %s", addr_string.c_str(), buffer_encode_base_16(stream.get_buffer(), stream.get_next_byte_position())->get_buffer());
 		
 		return _socket.send_to(the_address, stream.get_buffer(), stream.get_next_byte_position());
 	}

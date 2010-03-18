@@ -107,6 +107,12 @@ public:
 		_symmetric_cipher = the_cipher;
 	}
 
+	/// Gets the symmetric_cipher this connection will use for encryption
+	symmetric_cipher *get_symmetric_cipher()
+	{
+		return _symmetric_cipher;
+	}
+
 	pending_connection *_next;
 	nonce _initiator_nonce;
 	nonce _host_nonce;

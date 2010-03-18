@@ -89,7 +89,7 @@ protected:
 		if(!_symmetric_cipher.is_null())
 		{
 			_symmetric_cipher->setup_counter(_last_send_seq, _last_seq_recvd, packet_type, 0);
-			bit_stream_hash_and_encrypt(ps, message_signature_bytes, packet_header_byte_size, _symmetric_cipher);
+			// bit_stream_hash_and_encrypt(ps, message_signature_bytes, packet_header_byte_size, _symmetric_cipher);
 		}
 		if(_simulated_packet_loss && _torque_socket->random().random_unit_float() < _simulated_packet_loss)
 		{
@@ -134,7 +134,8 @@ protected:
 			stream.write_integer(_ack_mask[i], i == word_count - 1 ?
 								  (ack_byte_count - (i * 4)) * 8 : 32);
 		stream.advance_to_next_byte();
-		
+		logprintf("header write %d bits.", stream.get_bit_position());
+
 		// if we're resending this header, we can't advance the
 		// sequence recieved (in case this packet drops and the prev one
 		// goes through) 
@@ -217,11 +218,11 @@ protected:
 		if(!_symmetric_cipher.is_null())
 		{
 			_symmetric_cipher->setup_counter(pk_sequence_number, pk_highest_ack, pk_packet_type, 0);
-			if(!bit_stream_decrypt_and_check_hash(pstream, message_signature_bytes, packet_header_byte_size, _symmetric_cipher))
+			/*if(!bit_stream_decrypt_and_check_hash(pstream, message_signature_bytes, packet_header_byte_size, _symmetric_cipher))
 			{
 				TorqueLogMessage(LogNetConnection, ("Packet failed crypto"));
 				return false;
-			}
+			}*/
 		}
 		
 		uint32 pk_ack_byte_count = pstream.read_ranged_uint32(0, max_ack_byte_count);
@@ -234,7 +235,7 @@ protected:
 		for(uint32 i = 0; i < pk_ack_word_count; i++)
 			pk_ack_mask[i] = pstream.read_integer(i == pk_ack_word_count - 1 ? (pk_ack_byte_count - (i * 4)) * 8 : 32);
 		pstream.advance_to_next_byte();
-
+		logprintf("header read %d bits.", pstream.get_bit_position());
 		//if(is_network_connection())
 		//{
 		//   TorqueLogMessageFormatted(LogBlah, ("RCV: mHA: %08x  pkHA: %08x  mLSQ: %08x  pkSN: %08x  pkLS: %08x  pkAM: %08x",

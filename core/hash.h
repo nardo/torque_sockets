@@ -15,7 +15,7 @@ static uint32 next_larger_hash_prime(uint32 number)
 class looping_counter
 {
 	public:
-	looping_counter(uint32 initial_value, uint32 count) { assert(count > 0); _index = initial_value < count ? 0 : initial_value % count; _count = count; }
+	looping_counter(uint32 initial_value, uint32 count) { assert(count > 0); _index = ((initial_value < count) ? 0 : (initial_value % count)); _count = count; }
 	
 	looping_counter &operator=(uint32 value) { _index = value % _count; return *this; }
 	looping_counter &operator++() { _index++; if(_index >= _count) _index = 0; return *this; }
