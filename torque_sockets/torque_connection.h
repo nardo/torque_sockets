@@ -75,7 +75,7 @@ protected:
 	}
 	
 	/// Sends a packet that was written into a bit_stream to the remote host, or the _remote_connection on this host.
-	void send_packet(net_packet_type packet_type, bit_stream *data, uint32 *sequence = 0)
+	void send_packet(net_packet_type packet_type, uint8 *data, uint32 data_size, uint32 *sequence = 0)
 	{
 		packet_stream ps;
 		write_packet_header(ps, packet_type);
@@ -83,7 +83,7 @@ protected:
 		{
 			int32 start = ps.get_bit_position();
 			TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: START", _connection_index) );
-			ps.write_bytes(data->get_buffer(), data->get_next_byte_position());
+			ps.write_bytes(data, data_size);
 			TorqueLogMessageFormatted(LogNetConnection, ("torque_connection %d: END - %llu bits", _connection_index, ps.get_bit_position() - start) );			
 		}
 		if(!_symmetric_cipher.is_null())
@@ -103,7 +103,7 @@ protected:
 			_torque_socket->send_to_delayed(get_address(), ps, _simulated_latency);
 		}
 		else
-			_torque_socket->send_to(get_address(), ps);
+			_torque_socket->send_to(get_address(), ps.get_next_byte_position(),  ps.get_buffer());
 		if(sequence)
 			*sequence = _last_send_seq;
 	}
@@ -321,14 +321,14 @@ protected:
 	/// Sends a ping packet to the remote host, to determine if it is still alive and what its packet window status is.
 	void send_ping_packet()
 	{
-		send_packet(ping_packet, 0);
+		send_packet(ping_packet, 0, 0);
 		TorqueLogMessageFormatted(LogConnectionProtocol, ("send ping %d", _last_send_seq));
 	}
 	
 	/// Sends an ack packet to the remote host, in response to receiving a ping packet.
 	void send_ack_packet()
 	{
-		send_packet(ack_packet, 0);
+		send_packet(ack_packet, 0, 0);
 		TorqueLogMessageFormatted(LogConnectionProtocol, ("send ack %d", _last_send_seq));
 	}
 	

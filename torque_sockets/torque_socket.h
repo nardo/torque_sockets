@@ -948,7 +948,7 @@ public:
 	}
 	
 	/// Connect to a client connected to the host at middle_man.
-	torque_connection_id connect_introduced(torque_connection_id introducer, unsigned remote_client_identity, unsigned connection_token, bit_stream &connect_data)
+	torque_connection_id connect_introduced(torque_connection_id introducer, unsigned remote_client_identity, unsigned connection_token, uint32 connect_data_size, uint8 *connect_data)
 	{
 		/*/// Connects to a remote host that is also connecting to this torque_connection (negotiated by a third party)
 		 void connect_arranged(torque_socket *connection_torque_socket, const array<address> &possible_addresses, nonce &my_nonce, nonce &remote_nonce, byte_buffer_ptr shared_secret, bool is_initiator)
@@ -1053,20 +1053,20 @@ public:
 		}
 	}
 	/// Send a datagram packet to the remote host on the other side of the connection.  Returns the sequence number of the packet sent.
-	void send_to_connection(torque_connection_id connection_id, bit_stream &data, uint32 *sequence = 0)
+	void send_to_connection(torque_connection_id connection_id, uint8 *data, uint32 data_size, uint32 *sequence = 0)
 	{
 		torque_connection *conn = _find_connection(connection_id);
-		conn->send_packet(torque_connection::data_packet, &data, sequence);
+		conn->send_packet(torque_connection::data_packet, data, data_size, sequence);
 	}
 	
 	/// Sends a packet to the remote address over this torque_socket's socket.
-	udp_socket::send_to_result send_to(const address &the_address, bit_stream &stream)
+	udp_socket::send_to_result send_to(const address &the_address, uint32 data_size, uint8 *data)
 	{
 		string addr_string = the_address.to_string();
 		
-		logprintf("send: %s %s", addr_string.c_str(), buffer_encode_base_16(stream.get_buffer(), stream.get_next_byte_position())->get_buffer());
+		logprintf("send: %s %s", addr_string.c_str(), buffer_encode_base_16(data, data_size)->get_buffer());
 		
-		return _socket.send_to(the_address, stream.get_buffer(), stream.get_next_byte_position());
+		return _socket.send_to(the_address, data, data_size);
 	}
 	
 	/// Sends a packet to the remote address after millisecond_delay time has elapsed.  This is used to simulate network latency on a LAN or single computer.
