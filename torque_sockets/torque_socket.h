@@ -574,10 +574,7 @@ protected:
 			logprintf("got data packet");
 			torque_connection *conn = _find_connection(the_address);
 			if(conn)
-			{
-				logprintf("got data packet on conn");
 				conn->read_raw_packet(packet_stream);
-			}
 		}
 		else
 		{
@@ -807,7 +804,6 @@ protected:
 		//if(_connection_list)
 		//	return _connection_list;
 		hash_table_flat<address, torque_connection *>::pointer p = _connection_address_lookup_table.find(remote_address);
-		logprintf("finding connection for %s", remote_address.to_string().c_str());
 		if(p)
 			return *(p.value());
 		return 0;
