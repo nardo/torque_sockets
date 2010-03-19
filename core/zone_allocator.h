@@ -10,7 +10,7 @@ class zone_allocator
 
 	zone_allocator(uint32 quota = default_quota)
 	{
-		_quota = default_quota;
+		_quota = quota;
 		_memory_used = 0;
 	}
 	

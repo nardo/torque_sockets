@@ -7,6 +7,7 @@ class bit_stream
 	typedef uint64 bit_position;
 
 	bit_stream(byte *buffer = 0, uint32 buffer_size = 0) { _init(buffer, 0, buffer_size * 8); }
+	virtual ~bit_stream() {}
 	
 	void set_buffer(byte *buffer, uint32 bit_start, uint32 bit_end) { _init(buffer, bit_start, bit_end); }
 	byte *get_buffer() { return _base_ptr; }	
@@ -83,7 +84,7 @@ class bit_stream
 		return val + range_start;
 	}
 	
-	virtual bool more(uint32 bits_requested) { return false; }
+	virtual bool more(uint32 /*bits_requested*/) { return false; }
 	
 	private:
 	byte *_base_ptr;

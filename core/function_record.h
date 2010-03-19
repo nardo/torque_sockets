@@ -66,6 +66,7 @@ template<class arg1> struct function_call_record_decl<void, arg1, empty_type, em
 
 struct function_record
 {
+	virtual ~function_record() {}
 	function_type_signature _signature;
 	function_type_signature *get_signature() { return &_signature; }
 	

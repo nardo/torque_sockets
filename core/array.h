@@ -3,7 +3,7 @@
 // Maintain a reserve of half the public size
 struct array_half_reserve_policy
 {
-   inline static uint32 grow_to(uint32 public_size, uint32 array_size) {
+   inline static uint32 grow_to(uint32 public_size, uint32 /*array_size*/) {
       return public_size + public_size / 2;
    }
    inline static uint32 shrink_to(uint32 public_size, uint32 array_size) {

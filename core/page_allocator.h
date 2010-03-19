@@ -16,7 +16,7 @@ public:
 		clear();
 	}
 	
-	virtual void clear()
+	void clear()
 	{
 		while(_current_page)
 		{

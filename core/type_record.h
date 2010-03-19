@@ -87,9 +87,9 @@ template<typename type> struct pointer_manipulator
 	static const allocation_space pointee_allocation_space = allocation_space_heap;
 
 	// by default this returns the pointer's pointee type.
-	static type_record *get_real_pointee_type(type *pointer) { return get_global_type_record<pointee_type>(); }
-	static pointee_type *dereference(type *type_instance) { return 0; }
-	static void assign_instance(type *pointer, pointee_type *object) {}
+	static type_record *get_real_pointee_type(type */*pointer*/) { return get_global_type_record<pointee_type>(); }
+	static pointee_type *dereference(type */*type_instance*/) { return 0; }
+	static void assign_instance(type */*pointer*/, pointee_type */*object*/) {}
 };
 
 struct pointer_record
@@ -129,12 +129,12 @@ template<typename type> struct container_manipulator
 	typedef empty_type key_type;
 	typedef empty_type value_type;
 
-	static bool reserve(type *container, uint32 size, context *the_context) { return false; }
-	static void insert_key_value(type *container, key_type *key, value_type *value, context *the_context) { }
-	static value_type *insert_key(type *container, key_type *key, context *the_context) { return 0; }
-	static uint32 size(type *container) { return 0; }
+	static bool reserve(type */*container*/, uint32 /*size*/, context */*the_context*/) { return false; }
+	static void insert_key_value(type */*container*/, key_type */*key*/, value_type */*value*/, context */*the_context*/) { }
+	static value_type *insert_key(type */*container*/, key_type */*key*/, context */*the_context*/) { return 0; }
+	static uint32 size(type */*container*/) { return 0; }
 	
-	static value_type *find_element(type *container, key_type *key) { return 0; }
+	static value_type *find_element(type */*container*/, key_type */*key*/) { return 0; }
 };
 
 struct container_record
@@ -244,7 +244,7 @@ template<class type_name> type_record *get_global_type_record( type_name const *
 }
 
 #define TYPE_TEST(type, name) type name; printf("%08x - %s: size = %d, is_numeric = %d\n", \
-	get_global_type_record(&name), #type, get_global_type_record(&name)->size, get_global_type_record(&name)->is_numeric)
+	uint32(get_global_type_record(&name)), #type, int(get_global_type_record(&name)->size), get_global_type_record(&name)->is_numeric)
 	
 static void test_type_record()
 {

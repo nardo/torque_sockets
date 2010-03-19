@@ -32,15 +32,15 @@ inline void endian_swap(int64 &value) { endian_swap(reinterpret_cast<uint64&>(va
 inline void endian_swap(float64 &value) { endian_swap(reinterpret_cast<uint64&>(value)); }
 
 #ifdef LITTLE_ENDIAN
-template<class type> inline void host_to_little_endian(type& value) { }
+template<class type> inline void host_to_little_endian(type& /*value*/) { }
 template<class type> inline void host_to_big_endian(type& value) { endian_swap(value); }
-template<class type> inline void little_endian_to_host(type& value) { }
+template<class type> inline void little_endian_to_host(type& /*value*/) { }
 template<class type> inline void big_endian_to_host(type& value) { endian_swap(value); }
 #else
 template<class type> inline void host_to_little_endian(type& value) { endian_swap(value); }
-template<class type> inline void host_to_big_endian(type& value) { }
+template<class type> inline void host_to_big_endian(type& /*value*/) { }
 template<class type> inline void little_endian_to_host(type& value) { endian_swap(value); }
-template<class type> inline void big_endian_to_host(type& value) { }
+template<class type> inline void big_endian_to_host(type& /*value*/) { }
 #endif
 
 inline uint32 buffer_to_uint32(uint8 buffer[4])

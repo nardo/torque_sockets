@@ -39,7 +39,7 @@ template<typename type> inline void construct(type* ptr,type* end,const type& x)
 //-----------------------------------------------------------------------------
 
 namespace internal {
-	template <class type> inline void destroy_aux(type* ptr, type* end, true_type) {}
+	template <class type> inline void destroy_aux(type* /*ptr*/, type* /*end*/, true_type) {}
 	template <class type> inline void destroy_aux(type* ptr, type* end, false_type)
 	{
 		while (ptr != end)

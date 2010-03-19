@@ -149,7 +149,10 @@ public:
 	_thread = CreateThread(NULL, 0, thread_proc, this, 0, NULL);
 	_return_value = 0;		
 #else
-	int val = pthread_create(&_thread, NULL, thread_proc, this);
+	if(pthread_create(&_thread, NULL, thread_proc, this) != 0)
+	{
+		// handle error
+	}
 	_return_value = 0;		
 #endif
 	}

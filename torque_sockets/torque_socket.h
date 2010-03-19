@@ -751,6 +751,9 @@ protected:
 								break;
 						case pending_connection::requesting_challenge_response:
 								_send_challenge_request(pending);
+								break;
+						default:
+								break;
 						}
 						walk = &pending->_next;
 					}
@@ -801,14 +804,12 @@ protected:
 	/// looks up a connected connection on this torque_socket
 	torque_connection *_find_connection(const address &remote_address)
 	{
-		// TESTING -- this isn't right.
-		if(_connection_list)
-			return _connection_list;
-		
+		//if(_connection_list)
+		//	return _connection_list;
 		hash_table_flat<address, torque_connection *>::pointer p = _connection_address_lookup_table.find(remote_address);
 		logprintf("finding connection for %s", remote_address.to_string().c_str());
 		if(p)
-			*(p.value());
+			return *(p.value());
 		return 0;
 	}
 	

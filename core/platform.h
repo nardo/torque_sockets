@@ -4,19 +4,19 @@
 static const char *operating_system_string = "Win32";
 #define PLATFORM_WIN32
 #define FN_CDECL __cdecl
-#include "core/system_includes_win32.h"
+#include "system_includes_win32.h"
 
 #elif defined(linux)
 static const char *operating_system_string = "Linux";
 #define PLATFORM_LINUX
 #define FN_CDECL
-#include "core/system_includes_linux.h"
+#include "system_includes_linux.h"
 
 #elif defined(__APPLE__)
 static const char *operating_system_string = "Mac OSX";
 #define PLATFORM_MAC_OSX
 #define FN_CDECL
-#include "core/system_includes_mac_osx.h"
+#include "system_includes_mac_osx.h"
 
 #else
 #error "Unsupported operating system."
