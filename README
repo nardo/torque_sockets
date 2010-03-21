@@ -1,21 +1,16 @@
-Torque Network Platform
-
-The Torque Network Platform implements an unreliable connection-based datagram protocol atop UDP.
+Torque Sockets
 
 Directory structure overview:
 
 license:
-	source code licensing information.  The Torque Network Platform
-	is released under the MIT license
+	source code licensing information.  TorqueSockets and torque_sockets
+	are released under the MIT license
 	See: http://www.opensource.org/licenses/mit-license.php
 
-lib:
-	External libraries used by TNP (libtomcrypt for now)
+core:
+	core utilities library
 
-platform_library:
-	The Torque Network Platform source files, arranged by module
-
-test:
-	Unit tests for the network platform
+torque_sockets:
+	c and c++ reference APIs and implementation.
 
 
