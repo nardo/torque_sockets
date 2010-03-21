@@ -1,0 +1,82 @@
+The TorqueSockets API
+
+Draft 1 March 20, 2010
+
+Abstract
+
+This specification defines a proposed API that enables Web pages to use the TorqueSockets protocol for two-way real-time communication with remote hosts.
+
+Status of This document
+
+This section describes the status of this document at the time of its publication. Other documents may supersede this document.
+
+If you wish to make comments regarding this document, please send them to ???. All feedback is welcome.
+
+Implementors should be aware that this specification is not stable. Implementors who are not taking part in the discussions are likely to find the specification changing out from under them in incompatible ways. Vendors interested in implementing this specification before it eventually reaches the Candidate Recommendation stage should join the aforementioned mailing lists (once they truly are mentioned afore) and take part in the discussions.
+
+The latest stable version of the editor's draft of this specification is always available on nardo's torque_sockets github repository: http://github.com/nardo/torque_sockets/blob/master/TorqueSockets_API.txt
+
+1 Introduction
+
+To enable Web applications (specifically real-time multiplayer client/server and peer-to-peer games, communication tools) to maintain bidirectional, efficient real-time communications with server-side processes and introduced-host processes, this specification introduces the TorqueSockets interface.
+
+The high level goals of the TorqueSockets interface are:
+
+* minimal footprint, API attack surface
+* packet-based protocol to match underlying (UDP) transport
+* low per-packet overhead
+* connection-based, prevent raw access to underlying network
+* app-determined policy for send frequency and throughput
+
+Specifically, the handshake negotiation goals include:
+
+2 phase connect
+client-puzzle challenge response for improved DOS protection
+replicate "same origin" policies
+enable peer host connection introduction (peer-to-peer or multi-server)
+key exchange, public key validation option by web app code
+
+Connection packet protocol:
+
+Low per-packet protocol overhead (min-target 4 bytes/packet)
+Variable-width packet window protocol (currently implemented as constants)
+Packet delivery status notification (unreliable delivery, reliable notification)
+Duplicate, out-of-order packet rejection
+Variable-length packet signature (prototype implements as SHA-256, variable byte width recorded) 
+Symmetric key encryption (prototype implements as 128-bit AES)
+
+This interface does not allow for raw access to the underlying network.
+
+2 References
+
+This specification and prototype implementation draw from several reference sources:
+
+The WebSocket API - used for patterning in-browser JavaScript API - http://dev.w3.org/html5/websockets/
+OpenTNL 1.5 - open source game networking library based on Torque Game Engine network model - hosted at: http://github.com/nardo/torque_network_library_1_5
+Game Networking Resources - conceptual introduction to real-time game networking - http://gafferongames.com/2009/01/25/game-networking-resources/
+Tribes Engine Networking Model - Game Developer's Conference 2000 Proceedings - http://www710.univ-lyon1.fr/~jciehl/Public/educ/GAMA/2008/tribes_networking_model.pdf
+The torque_sockets C API  
+
+3 The TorqueSockets interface
+
+[Constructor()]
+interface TorqueSockets {
+	set_private_key(in DOMString private_key);
+	set_challenge_response(in DOMString challenge_response);
+	int connect(in DOMString URL, in DOMString connect_data, in optional DOMString protocol_settings);
+	int connect_introduced (in int introducer, in int remote_client_connection_id, bool is_host, in DOMString connect_data);
+	int introduce(in int initiator_connection, in int host_connection);
+	accept_challenge(in int pending_connection);
+	accept_connection(in int pending_connection);
+	close(in int connection_id, in optional DOMString reason_data);
+	unsigned long send_to(in int connection_id, DOMString packet_data);
+
+	attribute Function on_challenge_response;
+	attribute Function on_connect_request;
+	attribute Function on_close;
+	attribute Function on_packet;
+	attribute Function on_packet_delivery_notify;
+	attribute Function on_connection_established;
+};
+
+interface description to follow.
