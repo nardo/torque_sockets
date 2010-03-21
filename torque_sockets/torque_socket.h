@@ -1,41 +1,9 @@
-/// torque_socket class.
-///
-/// Manages all valid and pending notify protocol connections for a single open network socket (port/IP address).  A torque_socket instance is not thread safe, so should only be used from a single thread.  The torque_sockets library is thread safe in the sense that torque_socket instances may be created on different threads.
-///
-/// <b>Connection handshaking basic overview:</b>
-///
-/// torque_sockets does a two phase connect handshake to prevent a several types of Denial-of-Service (DoS) attacks.
-///
-/// The connection initiator starts the connection by sending a unique random nonce (number, used once) value to the host as part of the connect_challenge_request packet.
-/// initiator->host: connect_challenge_request(initiator_nonce)
-///
-/// The server responds to the connect_challenge_request with a "Client Puzzle" that has the property that verifying a solution to the puzzle is computationally simple, but can be of a specified computational, brute-force difficulty to compute the solution itself.  The client puzzle is of the form: secureHash(Ic, initiator_nonce, host_nonce, X) = Y >> k, where Ic is the identity of the client, and X is a value computed by the client such that the high k bits of the value y are all zero.  The client identity is computed by the server as a partial hash of the client's IP address and port and some random data on the host.  The response contains the host's current nonce, the initiator nonce, k, the host's public key and any data set via set_challenge_response_data
-/// host->initiator: connect_challenge_response(initiator_nonce, host_nonce, k, host_public_key, host_challenge_response_data)
-///
-/// The initiator, upon receipt of the connect_challenge_response, validates the packet sent by the host and computes a solution to the puzzle the host sent.  The initiator generates a shared secret from the initiator's key pair and the host's public key.  The initiator response to the host consists of:
-/// initiator->host: connect_request(initiator_nonce, host_nonce, X, initiator_public_key, shared_secret(key1, sequence1, connect_request_data))
-///
-/// The host then can validation the solution to the puzzle the initiator submitted, along with the client identity (Ic).  Until this point the host has allocated no memory for the initiator and has verified that the initiator is sending from a valid IP address, and that the initiator has done some amount of work to prove its willingness to start a connection.  As the host load increases, the host may choose to increase the difficulty (k) of the client puzzles it issues, thereby making a CPU/connection resource depletion DoS attack successively more difficult to launch.
-///
-/// If the server accepts the connection, it sends a connect accept packet that is encrypted and hashed using the shared secret.  The contents of the packet are another sequence number (sequence2) and another key (key2).  The sequence numbers are the initial send and receive sequence numbers for the torque_connection protocol, and the key2 value becomes the IV of the symmetric cipher.  The connection_accept_data is also sent and encrypted in this channel.
-/// 
-/// Connections using the secure key exchange are still vulnerable to Man-in-the-middle attacks.  Using a key signed by a trusted certificate authority (CA), makes the communications channel as securely trusted as the trust in the CA.  This could be implemented by the host sending its certificate and a signature of the public key down in the challenge_response_data
-///
-/// <b>Introduced Connection handshaking:</b>
-///
-/// torque_socket can also facilitate introduced connections.  Introduced connections are necessary when both parties to the connection are behind firewalls or NAT routers, or don't want to accept anonymous connections from the network.  Suppose there are two processes, initiator and host that want to establish a direct connection and that those two processes are connected to the same third party introducer.  All three parties can simultaneously initiate an introduced connection by calling the appropriate methods on their torque_socket instances.  The protocol works as follows:
-/// initiator/host->introducer: request_introduction(remote_connection_id, shared_secret(initiator/host _nonce))
-/// introducer->initiator/host: introduction_response( shared_secret( remote_public_addresses, introduced_connection_shared_secret, remote_nonce ) )
-/// The remote public addresses are the public (NAT'd) address of the hosts from the perspective of the introducer, as well as the IP addresses each client detects for itself.  This allows clients behind the same firewall to connect with each other using local (untranslated) addresses.
-///
-/// Once the initiator and host receive introduction_responses, they being sending "punch" packets to the known possible addresses of each other.  The punch packet I sends enables the punch packet H sends to be delivered through the router or firewall since it will appear as though it is a service response to I's initial packet, and vice versa.
-///
-/// Upon receipt of the punch packet by the initiator of the connection, an arranged_connect_request packet is sent.  If the non-initiator of the connection gets an ArrangedPunch packet, it simply sends another punch packet to the remote host, but narrows down its Address range to the address it received the packet from.
-/// The ArrangedPunch packet from the intiator contains the nonce for the non-initiator, and the nonce for the initiator encrypted with the shared secret.  The ArrangedPunch packet for the host of the connection contains all that, plus the public key/key_size of the receiver.
-
 class torque_connection;
 struct connection_parameters;
 
+/// torque_socket class.
+///
+/// Manages all valid and pending notify protocol connections for a single open network socket (port/IP address).  A torque_socket instance is not thread safe, so should only be used from a single thread.  The torque_sockets library is thread safe in the sense that torque_socket instances may be created on different threads.
 class torque_socket : public ref_object
 {
 	friend class torque_connection;
