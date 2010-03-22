@@ -4,14 +4,14 @@ Draft 1 March 22, 2010
 
 Abstract
 --------
-This specification defines a proposed API that enables Web pages to use the TorqueSocket protocol for two-way real-time communication with remote hosts.
+This specification defines a proposed API that enables Web pages to use the torque_sockets packet-based connection protocol for two-way real-time communication with remote hosts.
 
 
 Status of This document
 -----------------------
 This section describes the status of this document at the time of its publication. Other documents may supersede this document.
 
-If you wish to make comments regarding this document, please send them to ???. All feedback is welcome.
+If you wish to make comments regarding this document, please send them to Mark.  All feedback is welcome.
 
 Implementors should be aware that this specification is not stable. Implementors who are not taking part in the discussions are likely to find the specification changing out from under them in incompatible ways. Vendors interested in implementing this specification before it eventually reaches the Candidate Recommendation stage should join the aforementioned mailing lists (once they truly are mentioned afore) and take part in the discussions.
 
@@ -45,12 +45,12 @@ replicate "same origin" policies for requests to other hosts
 enable peer host connection introduction (peer-to-peer or multi-server)
 key exchange, public key validation option by web app code
 
-Connection packet protocol:
+The connection packet protocol high-level goals include:
 
 Low per-packet protocol overhead (min-target 4 bytes/packet)
 Variable-width packet window protocol (currently implemented as constants)
 Packet delivery status notification (unreliable delivery, reliable notification)
-Duplicate, out-of-order packet rejection
+Duplicate and out-of-order packet rejection
 Variable-length packet signature (prototype implements as SHA-256, variable byte width recorded) 
 Symmetric key encryption (prototype implements as 128-bit AES)
 
@@ -65,7 +65,7 @@ The WebSocket API - used for patterning in-browser JavaScript API - http://dev.w
 OpenTNL 1.5 - open source game networking library based on Torque Game Engine network model - hosted at: http://github.com/nardo/torque_network_library_1_5
 Game Networking Resources - conceptual introduction to real-time game networking - http://gafferongames.com/2009/01/25/game-networking-resources/
 Tribes Engine Networking Model - Game Developer's Conference 2000 Proceedings - http://www710.univ-lyon1.fr/~jciehl/Public/educ/GAMA/2008/tribes_networking_model.pdf
-The torque_sockets C API  
+The torque_sockets C API - underlying connection protocol API based on the low-level OpenTNL protocol - http://github.com/nardo/torque_sockets/raw/master/torque_sockets_reference_api.h
 
 
 3 The TorqueSocket interface
