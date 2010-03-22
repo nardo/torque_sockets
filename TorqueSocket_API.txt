@@ -1,6 +1,6 @@
 The TorqueSocket API
 
-Draft 1 March, 2010
+Draft 1 March 22, 2010
 
 Abstract
 --------
