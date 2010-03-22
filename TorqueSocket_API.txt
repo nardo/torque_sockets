@@ -72,21 +72,25 @@ The torque_sockets C API - underlying connection protocol API based on the low-l
 ----------------------------
 [Constructor()]
 interface TorqueSocket {
+	const unsigned int MAX_PACKET_SIZE = 1400;
+	const unsigned int DEFAULT_PACKET_WINDOW = 32;
+	const unsigned int DEFAULT_SIGNATURE_SIZE = 5;
+
 	set_key_pair(in DOMString public_private_key);
 
-	int connect(in DOMString URL, in optional DOMString connect_data, in optional DOMString protocol_settings);
-	int connect_introduced (in int introducer, in int remote_client_connection_id, bool is_host, in optional DOMString connect_data_or_challenge_response, in optional DOMString protocol_settings);
+	int connect(in DOMString URL, in optional ByteBuffer connect_data, in optional DOMString protocol_settings);
+	int connect_introduced (in int introducer, in int remote_client_connection_id, bool is_host, in optional ByteBuffer connect_data_or_challenge_response, in optional DOMString protocol_settings);
 	int introduce(in int initiator_connection, in int host_connection);
 	accept_challenge(in int pending_connection);
 	accept_connection(in int pending_connection);
-	close(in int connection_id, in optional DOMString reason);
-	unsigned long send_to(in int connection_id, DOMString packet_data);
+	close(in int connection_id, in optional ByteBuffer reason);
+	unsigned long send_to(in int connection_id, ByteBuffer packet_data);
 
-	attribute Function on_challenge_response(in int pending_connection, in DOMString public_key, in DOMString challenge_response);
-	attribute Function on_connect_request(in int pending_connection, in DOMString public_key, in DOMString connect_data);
+	attribute Function on_challenge_response(in int pending_connection, in DOMString public_key, in ByteBuffer challenge_response);
+	attribute Function on_connect_request(in int pending_connection, in DOMString public_key, in ByteBuffer connect_data);
 	attribute Function on_established(in int connection_id);
-	attribute Function on_close(in int connection_id, in DOMString reason);
-	attribute Function on_packet(in int connecion_id, in int packet_sequence, in DOMString packet_data);
+	attribute Function on_close(in int connection_id, in ByteBuffer reason);
+	attribute Function on_packet(in int connecion_id, in int packet_sequence, in ByteBuffer packet_data);
 	attribute Function on_packet_delivery_notify(in int connection_id, in int sent_packet_sequence, in bool delivery_successful);
 };
 
