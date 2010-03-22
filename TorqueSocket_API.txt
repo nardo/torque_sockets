@@ -145,6 +145,23 @@ Upon receipt of the punch packet by the host of the connection, the initiator en
 
 5 Detailed wire protocol description
 ------------------------------------
+A TorqueSocket data packet has the following basic format:
+header, ack_flags, packet_data, signature
 
-The TorqueSocket connection protocol 
-Packets received
+The header has the format:
+
+1 bit = 1 - data packet protocol flag
+5 bits - low 5 bits of packet sequence number
+2 bits, packet type
+	0 data packet
+	1 ping packet
+	2 ack packet
+sequence_number_bit_size - 5 bits - remainder of the sequence_number for this packet.  The sequence_number is a window into the full packet sequence index.
+ack_sequence_number_bit_size bits - the highest send sequence of packets received by the remote host.  This is used to frame the ack flags that follow.
+packet_header_pad_bits = 0 - padding bits to pad up to next byte boundary.
+
+The sequence numbers computed from the rotating send/recv sequence fields are used to set up the symmetric cipher's block chaining algorithm.  All subsequent data (ack_flags, packet_data) are encrypted by this cipher and the signature field holds some portion of the SHA-256 hash.  Note that the packet header, while not encrypted, is still computed into the hash, so even though an attacker may be able to determine a subset of the counter sequences, it can't tamper with the sequence numbers without invalidating the encrypted hash.
+
+The ack_flags section of the packet has the format:
+ranged_uint32(0, max_ack_byte_count) - the number of ack bytes following
+ack_bytes bytes - individual packet acks
