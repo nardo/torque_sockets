@@ -1,39 +1,47 @@
-The TorqueSockets API
+The TorqueSocket API
 
-Draft 1 March 20, 2010
+Draft 1 March, 2010
 
 Abstract
+--------
+This specification defines a proposed API that enables Web pages to use the TorqueSocket protocol for two-way real-time communication with remote hosts.
 
-This specification defines a proposed API that enables Web pages to use the TorqueSockets protocol for two-way real-time communication with remote hosts.
 
 Status of This document
-
+-----------------------
 This section describes the status of this document at the time of its publication. Other documents may supersede this document.
 
 If you wish to make comments regarding this document, please send them to ???. All feedback is welcome.
 
 Implementors should be aware that this specification is not stable. Implementors who are not taking part in the discussions are likely to find the specification changing out from under them in incompatible ways. Vendors interested in implementing this specification before it eventually reaches the Candidate Recommendation stage should join the aforementioned mailing lists (once they truly are mentioned afore) and take part in the discussions.
 
-The latest stable version of the editor's draft of this specification is always available on nardo's torque_sockets github repository: http://github.com/nardo/torque_sockets/blob/master/TorqueSockets_API.txt
+The latest stable version of the editor's draft of this specification is always available on nardo's torque_sockets github repository: http://github.com/nardo/torque_sockets/blob/master/TorqueSocket_API.txt
+
 
 1 Introduction
 --------------
+To enable Web applications (specifically real-time multiplayer client/server and peer-to-peer games, communication tools) to maintain bidirectional, efficient real-time communications with server-side processes and introduced-host processes, this specification introduces the TorqueSocket interface.
 
-To enable Web applications (specifically real-time multiplayer client/server and peer-to-peer games, communication tools) to maintain bidirectional, efficient real-time communications with server-side processes and introduced-host processes, this specification introduces the TorqueSockets interface.
-
-The high level goals of the TorqueSockets interface are:
+The high level goals of the TorqueSocket interface are:
 
 * minimal footprint, API attack surface
+	- intended to run in trusted code
 * packet-based protocol to match underlying (UDP) transport
+	- real-time protocols take varied approaches to data guarantee, fragmentation, priority
+	- API should aim for "least-common (yet useful) denominator"
+	- app-determined policy for send frequency and throughput
+* connection handshake-based, prevent raw access to underlying network
+	- Protocol should fit within browser security model
+	- enable encryption and data validation
 * low per-packet overhead
-* connection-based, prevent raw access to underlying network
-* app-determined policy for send frequency and throughput
+	- maximize bandwidth utilization for application
+	- intended to be at the bottom layer of app-defined protocol stack
 
 Specifically, the handshake negotiation goals include:
 
 2 phase connect
 client-puzzle challenge response for improved DOS protection
-replicate "same origin" policies
+replicate "same origin" policies for requests to other hosts
 enable peer host connection introduction (peer-to-peer or multi-server)
 key exchange, public key validation option by web app code
 
@@ -48,9 +56,9 @@ Symmetric key encryption (prototype implements as 128-bit AES)
 
 This interface does not allow for raw access to the underlying network.
 
+
 2 References
 ------------
-
 This specification and prototype implementation draw from several reference sources:
 
 The WebSocket API - used for patterning in-browser JavaScript API - http://dev.w3.org/html5/websockets/
@@ -59,34 +67,47 @@ Game Networking Resources - conceptual introduction to real-time game networking
 Tribes Engine Networking Model - Game Developer's Conference 2000 Proceedings - http://www710.univ-lyon1.fr/~jciehl/Public/educ/GAMA/2008/tribes_networking_model.pdf
 The torque_sockets C API  
 
-3 The TorqueSockets interface
------------------------------
 
+3 The TorqueSocket interface
+----------------------------
 [Constructor()]
-interface TorqueSockets {
-	set_private_key(in DOMString private_key);
-	set_challenge_response(in DOMString challenge_response);
-	int connect(in DOMString URL, in DOMString connect_data, in optional DOMString protocol_settings);
-	int connect_introduced (in int introducer, in int remote_client_connection_id, bool is_host, in DOMString connect_data);
+interface TorqueSocket {
+	set_key_pair(in DOMString public_private_key);
+
+	int connect(in DOMString URL, in optional DOMString connect_data, in optional DOMString protocol_settings);
+	int connect_introduced (in int introducer, in int remote_client_connection_id, bool is_host, in optional DOMString connect_data_or_challenge_response, in optional DOMString protocol_settings);
 	int introduce(in int initiator_connection, in int host_connection);
 	accept_challenge(in int pending_connection);
 	accept_connection(in int pending_connection);
-	close(in int connection_id, in optional DOMString reason_data);
+	close(in int connection_id, in optional DOMString reason);
 	unsigned long send_to(in int connection_id, DOMString packet_data);
 
-	attribute Function on_challenge_response;
-	attribute Function on_connect_request;
-	attribute Function on_close;
-	attribute Function on_packet;
-	attribute Function on_packet_delivery_notify;
-	attribute Function on_connection_established;
+	attribute Function on_challenge_response(in int pending_connection, in DOMString public_key, in DOMString challenge_response);
+	attribute Function on_connect_request(in int pending_connection, in DOMString public_key, in DOMString connect_data);
+	attribute Function on_established(in int connection_id);
+	attribute Function on_close(in int connection_id, in DOMString reason);
+	attribute Function on_packet(in int connecion_id, in int packet_sequence, in DOMString packet_data);
+	attribute Function on_packet_delivery_notify(in int connection_id, in int sent_packet_sequence, in bool delivery_successful);
 };
 
-interface description to follow.
+The TorqueSocket constructor opens a local UDP socket for communication through the interface.
+
+The set_key_pair(public_private_key) method sets the public/private key pair for this client.  TorqueSocket uses the host's key size for key exchange, so if an initiator's key is not the same size as the host (can be checked on challenge response), the initiator will generate a new key pair for that connection.
+
+The connect(URL, connect_data, protocol_settings) method initiates connection with a remote host using the TorqueSocket connection protocol.  The URL resolves to the remote host address/port, connect_data is optional data the host needs to validate on connection (for example, this could be a connection token passed into the page, or login data).  connect_data will be encrypted by the shared secret generated from the public key exchange.  The protocol_settings field specifies particular protocol settings, including packet window width and signature byte count.
+
+The second path for connection creation in TorqueSocket is by introduction.  Two TorqueSocket connected to a third "introducer" TorqueSocket can be introduced such that they have a direct connection between them.  This is accomplished by each party in the introduction (the initiator, the host and the introducer) calling either (in the case of initiator/host) connect_introduced(introducer, remote_client_connection_id, is_host, connect_data_or_challenge_response, protocol_settings) or introduce(initiator_connection, host_connection).  The introduction method allows clients connecting from behind certain NAT devices to learn the public address/port of the other party.
+
+The connect process is two-phase -- the first phase is called the "challenge" phase, where connection endpoints are verified and the host of the connection can defend against certain forms of DoS attack.  The second phase is called the "connect" phase.
+
+In the challenge phase, the initiator will receive a challenge response from the host via the on_challenge_response Function attribute.  If the challenge response is satisfactory -- the initiator can validate the public key and/or challenge_response_data -- the initiator should next call accept_challenge(pending_connection) with the connection id token or close(connection_id, reason_data) if it is not.
+
+In the connect phase, the host will receive a connection request via the on_connect_request(pending_connection, public_key, connect_data) Function attribute.  If the connect request is satisfactory, the host should call accept_connection(pending_connection) or close(pending_connection, reason) if not.
+
+Once TorqueSocket detects that the initiator and host have both completed the handshake, it issues a call to on_established(connection_id).  At this point, the instance can send data packets with a call to send_to(connection_id, packet_data), which will return the sequence number of the sent packet or a failure code if the OS-level send fails or if the packet window is full.  When the delivery status of a given packet send is detected, the TorqueSocket will issue a call to on_packet_delivery_notify(connection_id, sent_packet_sequence, delivery_successful).  Packets and delivery notifications are guaranteed to be delivered in order.
 
 4 Detailed connection handshake overview
 ----------------------------------------
-
 torque_sockets does a two phase connect handshake to prevent a several types of Denial-of-Service (DoS) attacks.
 
 The connection initiator starts the connection by sending a unique random nonce (number, used once) value to the host as part of the connect_challenge_request packet.
@@ -121,7 +142,9 @@ Once the initiator and host receive introduction_responses, they being sending "
 
 Upon receipt of the punch packet by the host of the connection, the initiator engages the normal connection process (challenge request/response, connect request/response).  If the host of the introduced connection gets challenge request it stops sending punch packets to the potential addresses.
 
+
 5 Detailed wire protocol description
 ------------------------------------
 
-to be written.
+The TorqueSocket connection protocol 
+Packets received
