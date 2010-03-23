@@ -3,20 +3,20 @@ Torque Sockets
 Top-level directory contents overview:
 
 core:
-	core foundational class library -- containers, basic types, etc.
+	core foundation class library -- containers, basic types, etc.
 
 lib:
 	third-party utility libraries needed to build torque_sockets
 	and the plugin.
 
 license:
-	source code licensing information.  TorqueSockets and
+	source code licensing information.  TorqueSocket and
 	torque_sockets are released under the MIT license
 	See: http://www.opensource.org/licenses/mit-license.php
 
 products:
-	build products for the TorqueSockets family -- the c library,
-	plugin prototype and unit tests.
+	build products for the TorqueSocket family -- the torque_sockets c library,
+	TorqueSocket plugin prototype and unit tests.
 
 README:
 	this file.
@@ -24,5 +24,5 @@ README:
 torque_sockets:
 	c and c++ reference APIs and implementation.
 
-TorqueSockets_API.txt:
+TorqueSocket_API.txt:
 	High level API specification for the TorqueSockets web plugin API
