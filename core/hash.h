@@ -37,6 +37,19 @@ template <typename type> inline uint32 hash(const type *x)
 	return x->hash();
 }
 
+uint32 hash_buffer(const void *buffer, uint32 len)
+{
+	uint8 *buf = (uint8 *) buffer;
+	uint32 result = 0;
+	while(len--)
+		result = ((result << 8) | (result >> 24)) ^ uint32(*buf++);
+	return result;
+}
+template <typename signature> uint32 hash_method(signature the_method)
+{
+	return hash_buffer((void *) &the_method, sizeof(the_method));
+}
+
 #define numeric_hash_overload(type) template<> inline uint32 hash<type>(const type &x) { return uint32(x); }
 
 numeric_hash_overload(int)

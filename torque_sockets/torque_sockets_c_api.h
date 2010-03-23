@@ -42,7 +42,7 @@ struct torque_socket_event
 	unsigned char *data;
 	unsigned packet_sequence;
 	int delivered;
-	sockaddr source_address;
+	struct sockaddr source_address;
 };
 
 torque_socket_handle torque_socket_create(struct sockaddr*); ///< Create a torque socket and bind it to the specified socket address interface.

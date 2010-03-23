@@ -1,0 +1,302 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 45;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1DF28AA5115922D000F1A3FA /* libtorquesockets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1DF28AA4115922D000F1A3FA /* libtorquesockets.cpp */; };
+		1DF28BBE11592B9600F1A3FA /* libtorquesockets_test.c in Sources */ = {isa = PBXBuildFile; fileRef = 1DF28BBD11592B9600F1A3FA /* libtorquesockets_test.c */; };
+		1DF28C03115935C800F1A3FA /* liblibtorquesockets.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D2AAC046055464E500DB518D /* liblibtorquesockets.a */; };
+		1DF28C061159361300F1A3FA /* libtomcrypt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DF28C051159361300F1A3FA /* libtomcrypt.a */; };
+		1DF28C081159363D00F1A3FA /* libtommath.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DF28C071159363D00F1A3FA /* libtommath.a */; };
+		1DF28C0C1159499500F1A3FA /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DF28C0B1159499500F1A3FA /* CoreServices.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1DF28AA4115922D000F1A3FA /* libtorquesockets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = libtorquesockets.cpp; sourceTree = "<group>"; };
+		1DF28BB811592B5600F1A3FA /* libtorquesockets_test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = libtorquesockets_test; sourceTree = BUILT_PRODUCTS_DIR; };
+		1DF28BBD11592B9600F1A3FA /* libtorquesockets_test.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = libtorquesockets_test.c; sourceTree = "<group>"; };
+		1DF28C051159361300F1A3FA /* libtomcrypt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libtomcrypt.a; path = ../../lib/libtomcrypt/libtomcrypt.a; sourceTree = SOURCE_ROOT; };
+		1DF28C071159363D00F1A3FA /* libtommath.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libtommath.a; path = ../../lib/libtommath/libtommath.a; sourceTree = SOURCE_ROOT; };
+		1DF28C0B1159499500F1A3FA /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
+		D2AAC046055464E500DB518D /* liblibtorquesockets.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = liblibtorquesockets.a; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1DF28BB611592B5600F1A3FA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1DF28C03115935C800F1A3FA /* liblibtorquesockets.a in Frameworks */,
+				1DF28C061159361300F1A3FA /* libtomcrypt.a in Frameworks */,
+				1DF28C081159363D00F1A3FA /* libtommath.a in Frameworks */,
+				1DF28C0C1159499500F1A3FA /* CoreServices.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D289987405E68DCB004EDB86 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		08FB7794FE84155DC02AAC07 /* libtorquesockets */ = {
+			isa = PBXGroup;
+			children = (
+				1DF28C071159363D00F1A3FA /* libtommath.a */,
+				1DF28C051159361300F1A3FA /* libtomcrypt.a */,
+				1DF28AA4115922D000F1A3FA /* libtorquesockets.cpp */,
+				C6A0FF2B0290797F04C91782 /* Documentation */,
+				1AB674ADFE9D54B511CA2CBB /* Products */,
+				1DF28BBD11592B9600F1A3FA /* libtorquesockets_test.c */,
+				1DF28C0B1159499500F1A3FA /* CoreServices.framework */,
+			);
+			name = libtorquesockets;
+			sourceTree = "<group>";
+		};
+		1AB674ADFE9D54B511CA2CBB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D2AAC046055464E500DB518D /* liblibtorquesockets.a */,
+				1DF28BB811592B5600F1A3FA /* libtorquesockets_test */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C6A0FF2B0290797F04C91782 /* Documentation */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Documentation;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		D2AAC043055464E500DB518D /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		1DF28BB711592B5600F1A3FA /* libtorquesockets_test */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1DF28BBC11592B7500F1A3FA /* Build configuration list for PBXNativeTarget "libtorquesockets_test" */;
+			buildPhases = (
+				1DF28BB511592B5600F1A3FA /* Sources */,
+				1DF28BB611592B5600F1A3FA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = libtorquesockets_test;
+			productName = libtorquesockets_test;
+			productReference = 1DF28BB811592B5600F1A3FA /* libtorquesockets_test */;
+			productType = "com.apple.product-type.tool";
+		};
+		D2AAC045055464E500DB518D /* libtorquesockets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1DEB91EB08733DB70010E9CD /* Build configuration list for PBXNativeTarget "libtorquesockets" */;
+			buildPhases = (
+				D2AAC043055464E500DB518D /* Headers */,
+				D2AAC044055464E500DB518D /* Sources */,
+				D289987405E68DCB004EDB86 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = libtorquesockets;
+			productName = libtorquesockets;
+			productReference = D2AAC046055464E500DB518D /* liblibtorquesockets.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		08FB7793FE84155DC02AAC07 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 1DEB91EF08733DB70010E9CD /* Build configuration list for PBXProject "libtorquesockets" */;
+			compatibilityVersion = "Xcode 3.1";
+			hasScannedForEncodings = 1;
+			mainGroup = 08FB7794FE84155DC02AAC07 /* libtorquesockets */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D2AAC045055464E500DB518D /* libtorquesockets */,
+				1DF28BB711592B5600F1A3FA /* libtorquesockets_test */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1DF28BB511592B5600F1A3FA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1DF28BBE11592B9600F1A3FA /* libtorquesockets_test.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D2AAC044055464E500DB518D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1DF28AA5115922D000F1A3FA /* libtorquesockets.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1DEB91EC08733DB70010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				HEADER_SEARCH_PATHS = (
+					../../lib/libtomcrypt/src/headers,
+					../..,
+				);
+				INSTALL_PATH = /usr/local/lib;
+				PRODUCT_NAME = libtorquesockets;
+			};
+			name = Debug;
+		};
+		1DEB91ED08733DB70010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_MODEL_TUNING = G5;
+				HEADER_SEARCH_PATHS = (
+					../../lib/libtomcrypt/src/headers,
+					../..,
+				);
+				INSTALL_PATH = /usr/local/lib;
+				PRODUCT_NAME = libtorquesockets;
+			};
+			name = Release;
+		};
+		1DEB91F008733DB70010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PREBINDING = NO;
+				SDKROOT = macosx10.5;
+			};
+			name = Debug;
+		};
+		1DEB91F108733DB70010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				PREBINDING = NO;
+				SDKROOT = macosx10.5;
+			};
+			name = Release;
+		};
+		1DF28BBA11592B5700F1A3FA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = i386;
+				HEADER_SEARCH_PATHS = ../..;
+				INSTALL_PATH = /usr/local/bin;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../lib/libtomcrypt\"",
+					"\"$(SRCROOT)/../../lib/libtommath\"",
+				);
+				PREBINDING = NO;
+				PRODUCT_NAME = libtorquesockets_test;
+				STANDARD_C_PLUS_PLUS_LIBRARY_TYPE = static;
+			};
+			name = Debug;
+		};
+		1DF28BBB11592B5700F1A3FA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				GCC_MODEL_TUNING = G5;
+				GCC_PREPROCESSOR_DEFINITIONS = i386;
+				HEADER_SEARCH_PATHS = ../..;
+				INSTALL_PATH = /usr/local/bin;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../lib/libtomcrypt\"",
+					"\"$(SRCROOT)/../../lib/libtommath\"",
+				);
+				PREBINDING = NO;
+				PRODUCT_NAME = libtorquesockets_test;
+				STANDARD_C_PLUS_PLUS_LIBRARY_TYPE = static;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1DEB91EB08733DB70010E9CD /* Build configuration list for PBXNativeTarget "libtorquesockets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB91EC08733DB70010E9CD /* Debug */,
+				1DEB91ED08733DB70010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1DEB91EF08733DB70010E9CD /* Build configuration list for PBXProject "libtorquesockets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB91F008733DB70010E9CD /* Debug */,
+				1DEB91F108733DB70010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1DF28BBC11592B7500F1A3FA /* Build configuration list for PBXNativeTarget "libtorquesockets_test" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DF28BBA11592B5700F1A3FA /* Debug */,
+				1DF28BBB11592B5700F1A3FA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 08FB7793FE84155DC02AAC07 /* Project object */;
+}
