@@ -1,6 +1,23 @@
 #include "core/platform.h"
 #include "torque_sockets/torque_sockets_c_api.h"
 
+enum world_type
+{
+	introducer,
+	initiator,
+	host,
+	introduced_initiator,
+	introduced_host,
+};
+
+typedef struct world
+{
+	int type;
+	torque_socket_handle the_socket;	
+	SOCKADDR_IN bind_address;
+	SOCKADDR_IN connect_address;
+};
+	
 int main(int argc, const char **argv)
 {
 	const char *address_string = "127.0.0.1";
@@ -18,4 +35,6 @@ int main(int argc, const char **argv)
 	
 	torque_socket_handle h;
 	h = torque_socket_create(&address);
+	
+	
 }
