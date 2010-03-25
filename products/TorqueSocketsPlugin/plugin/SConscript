@@ -11,27 +11,27 @@ Import('libs')
 files = Glob('*.cpp')
 
 # MIME types by configuration.  Optimized Debug uses MIME_RELEASE
-MIME_RELEASE = 'application/x-torque-network-platform'
-MIME_DEBUG = 'application/x-torque-network-platform-debug'
+MIME_RELEASE = 'application/x-torque-socket'
+MIME_DEBUG = 'application/x-torque-network-socket-debug'
 
 # Metadata configuration.  This is for Win32...
 hellorc_subst = {}
-hellorc_subst['dbg'] = {'FILE_DESC':'nptnp_debug', 'FILE_OPEN_NAME':'nptnp_debug'}
-hellorc_subst['dbg'].update({'INTERNAL_NAME':'Torque Network Platform Debug', 'MIME_TYPE':MIME_DEBUG})
-hellorc_subst['dbg'].update({'ORIGINAL_FILE_NAME':'nptnp_debug.dll', 'PRODUCT_NAME':'Torque Network Platform Plugin Debug'})
+hellorc_subst['dbg'] = {'FILE_DESC':'nptorque_socket_debug', 'FILE_OPEN_NAME':'nptorque_socket_debug'}
+hellorc_subst['dbg'].update({'INTERNAL_NAME':'Torque Socket Debug', 'MIME_TYPE':MIME_DEBUG})
+hellorc_subst['dbg'].update({'ORIGINAL_FILE_NAME':'nptorque_socket_debug.dll', 'PRODUCT_NAME':'Torque Socket Plugin Debug'})
 
-hellorc_subst['optdbg'] = {'FILE_DESC':'nptnp_optimized', 'FILE_OPEN_NAME':'nptnp_optimized'}
-hellorc_subst['optdbg'].update({'INTERNAL_NAME':'Torque Network Platform OptDebug', 'MIME_TYPE':MIME_RELEASE})
-hellorc_subst['optdbg'].update({'ORIGINAL_FILE_NAME':'nptnp_optimized.dll', 'PRODUCT_NAME':'Torque Network Platform Plugin OptDebug'})
+hellorc_subst['optdbg'] = {'FILE_DESC':'nptorque_socket_optimized', 'FILE_OPEN_NAME':'nptorque_socket_optimized'}
+hellorc_subst['optdbg'].update({'INTERNAL_NAME':'Torque Socket OptDebug', 'MIME_TYPE':MIME_RELEASE})
+hellorc_subst['optdbg'].update({'ORIGINAL_FILE_NAME':'nptorque_socket_optimized.dll', 'PRODUCT_NAME':'Torque Socket Plugin OptDebug'})
 
-hellorc_subst['release'] = {'FILE_DESC':'nptnp', 'FILE_OPEN_NAME':'nptnp'}
-hellorc_subst['release'].update({'INTERNAL_NAME':'Torque Network Platform', 'MIME_TYPE':MIME_RELEASE})
-hellorc_subst['release'].update({'ORIGINAL_FILE_NAME':'nptnp.dll', 'PRODUCT_NAME':'Torque Network Platform Plugin'})
+hellorc_subst['release'] = {'FILE_DESC':'nptorque_socket', 'FILE_OPEN_NAME':'nptorque_socket'}
+hellorc_subst['release'].update({'INTERNAL_NAME':'Torque Socket', 'MIME_TYPE':MIME_RELEASE})
+hellorc_subst['release'].update({'ORIGINAL_FILE_NAME':'nptorque_socket.dll', 'PRODUCT_NAME':'Torque Socket Plugin'})
 
 hellodef_subst = {}
-hellodef_subst['dbg'] = {'LIBNAME':'NPTNP_DEBUG'}
-hellodef_subst['optdbg'] = {'LIBNAME':'NPTNP_OPTIMIZED'}
-hellodef_subst['release'] = {'LIBNAME':'NPTNP'}
+hellodef_subst['dbg'] = {'LIBNAME':'NPTORQUE_SOCKET_DEBUG'}
+hellodef_subst['optdbg'] = {'LIBNAME':'NPTORQUE_SOCKET_OPTIMIZED'}
+hellodef_subst['release'] = {'LIBNAME':'NPTORQUE_SOCKET'}
 
 # And this is for OS X...
 infoplist_subst = {}
@@ -40,17 +40,17 @@ infoplist_subst['optdbg'] = {'MIME_TYPE':MIME_RELEASE}
 infoplist_subst['release'] = {'MIME_TYPE':MIME_RELEASE}
 
 hellor_osx_subst = {}
-hellor_osx_subst['dbg'] = {'FILE_DESC':'Torque Network Platform Debug Plugin', 'FILE_NAME':'Torque Network Platform Debug Plugin'}
-hellor_osx_subst['dbg'].update({'MIME_TYPE':MIME_DEBUG, 'MIME_DESC':'Torque Network Platform Debug'})
+hellor_osx_subst['dbg'] = {'FILE_DESC':'Torque Socket Debug Plugin', 'FILE_NAME':'Torque Socket Debug Plugin'}
+hellor_osx_subst['dbg'].update({'MIME_TYPE':MIME_DEBUG, 'MIME_DESC':'Torque Socket Debug'})
 
-hellor_osx_subst['optdbg'] = {'FILE_DESC':'Torque Network Platform Optimized Plugin', 'FILE_NAME':'Torque Network Platform Optimized Plugin'}
+hellor_osx_subst['optdbg'] = {'FILE_DESC':'Torque Socket Optimized Plugin', 'FILE_NAME':'Torque Socket Optimized Plugin'}
 hellor_osx_subst['optdbg'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Network Platform'})
 
-hellor_osx_subst['release'] = {'FILE_DESC':'Torque Network Platform Plugin', 'FILE_NAME':'Torque Network Platform Plugin'}
-hellor_osx_subst['release'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Network Platform'})
+hellor_osx_subst['release'] = {'FILE_DESC':'Torque Socket Plugin', 'FILE_NAME':'Torque Socket Plugin'}
+hellor_osx_subst['release'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Socket'})
 
 TOOL_SUBST(env)
-env.Append(CPPPATH=['../inc', '#/tnp/include', '#/platform_library', '.'], LIBPATH=['#/tnp', '#/lib/libtommath', '#/lib/libtomcrypt', '#/lib'])
+env.Append(CPPPATH=['../inc', '#/torque_sockets', '#/core', '.'], LIBPATH=['#/lib/libtommath', '#/lib/libtomcrypt'])
 
 # Determine which platform we're on.
 isLinux = env['PLATFORM'] == 'posix' or env['PLATFORM'] == 'linux'
@@ -73,12 +73,12 @@ if isWindows:
    cppdefines += ["WIN32", "OS_WINDOWS", "NOMINMAX", "_WINDOWS", 'MDCPUCFG="\\"prcpucfg_win32.h"\\"']
    # Substitue the proper names into our *.in files for each configuration we
    # are building.
-   f = env.Build('SubstInFile', 'tnp.def', 'tnp.def.in', copy=False, suffix=False, SUBST_DICT_CFG=hellodef_subst)[0]
+   f = env.Build('SubstInFile', 'torque_socket.def', 'torque_socket.def.in', copy=False, suffix=False, SUBST_DICT_CFG=hellodef_subst)[0]
    files.append(f)
-   f = env.Build('SubstInFile', 'tnp.rc', 'tnp.rc.in', copy=False, suffix=False, SUBST_DICT_CFG=hellorc_subst)[0]
+   f = env.Build('SubstInFile', 'torque_socket.rc', 'torque_socket.rc.in', copy=False, suffix=False, SUBST_DICT_CFG=hellorc_subst)[0]
    files.append(f)
    # On windows the plugin name must start with np.
-   target = 'nptnp'
+   target = 'nptorque_socket'
 
 TOOL_NIXYSA(env)
 AUTOGEN_OUTPUT = env.Nixysa('tnp.idl')
@@ -110,8 +110,8 @@ if isOSX:
    TOOL_BUNDLE(env)
    TOOL_REZ(env)
    f = env.Build('SubstInFile', 'Info.plist', 'Info.plist.in', copy=False, suffix=False, SUBST_DICT_CFG=infoplist_subst)[0]
-   res = env.Build('SubstInFile', 'tnp.r', 'tnp.r.in', copy=False, suffix=False, SUBST_DICT_CFG=hellor_osx_subst)[0]
-   rsrc = env.Build('REZ', 'tnp', res, copy=False, suffix=True)[0]
+   res = env.Build('SubstInFile', 'torque_socket.r', 'torque_socket.r.in', copy=False, suffix=False, SUBST_DICT_CFG=hellor_osx_subst)[0]
+   rsrc = env.Build('REZ', 'torque_socket', res, copy=False, suffix=True)[0]
    configs = env.subst('${cfg}').split()
    for config in configs:
       config = Config.allConfigs[config]
