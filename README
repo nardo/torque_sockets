@@ -9,7 +9,7 @@ lib:
 	third-party utility libraries needed to build torque_sockets
 	and the plugin.
 
-license:
+LICENSE:
 	source code licensing information.  TorqueSocket and
 	torque_sockets are released under the MIT license
 	See: http://www.opensource.org/licenses/mit-license.php
