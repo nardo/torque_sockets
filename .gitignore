@@ -14,4 +14,6 @@ plugin/tnp/glue
 plugin/tnp/torque*
 platform_library/build
 platform_library/libtnp*
-
+build
+*.pbxuser
+*.mode1v3
