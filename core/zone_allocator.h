@@ -27,6 +27,7 @@ class zone_allocator
 		if(_quota && (_memory_used + allocation_size > _quota))
 			return 0;
 		
+#ifdef PLATFORM_MAC_OSX
 		void* data;
 		kern_return_t err;
 		
@@ -38,18 +39,24 @@ class zone_allocator
 			data = NULL;
 		else
 			_memory_used += allocation_size;
-
 		return data;		
+#else
+		return malloc(allocation_size);
+#endif
 	}
 	
 	void deallocate_pages(void *the_page, uint32 page_count)
 	{
+#ifdef PLATFORM_MAC_OSX
 		kern_return_t err;
 		err = vm_deallocate((vm_map_t) mach_task_self(), (vm_address_t) the_page, page_size * page_count);
 
 		assert(err == KERN_SUCCESS);
 		if(err == KERN_SUCCESS)
 			_memory_used -= page_size * page_count;
+#else
+		free(the_page);
+#endif
 	}
 	private:
 	uint32 _quota;

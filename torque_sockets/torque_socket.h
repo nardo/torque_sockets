@@ -1115,6 +1115,8 @@ public:
 		_private_key = new asymmetric_key(16, _random_generator);
 		_challenge_response = new byte_buffer();
 		_event_queue_head = _event_queue_tail = 0;
+		_pending_connections = 0;
+		_connection_list = 0;
 	}
 		
 	udp_socket _socket; ///< Network socket this torque_socket communicates over.

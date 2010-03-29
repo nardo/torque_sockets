@@ -12,16 +12,20 @@ public:
 	{
 		#ifdef PLATFORM_WIN32
 			_semaphore = CreateSemaphore(NULL, initial_count, maximum_count, NULL);
-		#else
+		#elif defined(PLATFORM_MAC_OSX)
 			MPCreateSemaphore(maximum_count, initial_count, &_semaphore);
+		#else
+			sem_init(&_semaphore, 0, initial_count);
 		#endif
 	}
 	~semaphore()
 	{
 		#ifdef PLATFORM_WIN32
 			CloseHandle(_semaphore);
-		#else
+		#elif defined(PLATFORM_MAC_OSX)
 			MPDeleteSemaphore(_semaphore);
+		#else
+			sem_destroy(&_semaphore);
 		#endif
 	}
 
@@ -32,8 +36,10 @@ public:
 	{
 		#ifdef PLATFORM_WIN32
 			WaitForSingleObject(_semaphore, INFINITE);
-		#else
+		#elif defined(PLATFORM_MAC_OSX)
 			MPWaitOnSemaphore(_semaphore, kDurationForever);
+		#else
+			sem_wait(&_semaphore);
 		#endif
 	}
 	/// Increments the semaphore's internal count.  This will wake
@@ -42,17 +48,22 @@ public:
 	{
 		#ifdef PLATFORM_WIN32
 			ReleaseSemaphore(_semaphore, count, NULL);
-		#else
+		#elif defined(PLATFORM_MAC_OSX)
 			for(uint32 i = 0; i < count; i++)
 				MPSignalSemaphore(_semaphore);
+		#else
+			for(uint32 i = 0; i < count; i++)
+				sem_post(&_semaphore);
 		#endif
 	}
 
 private:
 	#ifdef PLATFORM_WIN32
 		HANDLE _semaphore;
-	#else
+	#elif defined(PLATFORM_MAC_OSX)
 		MPSemaphoreID _semaphore;
+	#else
+		sem_t _semaphore;
 	#endif
 };
 
@@ -68,10 +79,10 @@ public:
 		#else
 			pthread_mutexattr_t attr;
 			pthread_mutexattr_init(&attr);
-			#ifdef PLATFORM_LINUX
-				pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP);
-			#else
+			#ifdef PLATFORM_MAC_OSX
 				pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+			#else
+				pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP);
 			#endif
 			pthread_mutex_init(&_mutex, &attr);
 			pthread_mutexattr_destroy(&attr);

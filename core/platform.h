@@ -1,6 +1,11 @@
 // Copyright GarageGames.  See /license/info.txt in this distribution for licensing terms.
 
-#if defined(__WIN32__) || defined(_WIN32) || defined(__CYGWIN__)
+#if defined(__native_client__)
+#define PLATFORM_NACL
+#define FN_CDECL
+#include "system_includes_nacl.h"
+
+#elif defined(__WIN32__) || defined(_WIN32) || defined(__CYGWIN__)
 static const char *operating_system_string = "Win32";
 #define PLATFORM_WIN32
 #define FN_CDECL __cdecl
