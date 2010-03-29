@@ -17,6 +17,8 @@
 #include "npapi.h"
 #include "npupp.h"
 
+#include "scriptableObject.h"
+
 #ifndef WIN32
 #define OSCALL
 #endif
@@ -48,6 +50,33 @@ int16   NPP_HandleEvent(NPP instance, void* event);
 void    NPP_URLNotify(NPP instance, const char* URL, NPReason reason, void* notifyData);
 NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value);
 NPError NPP_SetValue(NPP instance, NPNVariable variable, void *value);
+
+class Plugin
+{
+public:
+   Plugin(NPP npp, NPNetscapeFuncs* funcs) : npp_(npp), npn_(funcs), scriptable_object_(NULL) {}
+   ~Plugin();
+   NPObject* GetScriptableObject();
+   
+   NPNetscapeFuncs* npn() { return npn_; }
+private:
+   NPP npp_;
+   NPNetscapeFuncs* npn_;
+   NPObject* scriptable_object_;
+};
+
+class ScriptablePlugin : public ScriptableObject<ScriptablePlugin>
+{
+   typedef ScriptableObject<ScriptablePlugin> Parent;
+public:
+   ScriptablePlugin(NPP npp);
+   
+   NPP npp() const { return npp_; }
+   bool CreateTorqueSocket(const NPVariant* args, uint32_t arg_count, NPVariant* result);
+private:
+   NPP npp_;
+   NPNetscapeFuncs* npn_;
+};
 
 #ifdef __cplusplus
 }

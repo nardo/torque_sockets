@@ -1,18 +1,17 @@
 from Config import *
 from Bundle import *
 from rez import *
-from NixysaBuilder import *
 
 # Import the build environment and static libs from our parent SConstruct.
 Import('env')
-Import('libs')
+#Import('libs')
 
 # files stores the files which will be compiled for the NPAPI plugin.
 files = Glob('*.cpp')
 
 # MIME types by configuration.  Optimized Debug uses MIME_RELEASE
 MIME_RELEASE = 'application/x-torque-socket'
-MIME_DEBUG = 'application/x-torque-network-socket-debug'
+MIME_DEBUG = 'application/x-torque-socket-debug'
 
 # Metadata configuration.  This is for Win32...
 hellorc_subst = {}
@@ -44,7 +43,7 @@ hellor_osx_subst['dbg'] = {'FILE_DESC':'Torque Socket Debug Plugin', 'FILE_NAME'
 hellor_osx_subst['dbg'].update({'MIME_TYPE':MIME_DEBUG, 'MIME_DESC':'Torque Socket Debug'})
 
 hellor_osx_subst['optdbg'] = {'FILE_DESC':'Torque Socket Optimized Plugin', 'FILE_NAME':'Torque Socket Optimized Plugin'}
-hellor_osx_subst['optdbg'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Network Platform'})
+hellor_osx_subst['optdbg'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Socket'})
 
 hellor_osx_subst['release'] = {'FILE_DESC':'Torque Socket Plugin', 'FILE_NAME':'Torque Socket Plugin'}
 hellor_osx_subst['release'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Socket'})
@@ -59,7 +58,7 @@ isWindows = env['PLATFORM'] == 'win32'
 cppdefines = []
 
 # Specify our unadorned target name.  Certain platforms may need to change this.
-target = 'torque'
+target = 'torque_socket'
 
 # Linux and OS X need the XP_UNIX #define and prcpucfg_unix.h
 if isLinux or isOSX:
@@ -80,17 +79,6 @@ if isWindows:
    # On windows the plugin name must start with np.
    target = 'nptorque_socket'
 
-TOOL_NIXYSA(env)
-AUTOGEN_OUTPUT = env.Nixysa('tnp.idl')
-AUTOGEN_CC_FILES = [f for f in AUTOGEN_OUTPUT if f.suffix == '.cc']
-files += AUTOGEN_CC_FILES
-
-# These are the files that nixysa needs, but does not generate (i.e. they're
-# static).  $STATIC_GLUE_DIR is added to the environment with the nixysa
-# builder is added by TOOL_NIXYSA.
-STATIC_GLUE_SOURCES=['common.cc', 'npn_api.cc', 'static_object.cc', 'main.cc']
-files += ['$STATIC_GLUE_DIR/' + f for f in STATIC_GLUE_SOURCES]
-
 # This is the Linux "metadata" configuration.  Linux uses CPP for everything
 # instead of a separate config file, so some of this stuff is still hardcoded
 # in plugin.cpp. Sorry.
@@ -100,7 +88,7 @@ cppdefine_cfg['optdbg'] = cppdefines + ['MIME_TYPE="\\"%s"\\"' % MIME_RELEASE]
 cppdefine_cfg['dbg'] = cppdefines + ['MIME_TYPE="\\"%s"\\"' % MIME_DEBUG]
 
 # And this is where we finally build the plugin.
-ret = env.Build('LoadableModule', target, files, LIBS_CFG=libs[1], CPPDEFINES_CFG=cppdefine_cfg)
+ret = env.Build('LoadableModule', target, files, CPPDEFINES_CFG=cppdefine_cfg)
 
 # On OS X we need to build the resource files and turn the whole thing into a
 # bundle.  We build the Info.plist and tnp.r files here because it's simpler
@@ -115,7 +103,7 @@ if isOSX:
    configs = env.subst('${cfg}').split()
    for config in configs:
       config = Config.allConfigs[config]
-      env.MakeBundle('torque' + config.suffix + '.plugin', 'torque' + config.suffix,
+      env.MakeBundle('torque_socket' + config.suffix + '.plugin', 'torque_socket' + config.suffix,
                      'build/' + config.name + '/Info.plist',
                      typecode='BRPL', creator='????',
                      resources=['English.lproj', rsrc[config.name]])
