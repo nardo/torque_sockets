@@ -24,6 +24,31 @@ class type_database
 		}
 		function->dispatch(0, arguments, return_value);
 	}
+	
+	void _call_method(function_record *function, function_type_signature *calling_signature, void *object, void *return_value, void **arguments)
+	{
+		// for now, compare signatures and make sure they're exactly the same:
+		function_type_signature *func_signature = function->get_signature();
+		if(func_signature->return_type != calling_signature->return_type)
+		{
+			printf("Signature return types don't match!\n");
+			return;
+		}
+		if(func_signature->argument_count != calling_signature->argument_count)
+		{
+			printf("Argument count mismatch!\n");
+			return;
+		}
+		for(uint32 i = 0; i < func_signature->argument_count; i++)
+		{
+			if(func_signature->argument_types[i] != calling_signature->argument_types[i])
+			{
+				printf("arg type %d mismatch!!\n");
+				return;
+			}
+		}
+		function->dispatch(object, arguments, return_value);
+	}
 public:
 	template<typename signature> void add_function(static_string static_name, signature func_address)
 	{
@@ -79,6 +104,8 @@ public:
 		indexed_string name;
 		type_rep *parent_class;
 		dictionary<field_rep> fields;
+		hash_table_flat<indexed_string, function_record *> method_table;
+
 		uint32 max_state_index;
 		uint32 class_index;
 		
@@ -266,7 +293,8 @@ public:
 	{
 		assert(_current_class != 0);
 		indexed_string name = static_to_indexed_string(static_name);
-		//function_record *rec = new function_record_decl<signature>(func_address);
+		function_record *rec = new function_record_decl<signature>(the_method);
+		_current_class->method_table.insert(name, rec);
 		//_function_table.insert(name, rec);		
 	}
 

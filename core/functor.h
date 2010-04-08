@@ -13,6 +13,28 @@ struct functor : public ref_object {
 	virtual void dispatch(void *t) = 0;
 };
 
+class functor_creator
+{
+public:
+	virtual functor *create() = 0;
+	virtual ~functor_creator() {}
+};
+
+template<typename signature> class functor_creator_decl : public functor_creator
+{
+	signature f;
+public:
+	functor_creator_decl(signature sig)
+	{
+		f = sig;
+	}
+	functor *create()
+	{
+		return new functor_decl<signature>(f);
+	}
+};
+
+
 /// functor_decl template class.  This class is specialized based on the member function call signature of the method it represents.  Other specializations hold specific member function pointers and slots for each of the function arguments.
 template <class T> 
 struct functor_decl : public functor {
