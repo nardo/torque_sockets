@@ -2,13 +2,13 @@
   "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head>
-   <embed type="application/x-torque-socket-debug">
+   <embed type="application/x-torque-socket">
    <script>
      var embed = document.embeds[0];
-     console.log(embed);
+     //console.log(embed);
      var result = embed.torqueSocket();
      result.setKeyPair(function() { alert("OMG"); });
-     console.log(result);
+     //console.log(result);
    </script>
 
 </body>
