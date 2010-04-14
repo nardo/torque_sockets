@@ -26,6 +26,7 @@
 #include "type_record.h"
 #include "context.h"
 #include "function_record.h"
+#include "function_call_record.h"
 #include "hash_table_flat.h"
 #include "hash_table_array.h"
 #include "dictionary.h"

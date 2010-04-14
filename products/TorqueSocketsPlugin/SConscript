@@ -7,7 +7,8 @@ Import('env')
 #Import('libs')
 
 # files stores the files which will be compiled for the NPAPI plugin.
-files = Glob('*.cpp')
+# Glob('*.cpp')
+files = ['TorqueSocketPlugin.cpp'] 
 
 # MIME types by configuration.  Optimized Debug uses MIME_RELEASE
 MIME_RELEASE = 'application/x-torque-socket'
@@ -49,7 +50,7 @@ hellor_osx_subst['release'] = {'FILE_DESC':'Torque Socket Plugin', 'FILE_NAME':'
 hellor_osx_subst['release'].update({'MIME_TYPE':MIME_RELEASE, 'MIME_DESC':'Torque Socket'})
 
 TOOL_SUBST(env)
-env.Append(CPPPATH=['../inc', '#/torque_sockets', '#/core', '.'], LIBPATH=['#/lib/libtommath', '#/lib/libtomcrypt'])
+env.Append(CPPPATH=['../../lib/libtomcrypt/src/headers', '../..', './npapi_include', '.'], LIBPATH=['../../lib/libtommath', '../../lib/libtomcrypt'])
 
 # Determine which platform we're on.
 isLinux = env['PLATFORM'] == 'posix' or env['PLATFORM'] == 'linux'
@@ -67,7 +68,7 @@ if isLinux:
 	cppdefines += ["OS_LINUX"]
 if isOSX:
    cppdefines += ["XP_MACOSX", "OS_MACOSX"]
-   env.Append(LINKFLAGS='-framework CoreFoundation')
+   env.Append(LINKFLAGS='-framework CoreFoundation -framework CoreServices -ltomcrypt -ltommath')
 if isWindows:
    cppdefines += ["WIN32", "OS_WINDOWS", "NOMINMAX", "_WINDOWS", 'MDCPUCFG="\\"prcpucfg_win32.h"\\"']
    # Substitue the proper names into our *.in files for each configuration we

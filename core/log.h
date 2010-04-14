@@ -5,7 +5,7 @@ extern void logprintf(const char *format, ...);
 #define TorqueLogEnable(logType, enabled) { }
 #define TorqueLogBlock(logType, code) { }
 
-int _log_index = 0;
+static const char* _log_prefix = "LOG";
 
 void logprintf(const char *format, ...)
 {
@@ -14,8 +14,8 @@ void logprintf(const char *format, ...)
 	va_list s;
 	va_start( s, format );
 	int32 len = vsnprintf(buffer + bufferStart, sizeof(buffer) - bufferStart, format, s);
-	printf("LOG %d: %s\n", _log_index, buffer);
+	fprintf(stderr, "%s: %s\n", _log_prefix, buffer);
 	va_end(s);
-	fflush(stdout);
+	fflush(stderr);
 }
 

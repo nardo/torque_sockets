@@ -12,5 +12,5 @@ Export('env')
 
 #libs = env.SConscript('platform_library/SConscript')
 #env.SConscript('test/test2/SConscript', 'libs')
-env.SConscript('TorqueSocketsPlugin/plugin/SConscript')
+env.SConscript('TorqueSocketsPlugin/SConscript')
 #env.SConscript('test/test3/SConscript', 'libs')

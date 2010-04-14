@@ -52,6 +52,11 @@ template <typename signature> uint32 hash_method(signature the_method)
 
 #define numeric_hash_overload(type) template<> inline uint32 hash<type>(const type &x) { return uint32(x); }
 
+typedef void *void_ptr;
+
+template<> inline uint32 hash<void_ptr>(const void_ptr &x) {
+	return uint32(x);
+}
 numeric_hash_overload(int)
 numeric_hash_overload(uint32)
 

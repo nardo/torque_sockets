@@ -382,7 +382,7 @@ public:
 	{
 		type_record *source_type;
 		type_record *dest_type;
-		typedef bool (*conversion_fn_type)(void *dest_ptr, void *source_ptr, context *the_context);
+		typedef bool (*conversion_fn_type)(void *dest_ptr, const void *source_ptr, context *the_context);
 		conversion_fn_type conversion_function;
 	};
 	static uint32 get_type_conversion_key(type_record *source_type, type_record *dest_type)
@@ -393,7 +393,9 @@ public:
 	template<class a, class b> void add_type_conversion(bool (*conversion_func)(a *dest, b *source, context *), bool loses_information)
 	{
 		type_record *dest_type = get_global_type_record<a>();
-		type_record *source_type = get_global_type_record<b>();
+		type_record *source_type = get_global_type_record<b >();
+		
+		fprintf(stderr, "Adding type conversion from %08x to %08x\n", source_type, dest_type);
 		
 		uint32 key = get_type_conversion_key(source_type, dest_type);
 		type_conversion_info info;
@@ -404,8 +406,10 @@ public:
 	}
 
 	//static void convert_float
-	bool type_convert(void *dest, type_record *dest_type, void *source, type_record *source_type)
+	bool type_convert(void *dest, type_record *dest_type, const void *source, type_record *source_type)
 	{
+		fprintf(stderr, "Converting from %08x to %08x\n", source_type, dest_type);
+		
 		if(dest_type == source_type)
 		{
 			// if it's a straight copy, use the type's construction functions to copy the data:

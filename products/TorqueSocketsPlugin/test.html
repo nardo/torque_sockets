@@ -6,8 +6,9 @@
    <script>
      var embed = document.embeds[0];
      //console.log(embed);
-     var result = embed.torqueSocket();
-     result.setKeyPair(function() { alert("OMG"); });
+     var result = embed.create_torque_socket();
+     result.set_key_pair(function() { alert("OMG"); });
+	 result.accept_challenge(1024);
      //console.log(result);
    </script>
 

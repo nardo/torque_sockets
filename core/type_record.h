@@ -27,8 +27,8 @@ struct numeric_record
 	int32 int_range_min;
 	uint32 int_range_size;
 	
-	typedef float64 (*to_float64_fn)(void *source);
-	typedef uint32 (*to_uint32_fn)(void *source);
+	typedef float64 (*to_float64_fn)(const void *source);
+	typedef uint32 (*to_uint32_fn)(const void *source);
 	typedef bool (*from_float64_fn)(void *dest, float64 source);
 	typedef bool (*from_uint32_fn)(void *dest, uint32 source);
 	
@@ -40,8 +40,8 @@ struct numeric_record
 
 template<typename type> struct numeric_manipulator
 {
-	static float64 to_float64(type *source) { return (float64) *source; }
-	static uint32 to_uint32(type *source) { return (uint32) *source; }
+	static float64 to_float64(const type *source) { return (float64) *source; }
+	static uint32 to_uint32(const type *source) { return (uint32) *source; }
 	static void from_float64(type *dest, float64 source) { *dest = (type) source; }
 	static void from_uint32(type *dest, uint32 source) { *dest = (type) source; }
 };
@@ -190,7 +190,7 @@ struct type_record
 	
 	typedef type_record *(get_type_from_instance_fn)(void *object);
 	typedef void (*construct_object_fn)(void *object);
-	typedef void (*construct_copy_object_fn)(void *object, void *copy);
+	typedef void (*construct_copy_object_fn)(void *object, const void *copy);
 	typedef void (*destroy_object_fn)(void *object);
 	
 	construct_object_fn construct_object;
