@@ -125,8 +125,10 @@ public:
 	
 	static void _deallocate(NPObject *object)
 	{
+		logprintf("_deallocate");
 		get_type_rep(object)->type->destroy_object(object);
 		NPNFuncs.memfree(object);
+		logprintf("_deallocate_done");
 	}
 	
 	static void _invalidate(NPObject *object)
@@ -453,21 +455,26 @@ class plugin_wrapper
 public:
 	plugin_wrapper()
 	{
+		logprintf("plugin_wrapper()");
 		_scriptable_object = 0;
 	}
 	~plugin_wrapper()
 	{
+		logprintf("~plugin_wrapper()");
 		if(_scriptable_object)
 			NPNFuncs.releaseobject(_scriptable_object);
+		//logprintf("~plugin_wrapper_fin()");
 	}
 	
 	NPObject *get_scriptable_object(NPP instance)
 	{
+		if(!_scriptable_object)
+			_scriptable_object = global_plugin.create_object(instance, global_plugin.get_plugin_class());
+
 		if(_scriptable_object)
-			return _scriptable_object;
+			NPNFuncs.retainobject(_scriptable_object);
 		
-		_scriptable_object = global_plugin.create_object(instance, global_plugin.get_plugin_class());
-		NPNFuncs.retainobject(_scriptable_object);
+		return _scriptable_object;
 	}
 };
 
@@ -484,6 +491,7 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc
 // Called to destroy an instance of the plugin
 NPError NPP_Destroy(NPP instance, NPSavedData** save)
 {
+	logprintf("NPP_Destroy");
 	if(!instance)
 		return NPERR_INVALID_INSTANCE_ERROR;
 	delete (plugin_wrapper *) instance->pdata;
@@ -606,6 +614,7 @@ NPError NP_Initialize(NPNetscapeFuncs *pFuncs)
 	
 NPError NP_Shutdown()
 {
+	logprintf("NP_Shutdown");
 	return NPERR_NO_ERROR;
 }	
 
