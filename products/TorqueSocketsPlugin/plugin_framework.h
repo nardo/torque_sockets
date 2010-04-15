@@ -32,6 +32,33 @@ static type_database &global_type_database()
 	return db;
 }
 
+struct NPObjectRef
+{
+	NPObject *obj;
+	
+	NPObjectRef()
+	{
+		obj = 0;
+	}
+	~NPObjectRef()
+	{
+		if(obj)
+			NPNFuncs.releaseobject(obj);
+	}
+	void operator=(NPObject *the_object)
+	{
+		if(obj)
+			NPNFuncs.releaseobject(obj);
+		obj = the_object;
+		if(obj)
+			NPNFuncs.retainobject(obj);
+	}
+	operator NPObject*()
+	{
+		return obj;
+	}
+};
+
 class scriptable_object : public NPObject
 {
 	friend class scriptable_class;	
@@ -57,15 +84,15 @@ public:
 	}
 	template<class return_type> void call_function(NPObject *func, return_type *return_value)
 	{
-		static function_call_record_decl<empty_type, return_type> call_decl;
+		static function_call_record_decl<return_type> call_decl;
 		_call_function(func, call_decl.get_signature(), return_value, 0);
 	}
 	
-	template<class return_type, class arg1_type> void call_function(NPObject *func, return_type *return_value, arg1_type arg1 )
+	template<class return_type, class arg0_type> void call_function(NPObject *func, return_type *return_value, arg0_type arg0 )
 	{
-		static function_call_record_decl<empty_type, return_type,arg1_type> call_decl;
+		static function_call_record_decl<return_type,arg0_type> call_decl;
 		void *args[1];
-		args[0] = &arg1;
+		args[0] = &arg0;
 		_call_function(func, call_decl.get_signature(), return_value, args);
 	}
 };
@@ -121,12 +148,11 @@ public:
 	{
 		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
 		logprintf("_invoke %s", text);
-		
 		NPNFuncs.memfree(text);
 
 		scriptable_class *cls = (scriptable_class *) object->_class;
 		function_record **method = cls->_methods.find(name).value();
-		if(!*method)
+		if(!method)
 			return false;
 
 		function_record *the_method = *method;
@@ -155,24 +181,39 @@ public:
 	{
 		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
 		logprintf("_has_property %s", text);
-		
 		NPNFuncs.memfree(text);
-		return false;
+
+		scriptable_class *cls = (scriptable_class *) object->_class;
+		type_database::field_rep **field = cls->_fields.find(name).value();
+		return field != 0;
 	}
 
 	static bool _get_property(NPObject* object, NPIdentifier name, NPVariant* result)
 	{
 		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
 		logprintf("_get_property %s", text);
-		
 		NPNFuncs.memfree(text);
-		return false;
+		
+		scriptable_class *cls = (scriptable_class *) object->_class;
+		type_database::field_rep **field = cls->_fields.find(name).value();
+		if(!field)
+			return false;
+		global_type_database().type_convert(result, get_global_type_record<NPVariant>(), ((core::uint8*)object) + (*field)->offset, (*field)->type);
+		return true;
 	}
 	
 	static bool _set_property(NPObject* object, NPIdentifier name, const NPVariant* value)
 	{
-		logprintf("_set_property");
-		return false;
+		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
+		logprintf("_set_property %s", text);
+		NPNFuncs.memfree(text);
+		
+		scriptable_class *cls = (scriptable_class *) object->_class;
+		type_database::field_rep **field = cls->_fields.find(name).value();
+		if(!field)
+			return false;
+		global_type_database().type_convert( ((core::uint8*)object) + (*field)->offset, (*field)->type, value, get_global_type_record<NPVariant>());
+		return true;
 	}
 
 	static bool _remove_property(NPObject* object, NPIdentifier name)
@@ -269,6 +310,18 @@ bool string_from_np_variant(core::string *dest, NPVariant *src, context *)
 	return false;
 }
 
+bool object_ref_from_np_variant(NPObjectRef *dest, NPVariant *src, context *)
+{
+	logprintf("np_variant_to_object_ref");
+	if(NPVARIANT_IS_OBJECT(*src))
+	{
+		*dest = NPVARIANT_TO_OBJECT(*src);
+		return true;
+	}
+	*dest = 0;
+	return false;
+}
+
 bool object_from_np_variant(NPObject **dest, NPVariant *src, context *)
 {
 	logprintf("np_variant_to_object");
@@ -316,10 +369,18 @@ bool np_variant_from_string(NPVariant *dest, core::string *src, context *)
 	return true;
 }
 
-bool np_variant_from_np_object(NPVariant *dest, NPObject **src, context *)
+bool np_variant_from_object(NPVariant *dest, NPObject **src, context *)
 {
 	logprintf("object_to_np_variant");
 	OBJECT_TO_NPVARIANT(*src, *dest);
+	return true;
+}
+
+bool np_variant_from_object_ref(NPVariant *dest, NPObjectRef *src, context *)
+{
+	logprintf("object_to_np_variant");
+	NPObject *the_object = *src;
+	OBJECT_TO_NPVARIANT(the_object, *dest);
 	return true;
 }
 
@@ -355,13 +416,15 @@ public:
 		db.add_type_conversion(double_from_np_variant, false);
 		db.add_type_conversion(string_from_np_variant, false);
 		db.add_type_conversion(object_from_np_variant, false);
+		db.add_type_conversion(object_ref_from_np_variant, false);
 		
 		db.add_type_conversion(np_variant_from_void, false);
 		db.add_type_conversion(np_variant_from_int32, false);
 		db.add_type_conversion(np_variant_from_bool, false);
 		db.add_type_conversion(np_variant_from_double, false);
 		db.add_type_conversion(np_variant_from_string, false);
-		db.add_type_conversion(np_variant_from_np_object, false);
+		db.add_type_conversion(np_variant_from_object, false);
+		db.add_type_conversion(np_variant_from_object_ref, false);
 	}
 	
 	~plugin()

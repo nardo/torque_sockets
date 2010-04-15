@@ -132,7 +132,7 @@ template<class T, class arg0, class arg1> struct function_record_decl<void (T::*
 	}
 	void dispatch(void *object, void **arguments, void *return_data_ptr)
 	{
-		((T*)object)->*_func (*( (arg0 *)arguments[0]), *( (arg1 *)arguments[1]) );
+		(((T*)object)->*_func) (*( (arg0 *)arguments[0]), *( (arg1 *)arguments[1]) );
 	}	
 };
 

@@ -8,7 +8,7 @@ struct function_call_record
 	function_type_signature *get_signature() { return &_signature; }
 };
 
-template<class return_type, class arg1 = empty_type, class arg2 = empty_type, class arg3 = empty_type, class arg4 = empty_type, class arg5 = empty_type> struct function_call_record_decl : function_call_record
+template<class return_type, class arg0 = empty_type, class arg1 = empty_type, class arg2 = empty_type, class arg3 = empty_type, class arg4 = empty_type> struct function_call_record_decl : function_call_record
 {
 function_call_record_decl() {}
 };

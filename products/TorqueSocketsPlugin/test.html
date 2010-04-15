@@ -7,8 +7,15 @@
      var embed = document.embeds[0];
      //console.log(embed);
      var result = embed.create_torque_socket();
-     result.set_key_pair(function() { alert("OMG"); });
+	 alert("OMG");
+	 var x = function() { alert("FOO"); return "boo" };
+     result.set_key_pair(x);
 	 result.accept_challenge(1024);
+	 console.log("Value of x:\n");
+	 console.log(x());
+	 
+	 result.on_established = function(x) { alert(x); return "boo"; };
+	 result.accept_connection(1);
      //console.log(result);
    </script>
 

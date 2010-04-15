@@ -21,6 +21,12 @@ namespace core
 class torque_socket_instance : public scriptable_object
 {
 	torque_socket_handle _socket;
+	NPObjectRef on_challenge_response;
+	NPObjectRef on_connect_request;
+	NPObjectRef on_established;
+	NPObjectRef on_close;
+	NPObjectRef on_packet;
+	NPObjectRef on_packet_delivery_notify;
 public:
 	torque_socket_instance()
 	{
@@ -55,22 +61,37 @@ public:
 	
 	void accept_connection(int pending_connection)
 	{
-		
+		string return_value;
+		char buffer[100];
+		sprintf(buffer, "OMG%d!", pending_connection);
+		string arg(buffer);
+		logprintf("Calling on_established");
+		call_function(on_established, &return_value, arg);
+		logprintf("Returned: \"%s\"", return_value.c_str());
 	}
 	
 	void close(int connection_id, core::string reason)
 	{
 		
 	}
-	static void register_class(core::type_database &the_database)
+	
+	static void register_class(core::type_database &db)
 	{
-		tnl_begin_class(the_database, torque_socket_instance, scriptable_object, true);
-		tnl_method(the_database, torque_socket_instance, set_key_pair);
-		tnl_method(the_database, torque_socket_instance, connect);
-		tnl_method(the_database, torque_socket_instance, connect_introduced);
-		tnl_method(the_database, torque_socket_instance, introduce);
-		tnl_method(the_database, torque_socket_instance, accept_challenge);
-		tnl_end_class(the_database);
+		tnl_begin_class(db, torque_socket_instance, scriptable_object, true);
+		tnl_slot(db, torque_socket_instance, on_challenge_response, 0);
+		tnl_slot(db, torque_socket_instance, on_connect_request, 0);
+		tnl_slot(db, torque_socket_instance, on_established, 0);
+		tnl_slot(db, torque_socket_instance, on_close, 0);
+		tnl_slot(db, torque_socket_instance, on_packet, 0);
+		tnl_slot(db, torque_socket_instance, on_packet_delivery_notify, 0);
+		tnl_method(db, torque_socket_instance, set_key_pair);
+		tnl_method(db, torque_socket_instance, connect);
+		tnl_method(db, torque_socket_instance, connect_introduced);
+		tnl_method(db, torque_socket_instance, introduce);
+		tnl_method(db, torque_socket_instance, accept_challenge);
+		tnl_method(db, torque_socket_instance, accept_connection);
+		tnl_method(db, torque_socket_instance, close);
+		tnl_end_class(db);
 	}
 };
 
