@@ -98,12 +98,7 @@ public:
 		#endif
 	}
 
-	/// Locks the mutex.  If another thread already has this mutex
-	/// locked, this call will block until it is unlocked.  If the lock
-	/// method is called from a thread that has already locked this mutex,
-	/// the call will not block and the thread will have to unlock
-	/// the mutex for as many calls as were made to lock before another
-	/// thread will be allowed to lock the mutex.
+	/// Locks the mutex.  If another thread already has this mutex locked, this call will block until it is unlocked.  If the lock method is called from a thread that has already locked this mutex, the call will not block and the thread will have to unlock the mutex for as many calls as were made to lock before another thread will be allowed to lock the mutex.
 	void lock()
 	{
 		#ifdef PLATFORM_WIN32
@@ -138,37 +133,46 @@ public:
 	/// thread constructor.
 	thread()
 	{
+		_thread_running = false;
 	}
 	/// thread destructor.
 	~thread()
 	{
-		#ifdef PLATFORM_WIN32
-			CloseHandle(_thread);
-		#endif
+		if(_thread_running)
+		{
+			#ifdef PLATFORM_WIN32
+				CloseHandle(_thread);
+			#else
+				pthread_cancel(_thread);
+			#endif
+		}
 	}
 
 	/// run function called when thread is started.
 	virtual uint32 run()
 	{
+		_thread_running = false;
 		return 0;
 	}
 
 	/// starts the thread's main run function.
 	void start()
 	{
-#ifdef PLATFORM_WIN32
-	_thread = CreateThread(NULL, 0, thread_proc, this, 0, NULL);
-	_return_value = 0;		
-#else
-	if(pthread_create(&_thread, NULL, thread_proc, this) != 0)
-	{
-		// handle error
-	}
-	_return_value = 0;		
-#endif
+		_thread_running = true;
+		#ifdef PLATFORM_WIN32
+			_thread = CreateThread(NULL, 0, thread_proc, this, 0, NULL);
+			_return_value = 0;		
+		#else
+			if(pthread_create(&_thread, NULL, thread_proc, this) != 0)
+			{
+				// handle error
+			}
+			_return_value = 0;		
+		#endif
 	}
 protected:
 	uint32 _return_value; ///< Return value from thread function
+	bool _thread_running;
 	
 #ifdef PLATFORM_WIN32
 	HANDLE _thread;

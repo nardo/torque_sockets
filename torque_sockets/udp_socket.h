@@ -30,7 +30,7 @@ public:
 		socket_allocation_failure,
 		generic_failure,
 	};
-	bind_result bind(const address bind_address, bool accepts_broadcast_packets = true, bool non_blocking_io = true, uint32 send_buffer_size = default_send_buffer_size, uint32 recv_buffer_size = default_recv_buffer_size)
+	bind_result bind(const address bind_address, bool non_blocking_io = true, bool accepts_broadcast_packets = true, uint32 send_buffer_size = default_send_buffer_size, uint32 recv_buffer_size = default_recv_buffer_size)
 	{
 		if(!sockets_init())
 			return initialization_failure;
@@ -119,6 +119,8 @@ public:
 	};
 	send_to_result send_to(const address &the_address, const byte *buffer, uint32 buffer_size)
 	{
+		logprintf("udp socket sending to %s: %s.", the_address.to_string().c_str(), string((const char *) buffer_encode_base_16(buffer, buffer_size)->get_buffer()).c_str());
+
 		SOCKADDR dest_address;
 		the_address.to_sockaddr(&dest_address);
 		if(sendto(_socket, (const char *) buffer, int(buffer_size), 0, &dest_address, sizeof(dest_address)) == SOCKET_ERROR)
@@ -144,6 +146,9 @@ public:
 
 		if(sender_address)
 			sender_address->from_sockaddr(sender_sockaddr);
+		
+		if(packet_received == udp_socket::packet_received)
+			logprintf("udp socket received from %s: %s.", sender_address->to_string().c_str(), string((const char *) buffer_encode_base_16(buffer, *incoming_packet_size)->get_buffer()).c_str());
 
 		return packet_received;
 	}

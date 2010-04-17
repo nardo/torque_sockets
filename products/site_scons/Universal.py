@@ -2,7 +2,7 @@ from SCons.Script import *
 from os import path
 
 def GetVars(vars):
-   vars.Add(ListVariable('arch', 'Build architectures', 'all',
+   vars.Add(ListVariable('arch', 'Build architectures', 'i386',
                          ['ppc','i386','x86_64']))
 
 def DoUniversal(env, command, target, source, *args, **kw):

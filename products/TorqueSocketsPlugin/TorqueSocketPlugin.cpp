@@ -31,9 +31,13 @@ public:
 	torque_socket_instance()
 	{
 		logprintf("torque_socket_instance constructor");
+		core::net::address bind_address;
+		sockaddr addr;
+		bind_address.to_sockaddr(&addr);
+		_socket = torque_socket_create(&addr);
 	}
 	
-	void set_key_pair(NPObject *public_private_key)
+	void set_key_pair(core::string the_key)
 	{
 		empty_type return_value;
 		call_function(public_private_key, &return_value);
@@ -75,6 +79,11 @@ public:
 		
 	}
 	
+	int send_to(int connection_id, core::string packet_data)
+	{
+		
+	}
+
 	static void register_class(core::type_database &db)
 	{
 		tnl_begin_class(db, torque_socket_instance, scriptable_object, true);
@@ -91,6 +100,7 @@ public:
 		tnl_method(db, torque_socket_instance, accept_challenge);
 		tnl_method(db, torque_socket_instance, accept_connection);
 		tnl_method(db, torque_socket_instance, close);
+		tnl_method(db, torque_socket_instance, send_to);
 		tnl_end_class(db);
 	}
 };

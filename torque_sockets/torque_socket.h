@@ -615,10 +615,10 @@ protected:
 	}
 
 protected:
-	/// Structure used to track packets that are delayed in sending for simulating a high-latency connection.  The delay_send_packet is allocated as sizeof(delay_send_packet) + packet_size;
-	struct delay_send_packet
+	/// Structure used to track packets that read by the background packet reader or are delayed in sending for simulating a high-latency connection.  The packet_record is allocated as sizeof(packet_record) + packet_size;
+	struct packet_record
 	{
-		delay_send_packet *next_packet; ///< The next packet in the list of delayed packets.
+		packet_record *next_packet; ///< The next packet in the list of delayed packets.
 		address remote_address; ///< The address to send this packet to.
 		time send_time; ///< time when we should send the packet.
 		uint32 packet_size; ///< Size, in bytes, of the packet data.
@@ -681,7 +681,7 @@ protected:
 		// first see if there are any delayed packets that need to be sent...
 		while(_send_packet_list && _send_packet_list->send_time < get_process_start_time())
 		{
-			delay_send_packet *next = _send_packet_list->next_packet;
+			packet_record *next = _send_packet_list->next_packet;
 			_socket.send_to(_send_packet_list->remote_address,
 							_send_packet_list->packet_data, _send_packet_list->packet_size);
 			memory_deallocate(_send_packet_list);
@@ -846,6 +846,82 @@ protected:
 		_connection_id_lookup_table.remove(the_connection->get_connection_index());
 		_connection_address_lookup_table.remove(the_connection->get_address());
 		delete the_connection;
+	}
+	
+	class socket_thread : public thread
+	{
+		torque_socket *_socket;
+	public:
+		socket_thread(torque_socket *socket)
+		{
+			_socket = socket;
+		}
+		virtual uint32 run()
+		{
+			_socket->thread_socket_process();
+			return 0;
+		}
+	};
+	
+	packet_record *allocate_packet_record(const address &the_address, bit_stream &stream)
+	{
+		uint32 data_size = stream.get_next_byte_position();
+		
+		// allocate the send packet, with the data size added on
+		packet_record *the_packet = (packet_record *) memory_allocate(sizeof(packet_record) + data_size);
+		the_packet->remote_address = the_address;
+		the_packet->packet_size = data_size;
+		memcpy(the_packet->packet_data, stream.get_buffer(), data_size);
+		the_packet->next_packet = 0;
+		return the_packet;
+	}
+
+	void thread_socket_process()
+	{
+		packet_stream stream;
+		address addr;
+		for(;;)
+		{
+			udp_socket::recv_from_result result = stream.recv_from(_socket, &addr);
+			if(result == udp_socket::packet_received)
+			{
+				logprintf("Back thread got a packet: %s.", stream.to_string().c_str());
+				
+				stream.set_bit_position(stream.get_stream_bit_size());
+				packet_record *new_packet = allocate_packet_record(addr, stream);
+				_packet_queue_mutex.lock();
+				packet_record **walk = &_received_packet_list;
+				while(*walk)
+					walk = &((*walk)->next_packet);
+				*walk = new_packet;
+				_packet_queue_mutex.unlock();
+				if(_event_ready_notify_fn)
+					_event_ready_notify_fn();
+			}
+		}
+	}
+	
+	bool _get_next_packet(packet_stream &stream, address &addr)
+	{
+		if(_thread_socket)
+		{
+			_packet_queue_mutex.lock();
+			packet_record *packet = _received_packet_list;
+			if(_received_packet_list)
+				_received_packet_list = _received_packet_list->next_packet;
+			_packet_queue_mutex.unlock();
+			if(!packet)
+				return false;
+			stream.set_from_buffer(packet->packet_data, packet->packet_size);
+			addr = packet->remote_address;
+			memory_deallocate(packet);
+			return true;
+		}
+		else
+		{
+			udp_socket::recv_from_result result;
+			return stream.recv_from(_socket, &addr) == udp_socket::packet_received;
+		}
 	}
 public:
 	/// Sets the private key this torque_socket will use for authentication and key exchange
@@ -1037,17 +1113,11 @@ public:
 	/// Sends a packet to the remote address after millisecond_delay time has elapsed.  This is used to simulate network latency on a LAN or single computer.
 	void send_to_delayed(const address &the_address, bit_stream &stream, uint32 millisecond_delay)
 	{
-		uint32 data_size = stream.get_next_byte_position();
-		
-		// allocate the send packet, with the data size added on
-		delay_send_packet *the_packet = (delay_send_packet *) memory_allocate(sizeof(delay_send_packet) + data_size);
-		the_packet->remote_address = the_address;
+		packet_record *the_packet = allocate_packet_record(the_address, stream);
 		the_packet->send_time = get_process_start_time() + time(millisecond_delay);
-		the_packet->packet_size = data_size;
-		memcpy(the_packet->packet_data, stream.get_buffer(), data_size);
-		
-		// insert it into the delay_send_packet list, sorted by time
-		delay_send_packet **list;
+
+		// insert it into the packet_record list, sorted by time
+		packet_record **list;
 		for(list = &_send_packet_list; *list && ((*list)->send_time <= the_packet->send_time); list = &((*list)->next_packet))
 			;
 		the_packet->next_packet = *list;
@@ -1063,14 +1133,13 @@ public:
 			_event_queue_allocator.clear();
 			// if there's nothing in the event queue, see if a new packet's come in.
 			packet_stream stream;
-			udp_socket::recv_from_result result;
-			address sourceAddress;
+			address source_address;
 			
-			while((result = stream.recv_from(_socket, &sourceAddress)) == udp_socket::packet_received)
+			while(_get_next_packet(stream, source_address))
 			{
-				logprintf("Got a packet.");
+				logprintf("Got a packet: %s.", stream.to_string().c_str());
 				_process_start_time = time::get_current();
-				_process_packet(sourceAddress, stream);
+				_process_packet(source_address, stream);
 				if(_event_queue_head)
 					break;
 			}
@@ -1096,7 +1165,7 @@ public:
 	}
 	
 	/// @param bind_address Local network address to bind this torque_socket to.
-	torque_socket(const address &bind_address) : _puzzle_manager(_random_generator, &_allocator), _event_queue_allocator(&_allocator)
+	torque_socket(const address &bind_address, bool thread_socket = false, void (*socket_notify_fn)() = 0) : _puzzle_manager(_random_generator, &_allocator), _event_queue_allocator(&_allocator), _packet_thread(this)
 	{
 		_next_connection_index = 1;
 		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
@@ -1109,16 +1178,27 @@ public:
 		_send_packet_list = NULL;
 		_process_start_time = time::get_current();
 		
-		udp_socket::bind_result res = _socket.bind(bind_address);
+		_event_ready_notify_fn = socket_notify_fn;
+		_thread_socket = thread_socket;
+		_received_packet_list = 0;
 		
+		udp_socket::bind_result res = _socket.bind(bind_address, !thread_socket);
 		// Supply our own (small) unique private key for the time being.
 		_private_key = new asymmetric_key(16, _random_generator);
 		_challenge_response = new byte_buffer();
 		_event_queue_head = _event_queue_tail = 0;
 		_pending_connections = 0;
 		_connection_list = 0;
+
+		if(_thread_socket)
+			_packet_thread.start();
 	}
 		
+	mutex _packet_queue_mutex;
+	packet_record *_received_packet_list;
+	bool _thread_socket;
+	socket_thread _packet_thread; ///< background thread that blocks on socket read and calls the socket_notify_fn whenever it posts something into the packet queue
+	void (*_event_ready_notify_fn)(); ///< When the socket operates with a background reader thread, this function is called when each new packet arrives.  This function is called from the background thread, so beware of thread safety issues.  Mostly this is just here for the NPAPI version.
 	udp_socket _socket; ///< Network socket this torque_socket communicates over.
 	random_generator _random_generator;	///< cryptographic random number generator for this socket
 	puzzle_solver _puzzle_solver; ///< helper class for solving client puzzles
@@ -1146,5 +1226,5 @@ public:
 	page_allocator<16> _event_queue_allocator;
 	hash_table_flat<uint32, torque_connection *> _connection_index_table;
 
-	delay_send_packet *_send_packet_list; ///< List of delayed packets pending to send.
+	packet_record *_send_packet_list; ///< List of delayed packets pending to send.
 };

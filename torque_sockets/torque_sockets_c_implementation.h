@@ -2,7 +2,7 @@ torque_socket_handle torque_socket_create(struct sockaddr *bind_address)
 {
 	core::net::address a(*bind_address);
 
-	core::net::torque_socket *ret = new core::net::torque_socket(a);
+	core::net::torque_socket *ret = new core::net::torque_socket(a, true);
 	return (void *) ret;
 }
 
