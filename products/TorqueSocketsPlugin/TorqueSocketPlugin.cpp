@@ -30,58 +30,163 @@ class torque_socket_instance : public scriptable_object
 public:
 	torque_socket_instance()
 	{
-		logprintf("torque_socket_instance constructor");
-		core::net::address bind_address;
-		sockaddr addr;
-		bind_address.to_sockaddr(&addr);
-		_socket = torque_socket_create(&addr);
+		_socket = 0;
 	}
 	
+	~torque_socket_instance()
+	{
+		if(_socket)
+			torque_socket_destroy(_socket);
+	}
+	
+	static void background_socket_notify(void *the_socket_instance)
+	{
+		torque_socket_instance *inst = (torque_socket_instance *) the_socket_instance;
+		NPNFuncs.pluginthreadasynccall(inst->get_plugin_instance(), main_thread_socket_notify, the_socket_instance);
+	}
+									
+	static void main_thread_socket_notify(void *the_socket_instance)
+	{
+		torque_socket_instance *inst = (torque_socket_instance *) the_socket_instance;		
+		inst->pump();
+	}
+	
+	void pump()
+	{
+		if(!_socket)
+			return;
+		
+		// pump the socket's event queue and generate events to post back from the plugin.
+		torque_socket_event *event;
+		empty_type void_return_value;
+		string key, message;
+		
+		while((event = torque_socket_get_next_event(_socket)) != NULL)
+		{
+			switch(event->event_type)
+			{
+				case torque_connection_challenge_response_event_type:
+					key.set((const char *) event->public_key, event->public_key_size);
+					message.set((const char *) event->data, event->data_size);
+					call_function(on_challenge_response, &void_return_value, event->connection, key, message);
+					break;
+				case torque_connection_requested_event_type:
+					key.set((const char *) event->public_key, event->public_key_size);
+					message.set((const char *) event->data, event->data_size);
+					call_function(on_connect_request, &void_return_value, event->connection, key, message);
+					break;
+				case torque_connection_arranged_connection_request_event_type:
+					break;
+				case torque_connection_timed_out_event_type:
+					message.set("timeout");
+					call_function(on_close, &void_return_value, event->connection, message);
+					break;
+				case torque_connection_disconnected_event_type:
+					message.set((const char *) event->data, event->data_size);
+					call_function(on_close, &void_return_value, event->connection, message);
+					break;
+				case torque_connection_established_event_type:
+					call_function(on_established, &void_return_value, event->connection);
+					break;
+				case torque_connection_packet_event_type:
+					message.set((const char *) event->data, event->data_size);
+					call_function(on_packet, &void_return_value, event->connection, event->packet_sequence, message);
+					break;
+				case torque_connection_packet_notify_event_type:
+					call_function(on_packet_delivery_notify, &void_return_value, event->connection, event->packet_sequence, event->delivered);
+					break;
+				case torque_socket_packet_event_type:
+					break;
+			}
+		}
+	}
+	
+	bool bind(core::string bind_address)
+	{
+		if(_socket)
+		{
+			torque_socket_destroy(_socket);
+		}
+		logprintf("torque_socket_instance constructor");
+		core::net::address the_addr(bind_address.c_str(), false, 0);
+		sockaddr addr;
+		the_addr.to_sockaddr(&addr);
+		_socket = torque_socket_create(&addr, background_socket_notify, this);
+	}
+
 	void set_key_pair(core::string the_key)
 	{
-		empty_type return_value;
-		call_function(public_private_key, &return_value);
+		if(!_socket)
+			return;
+		const char *str = the_key.c_str();
+		//byte_buffer_ptr key_buffer = buffer_decode(str, strlen(str));
+		
+		torque_socket_set_key_pair(_socket, the_key.len(), (core::uint8*)the_key.c_str());
 	}
 	
 	int connect(core::string url, core::string connect_data, core::string protocol_settings)
 	{
-		return 0;
+		if(!_socket)
+			return 0;
+		core::net::address connect_address(url.c_str(), false, 0);
+		sockaddr addr;
+		connect_address.to_sockaddr(&addr);
+		return torque_socket_connect(_socket, &addr, connect_data.len(), (core::uint8*) connect_data.c_str());
 	}
 	
 	int connect_introduced (int introducer, int remote_client_connection_id, bool is_host, core::string connect_data_or_challenge_response, core::string protocol_settings)
 	{
+		if(!_socket)
+			return 0;
+		
 		return 0;
 	}
 	
 	int introduce(int initiator_connection, int host_connection)
 	{
+		if(!_socket)
+			return 0;
 		return 0;
 	}
 	
 	void accept_challenge(int pending_connection)
 	{
-		logprintf("Got accept_challenge %d", pending_connection);
+		if(!_socket)
+			return;
+		logprintf("accept_challenge %d", pending_connection);
+		torque_socket_accept_challenge(_socket, pending_connection);
 	}
 	
 	void accept_connection(int pending_connection)
 	{
+		if(!_socket)
+			return;
+		logprintf("accept_connection %d", pending_connection);
+		torque_socket_accept_connection(_socket, pending_connection);
+		/*
 		string return_value;
 		char buffer[100];
 		sprintf(buffer, "OMG%d!", pending_connection);
 		string arg(buffer);
 		logprintf("Calling on_established");
 		call_function(on_established, &return_value, arg);
-		logprintf("Returned: \"%s\"", return_value.c_str());
+		logprintf("Returned: \"%s\"", return_value.c_str());*/
 	}
 	
 	void close(int connection_id, core::string reason)
 	{
-		
+		if(!_socket)
+			return;
+		logprintf("close connection %d", connection_id);
+		torque_socket_close_connection(_socket, connection_id, reason.len(), (core::uint8*) reason.c_str());
 	}
 	
 	int send_to(int connection_id, core::string packet_data)
 	{
+		if(!_socket)
+			return 0;
 		
+		return torque_socket_send_to_connection(_socket, connection_id, packet_data.len(), (core::uint8*) packet_data.c_str());
 	}
 
 	static void register_class(core::type_database &db)

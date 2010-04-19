@@ -20,7 +20,6 @@ enum torque_socket_event_type
 	torque_connection_requested_event_type,
 	torque_connection_arranged_connection_request_event_type,
 	torque_connection_accepted_event_type,
-	torque_connection_rejected_event_type,
 	torque_connection_timed_out_event_type,
 	torque_connection_disconnected_event_type,
 	torque_connection_established_event_type,
@@ -45,13 +44,13 @@ struct torque_socket_event
 	struct sockaddr source_address;
 };
 
-torque_socket_handle torque_socket_create(struct sockaddr*); ///< Create a torque socket and bind it to the specified socket address interface.
+torque_socket_handle torque_socket_create(struct sockaddr*, void (*socket_notify)(void *), void *socket_notify_data); ///< Create a torque socket and bind it to the specified socket address interface.
 
 void torque_socket_destroy(torque_socket_handle); ///< Close the specified socket; any open connections on this socket will be closed automatically.
 
 void torque_socket_allow_incoming_connections(torque_socket_handle, int allowed); ///< Sets whether or not this connection accepts incoming connections; if not, all incoming connection challenges and requests will be silently ignored.  FUTURE: add a list of domain referrers that are allowed to refer a client to this domain.
 
-void torque_socket_set_private_key(torque_socket_handle, unsigned key_data_size, unsigned char *the_key); ///< Sets the private/public key pair to be used for this connection;  In the prototype implementation these are formatted as libtomcrypt keys, and currently only ECC key format is supported.
+void torque_socket_set_key_pair(torque_socket_handle, unsigned key_data_size, unsigned char *the_key); ///< Sets the private/public key pair to be used for this connection;  In the prototype implementation these are formatted as libtomcrypt keys, and currently only ECC key format is supported.
 
 void torque_socket_set_challenge_response(torque_socket_handle, unsigned challenge_response_size, unsigned char *challenge_response); ///< Sets the data to be sent back upon challenge request along with the client puzzle and public key.  challenge_response_data_size must be <= torque_max_status_datagram_size
 
@@ -71,8 +70,8 @@ void torque_socket_accept_challenge(torque_socket_handle, torque_connection_id p
 
 void torque_socket_accept_connection(torque_socket_handle, torque_connection_id); ///< accept an incoming connection request.
 
-void torque_socket_disconnect(torque_socket_handle, torque_connection_id, unsigned disconnect_data_size, unsigned char *disconnect_data); ///< Close an open connection or rejects a pending connection
+void torque_socket_close_connection(torque_socket_handle, torque_connection_id, unsigned disconnect_data_size, unsigned char *disconnect_data); ///< Close an open connection or rejects a pending connection
 
 struct torque_socket_event *torque_socket_get_next_event(torque_socket_handle); ///< Gets the next event on this socket; returns NULL if there are no events to be read.
 
-int torque_socket_send_to_connection(torque_socket_handle, torque_connection_id, unsigned datagram_size, unsigned char buffer[torque_sockets_max_datagram_size], unsigned *sequence_number); ///< Send a datagram packet to the remote host on the other side of the connection.  Returns the sequence number of the packet sent.
+int torque_socket_send_to_connection(torque_socket_handle, torque_connection_id, unsigned datagram_size, unsigned char buffer[torque_sockets_max_datagram_size]); ///< Send a datagram packet to the remote host on the other side of the connection.  Returns the sequence number of the packet sent.

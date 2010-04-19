@@ -82,17 +82,34 @@ public:
 		db.type_convert(return_value, calling_signature->return_type, &np_return_value, variant_type);
 		NPNFuncs.releasevariantvalue(&np_return_value);
 	}
-	template<class return_type> void call_function(NPObject *func, return_type *return_value)
+	template<class return_type> void call_function(NPObjectRef &func, return_type *return_value)
 	{
 		static function_call_record_decl<return_type> call_decl;
 		_call_function(func, call_decl.get_signature(), return_value, 0);
 	}
 	
-	template<class return_type, class arg0_type> void call_function(NPObject *func, return_type *return_value, arg0_type arg0 )
+	template<class return_type, class arg0_type> void call_function(NPObjectRef &func, return_type *return_value, arg0_type &arg0 )
 	{
 		static function_call_record_decl<return_type,arg0_type> call_decl;
 		void *args[1];
 		args[0] = &arg0;
+		_call_function(func, call_decl.get_signature(), return_value, args);
+	}
+	template<class return_type, class arg0_type, class arg1_type> void call_function(NPObjectRef &func, return_type *return_value, arg0_type &arg0, arg1_type &arg1 )
+	{
+		static function_call_record_decl<return_type,arg0_type,arg1_type> call_decl;
+		void *args[2];
+		args[0] = &arg0;
+		args[1] = &arg1;
+		_call_function(func, call_decl.get_signature(), return_value, args);
+	}
+	template<class return_type, class arg0_type, class arg1_type, class arg2_type> void call_function(NPObjectRef &func, return_type *return_value, arg0_type &arg0, arg1_type &arg1, arg2_type &arg2 )
+	{
+		static function_call_record_decl<return_type,arg0_type,arg1_type,arg2_type> call_decl;
+		void *args[3];
+		args[0] = &arg0;
+		args[1] = &arg1;
+		args[2] = &arg2;
 		_call_function(func, call_decl.get_signature(), return_value, args);
 	}
 };
@@ -367,7 +384,7 @@ bool np_variant_from_double(NPVariant *dest, core::float64 *src, context *)
 bool np_variant_from_string(NPVariant *dest, core::string *src, context *)
 {
 	logprintf("string_to_np_variant");
-	STRINGZ_TO_NPVARIANT(src->c_str(), *dest);
+	STRINGN_TO_NPVARIANT(src->c_str(), src->len(), *dest);
 	return true;
 }
 

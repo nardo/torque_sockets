@@ -1,8 +1,8 @@
-torque_socket_handle torque_socket_create(struct sockaddr *bind_address)
+torque_socket_handle torque_socket_create(struct sockaddr *bind_address, void (*socket_notify)(void *), void *socket_notify_data)
 {
 	core::net::address a(*bind_address);
 
-	core::net::torque_socket *ret = new core::net::torque_socket(a, true);
+	core::net::torque_socket *ret = new core::net::torque_socket(a, true, socket_notify, socket_notify_data);
 	return (void *) ret;
 }
 
@@ -16,7 +16,7 @@ void torque_socket_allow_incoming_connections(torque_socket_handle the_socket, i
 	((core::net::torque_socket *) the_socket)->set_allows_connections(allowed);
 }
 
-void torque_socket_set_private_key(torque_socket_handle the_socket, unsigned key_data_size, unsigned char *the_key)
+void torque_socket_set_key_pair(torque_socket_handle the_socket, unsigned key_data_size, unsigned char *the_key)
 {
 	core::net::asymmetric_key *key = new core::net::asymmetric_key(the_key, key_data_size);
 
@@ -74,7 +74,7 @@ void torque_socket_accept_connection(torque_socket_handle the_socket, torque_con
 	((core::net::torque_socket *) the_socket)->accept_connection( pending);
 }
 
-void torque_socket_disconnect(torque_socket_handle the_socket, torque_connection_id connection_id, unsigned disconnect_data_size, unsigned char *disconnect_data)
+void torque_socket_close_connection(torque_socket_handle the_socket, torque_connection_id connection_id, unsigned disconnect_data_size, unsigned char *disconnect_data)
 {
 	((core::net::torque_socket *) the_socket)->disconnect(connection_id, disconnect_data,  disconnect_data_size);
 }
@@ -84,7 +84,9 @@ struct torque_socket_event *torque_socket_get_next_event(torque_socket_handle th
 	return ((core::net::torque_socket *) the_socket)->get_next_event();
 }
 
-int torque_socket_send_to_connection(torque_socket_handle the_socket, torque_connection_id connection_id, unsigned datagram_size, unsigned char buffer[torque_sockets_max_datagram_size], unsigned *sequence_number)
+int torque_socket_send_to_connection(torque_socket_handle the_socket, torque_connection_id connection_id, unsigned datagram_size, unsigned char buffer[torque_sockets_max_datagram_size])
 {
-	((core::net::torque_socket *) the_socket)->send_to_connection(connection_id, buffer, datagram_size, sequence_number);
+	unsigned sequence;
+	((core::net::torque_socket *) the_socket)->send_to_connection(connection_id, buffer, datagram_size, &sequence);
+	return sequence;
 }

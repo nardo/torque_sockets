@@ -1,6 +1,6 @@
 The TorqueSocket API
 
-Draft 1 March 22, 2010
+First drafted March 22, 2010
 
 Abstract
 --------
@@ -77,7 +77,7 @@ interface TorqueSocket {
 	const unsigned int DEFAULT_SIGNATURE_SIZE = 5;
 
 	set_key_pair(in DOMString public_private_key);
-
+	bool bind(in DOMString local_address);
 	int connect(in DOMString URL, in optional ByteBuffer connect_data, in optional DOMString protocol_settings);
 	int connect_introduced (in int introducer, in int remote_client_connection_id, bool is_host, in optional ByteBuffer connect_data_or_challenge_response, in optional DOMString protocol_settings);
 	int introduce(in int initiator_connection, in int host_connection);
@@ -94,7 +94,9 @@ interface TorqueSocket {
 	attribute Function on_packet_delivery_notify(in int connection_id, in int sent_packet_sequence, in bool delivery_successful);
 };
 
-The TorqueSocket constructor opens a local UDP socket for communication through the interface.
+The TorqueSocket constructor returns an initialized TorqueSocket.
+
+The bind method opens a local UDP socket for communication.  bind must be called before any subsequent calls can be successfully made on the TorqueSocket.  Subsequent calls to bind will close and reopen the socket on the newly specified interface address; this will have the side effect of closing all connections currently open on the socket.
 
 The set_key_pair(public_private_key) method sets the public/private key pair for this client.  TorqueSocket uses the host's key size for key exchange, so if an initiator's key is not the same size as the host (can be checked on challenge response), the initiator will generate a new key pair for that connection.
 

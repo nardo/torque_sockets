@@ -74,6 +74,10 @@ public:
 	{
 		return _string_record->data;
 	}
+	uint32 len()
+	{
+		return _string_record->len;
+	}
 };
 
 inline string format_string(const char *fmt, ...)

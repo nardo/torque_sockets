@@ -414,12 +414,6 @@ protected:
 		_add_connection(the_connection); // first, add it as a regular connection
 		TorqueLogMessageFormatted(LogNettorque_socket, ("Received Connect Accept - connection established."));
 
-		torque_socket_event *event = _allocate_queued_event();
-		event->event_type = torque_connection_accepted_event_type;
-		event->connection = the_connection->get_connection_index();
-		event->data_size = 0;
-		event->data = 0;
-	
 		_post_connection_event(the_connection->get_connection_index(), torque_connection_established_event_type, 0);
 	}
 	
@@ -669,6 +663,11 @@ protected:
 			event->data = _allocate_queue_data(event->data_size);
 			memcpy(event->data, data->get_buffer(), event->data_size);
 		}
+		else
+		{
+			event->data_size = 0;
+			event->data = 0;
+		}
 		return event;
 	}
 	
@@ -896,7 +895,7 @@ protected:
 				*walk = new_packet;
 				_packet_queue_mutex.unlock();
 				if(_event_ready_notify_fn)
-					_event_ready_notify_fn();
+					_event_ready_notify_fn(_event_ready_user_data);
 			}
 		}
 	}
@@ -1165,7 +1164,7 @@ public:
 	}
 	
 	/// @param bind_address Local network address to bind this torque_socket to.
-	torque_socket(const address &bind_address, bool thread_socket = false, void (*socket_notify_fn)() = 0) : _puzzle_manager(_random_generator, &_allocator), _event_queue_allocator(&_allocator), _packet_thread(this)
+	torque_socket(const address &bind_address, bool thread_socket = false, void (*socket_notify_fn)(void *) = 0, void *socket_notify_data = 0) : _puzzle_manager(_random_generator, &_allocator), _event_queue_allocator(&_allocator), _packet_thread(this)
 	{
 		_next_connection_index = 1;
 		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
@@ -1179,6 +1178,7 @@ public:
 		_process_start_time = time::get_current();
 		
 		_event_ready_notify_fn = socket_notify_fn;
+		_event_ready_user_data = socket_notify_data;
 		_thread_socket = thread_socket;
 		_received_packet_list = 0;
 		
@@ -1198,7 +1198,8 @@ public:
 	packet_record *_received_packet_list;
 	bool _thread_socket;
 	socket_thread _packet_thread; ///< background thread that blocks on socket read and calls the socket_notify_fn whenever it posts something into the packet queue
-	void (*_event_ready_notify_fn)(); ///< When the socket operates with a background reader thread, this function is called when each new packet arrives.  This function is called from the background thread, so beware of thread safety issues.  Mostly this is just here for the NPAPI version.
+	void *_event_ready_user_data;
+	void (*_event_ready_notify_fn)(void *); ///< When the socket operates with a background reader thread, this function is called when each new packet arrives.  This function is called from the background thread, so beware of thread safety issues.  Mostly this is just here for the NPAPI version.
 	udp_socket _socket; ///< Network socket this torque_socket communicates over.
 	random_generator _random_generator;	///< cryptographic random number generator for this socket
 	puzzle_solver _puzzle_solver; ///< helper class for solving client puzzles
