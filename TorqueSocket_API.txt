@@ -78,6 +78,7 @@ interface TorqueSocket {
 
 	set_key_pair(in DOMString public_private_key);
 	bool bind(in DOMString local_address);
+	set_challenge_response(in ByteBuffer data);
 	int connect(in DOMString URL, in optional ByteBuffer connect_data, in optional DOMString protocol_settings);
 	int connect_introduced (in int introducer, in int remote_client_connection_id, bool is_host, in optional ByteBuffer connect_data_or_challenge_response, in optional DOMString protocol_settings);
 	int introduce(in int initiator_connection, in int host_connection);
@@ -120,7 +121,7 @@ The connection initiator starts the connection by sending a unique random nonce 
 
 initiator->host: connect_challenge_request(initiator_nonce)
 
-The host responds to the connect_challenge_request with a "Client Puzzle" that has the property that verifying a solution to the puzzle is computationally simple, but can be of a specified computational, brute-force difficulty to compute the solution itself.  The client puzzle is of the form: secureHash(Ic, initiator_nonce, host_nonce, X) = Y >> k, where Ic is the identity of the client, and X is a value computed by the client such that the high k bits of the value y are all zero.  The client identity is computed by the server as a partial hash of the client's IP address and port and some random data on the host.  The response contains the host's current nonce, the initiator nonce, k, the host's public key and any data set via set_challenge_response_data
+The host responds to the connect_challenge_request with a "Client Puzzle" that has the property that verifying a solution to the puzzle is computationally simple, but can be of a specified computational, brute-force difficulty to compute the solution itself.  The client puzzle is of the form: secureHash(Ic, initiator_nonce, host_nonce, X) = Y >> k, where Ic is the identity of the client, and X is a value computed by the client such that the high k bits of the value y are all zero.  The client identity is computed by the server as a partial hash of the client's IP address and port and some random data on the host.  The response contains the host's current nonce, the initiator nonce, k, the host's public key and any data set via set_challenge_response
 
 host->initiator: connect_challenge_response(initiator_nonce, host_nonce, k, host_public_key, host_challenge_response_data)
 

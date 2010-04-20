@@ -30,7 +30,7 @@ public:
 		socket_allocation_failure,
 		generic_failure,
 	};
-	bind_result bind(const address bind_address, bool non_blocking_io = true, bool accepts_broadcast_packets = true, uint32 send_buffer_size = default_send_buffer_size, uint32 recv_buffer_size = default_recv_buffer_size)
+	bind_result bind(const address bind_address, bool non_blocking_io = true, time recv_timeout = 0, bool accepts_broadcast_packets = true, uint32 send_buffer_size = default_send_buffer_size, uint32 recv_buffer_size = default_recv_buffer_size)
 	{
 		if(!sockets_init())
 			return initialization_failure;
@@ -85,6 +85,21 @@ public:
 			unbind();
 			return generic_failure;
 		}
+		if(recv_timeout != 0)
+		{
+			logprintf("udpsocket set recv timeout to %d", int(recv_timeout.get_milliseconds()));
+			#if defined(PLATFORM_WIN32)
+				DWORD ms_delay = recv_timeout.get_milliseconds();
+				setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, &ms_delay, sizeof(ms_delay));
+			#else
+				uint32 ms_delay = recv_timeout.get_milliseconds();
+				struct timeval tv;
+				tv.tv_sec = ms_delay / 1000;
+				tv.tv_usec = (ms_delay % 1000) * 1000;
+				setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+			#endif
+		}
+			
 		return bind_success;
 	}
 

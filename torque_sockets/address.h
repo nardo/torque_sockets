@@ -110,12 +110,12 @@ struct address
 		_port = port;
 	}
 
-	uint16 get_port()
+	uint16 get_port() const
 	{
 		return _port;
 	}
 
-	uint32 get_host()
+	uint32 get_host() const 
 	{
 		return _host;
 	}

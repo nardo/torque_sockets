@@ -61,9 +61,12 @@ protected:
 	{
 		hash_state state;
 		uint32 hash[8];
+		uint32 host = htonl(the_address.get_host());
+		uint32 port = htonl(the_address.get_port());
 		
 		sha256_init(&state);
-		sha256_process(&state, (uint8 *) &the_address, sizeof(address));
+		sha256_process(&state, (uint8 *) &host, sizeof(host));
+		sha256_process(&state, (uint8 *) &port, sizeof(port));
 		sha256_process(&state, (uint8 *) &the_nonce, sizeof(the_nonce));
 		sha256_process(&state, _random_hash_data, sizeof(_random_hash_data));
 		sha256_done(&state, (uint8 *) hash);
@@ -884,8 +887,6 @@ protected:
 			udp_socket::recv_from_result result = stream.recv_from(_socket, &addr);
 			if(result == udp_socket::packet_received)
 			{
-				logprintf("Back thread got a packet: %s.", stream.to_string().c_str());
-				
 				stream.set_bit_position(stream.get_stream_bit_size());
 				packet_record *new_packet = allocate_packet_record(addr, stream);
 				_packet_queue_mutex.lock();
@@ -894,9 +895,9 @@ protected:
 					walk = &((*walk)->next_packet);
 				*walk = new_packet;
 				_packet_queue_mutex.unlock();
-				if(_event_ready_notify_fn)
-					_event_ready_notify_fn(_event_ready_user_data);
 			}
+			if(_event_ready_notify_fn)
+				_event_ready_notify_fn(_event_ready_user_data);
 		}
 	}
 	
@@ -1181,8 +1182,10 @@ public:
 		_event_ready_user_data = socket_notify_data;
 		_thread_socket = thread_socket;
 		_received_packet_list = 0;
-		
-		udp_socket::bind_result res = _socket.bind(bind_address, !thread_socket);
+		time block_timeout = 0;
+		if(thread_socket)
+			block_timeout = 500;
+		udp_socket::bind_result res = _socket.bind(bind_address, !thread_socket, block_timeout);
 		// Supply our own (small) unique private key for the time being.
 		_private_key = new asymmetric_key(16, _random_generator);
 		_challenge_response = new byte_buffer();

@@ -15,7 +15,6 @@ namespace core
 };
 
 #include "torque_sockets/torque_sockets_c_implementation.h"
-
 #include "plugin_framework.h"
 
 class torque_socket_instance : public scriptable_object
@@ -63,37 +62,39 @@ public:
 		
 		while((event = torque_socket_get_next_event(_socket)) != NULL)
 		{
+			int connection = event->connection;
+			int sequence = event->packet_sequence;
 			switch(event->event_type)
 			{
 				case torque_connection_challenge_response_event_type:
 					key.set((const char *) event->public_key, event->public_key_size);
 					message.set((const char *) event->data, event->data_size);
-					call_function(on_challenge_response, &void_return_value, event->connection, key, message);
+					call_function(on_challenge_response, &void_return_value, connection, key, message);
 					break;
 				case torque_connection_requested_event_type:
 					key.set((const char *) event->public_key, event->public_key_size);
 					message.set((const char *) event->data, event->data_size);
-					call_function(on_connect_request, &void_return_value, event->connection, key, message);
+					call_function(on_connect_request, &void_return_value, connection, key, message);
 					break;
 				case torque_connection_arranged_connection_request_event_type:
 					break;
 				case torque_connection_timed_out_event_type:
 					message.set("timeout");
-					call_function(on_close, &void_return_value, event->connection, message);
+					call_function(on_close, &void_return_value, connection, message);
 					break;
 				case torque_connection_disconnected_event_type:
 					message.set((const char *) event->data, event->data_size);
-					call_function(on_close, &void_return_value, event->connection, message);
+					call_function(on_close, &void_return_value, connection, message);
 					break;
 				case torque_connection_established_event_type:
-					call_function(on_established, &void_return_value, event->connection);
+					call_function(on_established, &void_return_value, connection);
 					break;
 				case torque_connection_packet_event_type:
 					message.set((const char *) event->data, event->data_size);
-					call_function(on_packet, &void_return_value, event->connection, event->packet_sequence, message);
+					call_function(on_packet, &void_return_value, connection, sequence, message);
 					break;
 				case torque_connection_packet_notify_event_type:
-					call_function(on_packet_delivery_notify, &void_return_value, event->connection, event->packet_sequence, event->delivered);
+					call_function(on_packet_delivery_notify, &void_return_value, connection, sequence, event->delivered);
 					break;
 				case torque_socket_packet_event_type:
 					break;
@@ -124,6 +125,13 @@ public:
 		torque_socket_set_key_pair(_socket, the_key.len(), (core::uint8*)the_key.c_str());
 	}
 	
+	void set_challenge_response(core::string the_response)
+	{
+		if(!_socket)
+			return;
+		torque_socket_set_challenge_response(_socket, the_response.len(), (core::uint8*)the_response.c_str());		
+	}
+	
 	int connect(core::string url, core::string connect_data, core::string protocol_settings)
 	{
 		if(!_socket)
@@ -151,9 +159,9 @@ public:
 	
 	void accept_challenge(int pending_connection)
 	{
+		logprintf("accept_challenge %d", pending_connection);
 		if(!_socket)
 			return;
-		logprintf("accept_challenge %d", pending_connection);
 		torque_socket_accept_challenge(_socket, pending_connection);
 	}
 	
@@ -198,7 +206,9 @@ public:
 		tnl_slot(db, torque_socket_instance, on_close, 0);
 		tnl_slot(db, torque_socket_instance, on_packet, 0);
 		tnl_slot(db, torque_socket_instance, on_packet_delivery_notify, 0);
+		tnl_method(db, torque_socket_instance, bind);
 		tnl_method(db, torque_socket_instance, set_key_pair);
+		tnl_method(db, torque_socket_instance, set_challenge_response);
 		tnl_method(db, torque_socket_instance, connect);
 		tnl_method(db, torque_socket_instance, connect_introduced);
 		tnl_method(db, torque_socket_instance, introduce);
@@ -232,6 +242,7 @@ public:
 
 void plugin_main()
 {
+	ltc_mp = ltm_desc;
 	torque_socket_instance::register_class(global_type_database());
 	torque_socket_plugin::register_class(global_type_database());
 	global_plugin.add_class(get_global_type_record<torque_socket_instance>());

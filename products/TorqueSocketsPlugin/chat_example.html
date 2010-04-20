@@ -2,114 +2,120 @@
   "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head>
+</head>
+<body>
+<object type="application/x-torque-socket" id="plugin" width="0" height="0"> </object>
 <script type="text/javascript">
 
-function sendData()
+var socket;
+var plugin;
+var connection = 0;
+
+function clear_output()
 {
-	connection.send(document.output.doSay.value);
+	document.output.innerHTML = "";
 }
 
-function acceptConnection()
+function output(str)
 {
-	connection = iface.acceptConnection(connectionEvent, document.output.say.value);
-	document.output.theButton.disabled = true;
-	document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
+	document.output.innerHTML += str + "<br/>";
 }
 
-function pump() {
-	var event = iface.getNextEvent();
-	if(!event.recv)
-		return;
-
-	if(event.eventType == plugin.tnp.CONNECTION_REQUESTED_EVENT)
-	{
-		connectionEvent = event;
-		var req = "Connection requested from " + event.sourceAddress + ".  It says " + event.data + "<br/>Reply: <input type=\"text\" name=\"say\"/><br/><input type=\"button\" onclick=\"acceptConnection();\" name=\"theButton\" value=\"Accept\"/>"
-		document.output.innerHTML = req;
-	}
-	
-	if(event.eventType == plugin.tnp.CONNECTION_ACCEPTED_EVENT)
-	{
-		document.output.innerHTML = "Connection accepted from " + event.sourceAddress + ".  It says " + event.data;
-		document.output.innerHTML += "<br/><input type=\"text\" name=\"doSay\"/><input type=\"button\" onclick=\"sendData();\" value=\"Say\"/><br/>"
-	}
-	
-	if(event.eventType > plugin.tnp.USER_BARRIER)
-	{
-		document.output.innerHTML += event.sourceAddress + " says " + event.data + "<br/>"
-	}
+function on_challenge_response(the_connection, key, message)
+{
+	output("Connection " + the_connection + " got a challenge response: " + message);
+	socket.accept_challenge(the_connection);
 }
 
-function init() {
-	if(document.params.addy.value == '')
+function on_connect_request(the_connection, key, message)
+{
+	output("Incoming connection request " + the_connection + ": " + message);
+	socket.accept_connection(the_connection);
+	connection = the_connection;
+}
+
+function on_established(the_connection)
+{
+	output("Connection " + the_connection + " established.");
+	document.chat_section.say_button.disabled = false;
+	document.chat_section.chat_text.disabled = false;
+}
+
+function on_close(the_connection, reason)
+{
+}
+
+function on_packet(the_connection, sequence, packet)
+{
+	output("Received message: " + packet + ", seq = " + sequence + " connection " + the_connection);
+}
+
+function on_packet_delivery_notify(the_connection, send_sequence, delivery_status)
+{
+	var result;
+	if(delivery_status)
+		result = " made it!";
+	else
+		result = " was dropped :(.";
+	output("Packet " + send_sequence + " on connection " + the_connection + result);
+}
+
+function bind()
+{
+	if(document.bind_section.bind_address.value == '')
 	{
-		document.getElementById("output").innerHTML = "Please enter a valid address";
+		output("Please enter a valid address");
 		return;
 	}
-	
-	document.getElementById("output").innerHTML = "";
-	
-	document.params.theButton.disabled = true;
-	var connType = '';
-	for(i = 0; i < document.params.connType.length; i++)
-	{
-		if(document.params.connType[i].checked)
-		{
-			connType = document.params.connType[i].value;
-			break;
-		}
-	}
-	
-	isServer = connType == 'Server';
 
 	plugin = document.getElementById("plugin");
-	iface = plugin.create_torque_socket();//(document.params.addy.value);
-	if (!iface) {
-	alert("no plugin");
-	}
-
-	iface.allowsConnections = isServer;
-	
-	setInterval('pump()', 32);
-	
-	if(!isServer)
-	{
-		document.params.innerHTML = "Connect to address: <input type=\"text\" name=\"addy\"/><br/>And say:<input type=\"text\" name=\"say\"/><br/><input type=\"button\" name=\"theButton\" onclick=\"connect()\" value=\"Connect!\">";
-	}
+	socket = plugin.create_torque_socket();//(document.params.addy.value);
+	socket.on_challenge_response = on_challenge_response;
+	socket.on_connect_request = on_connect_request;
+	socket.on_established = on_established;
+	socket.on_close = on_close;
+	socket.on_packet = on_packet;
+	socket.on_packet_delivery_notify = on_packet_delivery_notify;
+	socket.bind(document.bind_section.bind_address.value);
+	socket.set_challenge_response(document.bind_section.challenge_response.value);
+	document.connection_section.innerHTML = "Connect to address: <input type=\"text\" name=\"connect_address\"/><br/>With request_data:<input type=\"text\" name=\"request_data\"/><br/><input type=\"button\" name=\"connect_button\" onclick=\"connect()\" value=\"Connect!\">";
 }
 
 function connect()
 {
-	if(document.params.addy.value == '')
+	if(document.connection_section.connect_address.value == '')
 	{
-		document.getElementById("output").innerHTML = "Please enter a valid address";
+		output("Please enter a valid address");
 		return;
 	}
+	clear_output();
+	connection = socket.connect(document.connection_section.connect_address.value, document.connection_section.request_data.value, "");
+	output("Connecting to host " + document.connection_section.connect_address.value + ", connection = " + connection);
 	
-	document.getElementById("output").innerHTML = "";
-	
-	connection = iface.connect(document.params.addy.value, document.params.say.value);
-	
-	document.params.theButton.disabled = true;
+	document.connection_section.connect_button.disabled = true;
+}
+
+function say()
+{
+	var seq = socket.send_to(connection, document.chat_section.chat_text.value);
+	output("Sent message: " + document.chat_section.chat_text.value + ", seq = " + seq);
 }
 
 </script>
+<form name="bind_section">
+	Bind TorqueSocket to address <input type="text" id="bind_address" name="bind_address"/><br/>
+	With challenge response <input type="text" id="challenge_response" name="challenge_response"/><br/>
+	<input type="button" name="bind_button" onclick="bind()" value="Bind"/>
+</form>
 
-</head>
+<form name="connection_section" id="connection_section">
+</form>
 
-<body>
-<object type="application/x-torque-socket" id="plugin" width="0" height="0"> </object><br/>
-<form name="params">
-I am a:
-<input type="radio" name="connType" value="Server" checked>Server
-<input type="radio" name="connType" value="Client">Client
-<br/>
-Bound to the address <input type="text" id="addy" name="addy" /><br/>
-
-<input type="button" name="theButton" onclick="init()" value="Go!">
+<form name="chat_section" id = "chat_section">
+	Say <input type="text" disabled = true id = "chat_text" name = "chat_text"/>
+	<input type="button" disabled = true name="say_button" onclick="say()" value="Send"/>
 </form>
 
 <form name="output" id="output"></form>
-
 </body>
 </html>

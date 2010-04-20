@@ -43,7 +43,6 @@ public:
 	   udp_socket::recv_from_result the_result;
 	   uint32 data_size;
 	   the_result = incoming_socket.recv_from(recv_address, buffer, sizeof(buffer), &data_size);
-		logprintf("packet read, datasize = %d", data_size);
 	   set_buffer(buffer, 0, data_size * 8);
 	   return the_result;
 	}

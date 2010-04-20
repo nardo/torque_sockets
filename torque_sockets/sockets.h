@@ -10,7 +10,7 @@ static bool sockets_init()
 	{
 		initialized = true;
 		WSADATA startup_wsa_data;
-		success = !WSAStartup(0x0101, &startup_wsa_data);
+		success = !WSAStartup(0x0202, &startup_wsa_data);
 	}
 #endif
 	return success;
