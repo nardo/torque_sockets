@@ -225,7 +225,7 @@ template<class T, class return_type, class arg0> struct function_record_decl<ret
 	}
 	void dispatch(void *object, void **arguments, void *return_data_ptr)
 	{
-		*((return_type *) return_data_ptr) = ((T*)object)->*_func(*((arg0 *)arguments[0]));
+		*((return_type *) return_data_ptr) = (((T*)object)->*_func)(*((arg0 *)arguments[0]));
 	}	
 };
 
