@@ -21,15 +21,6 @@ public:
 		unbind();
 	}
 
-	enum bind_result
-	{
-		bind_success,
-		address_in_use, ///< A process on this computer is already bound to this address.
-		address_invalid, ///< The specified address is not valid for this computer
-		initialization_failure,
-		socket_allocation_failure,
-		generic_failure,
-	};
 	bind_result bind(const address bind_address, bool non_blocking_io = true, time recv_timeout = 0, bool accepts_broadcast_packets = true, uint32 send_buffer_size = default_send_buffer_size, uint32 recv_buffer_size = default_recv_buffer_size)
 	{
 		if(!sockets_init())

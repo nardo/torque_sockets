@@ -1,14 +1,19 @@
-torque_socket_handle torque_socket_create(struct sockaddr *bind_address, void (*socket_notify)(void *), void *socket_notify_data)
+torque_socket_handle torque_socket_create(bool background_thread, void (*socket_notify)(void *), void *socket_notify_data)
 {
-	core::net::address a(*bind_address);
-
-	core::net::torque_socket *ret = new core::net::torque_socket(a, true, socket_notify, socket_notify_data);
+	core::net::torque_socket *ret = new core::net::torque_socket(background_thread, socket_notify, socket_notify_data);
 	return (void *) ret;
+
 }
 
 void torque_socket_destroy(torque_socket_handle the_socket)
 {
 	delete (core::net::torque_socket *) the_socket;
+}
+
+bind_result torque_socket_bind(torque_socket_handle the_socket, struct sockaddr *bound_interface_address)
+{
+	core::net::address a(*bound_interface_address);
+	return ((core::net::torque_socket *) the_socket)->bind(a);
 }
 
 void torque_socket_allow_incoming_connections(torque_socket_handle the_socket, int allowed)
@@ -54,14 +59,14 @@ torque_connection_id torque_socket_connect(torque_socket_handle the_socket, stru
 	return ((core::net::torque_socket *) the_socket)->connect(a, connect_data, connect_data_size);
 }
 
-torque_connection_id torque_socket_connect_introduced(torque_socket_handle the_socket, torque_connection_id introducer, unsigned remote_client_identity, unsigned connection_token, unsigned connect_data_size, unsigned char *connect_data)
+torque_connection_id torque_socket_connect_introduced(torque_socket_handle the_socket, torque_connection_id introducer, torque_connection_id remote_client_identity, int is_host, unsigned connect_data_size, unsigned char *connect_data)
 {
-	return  ((core::net::torque_socket *) the_socket)->connect_introduced(introducer, remote_client_identity,  connection_token, connect_data_size, connect_data);
+	return  ((core::net::torque_socket *) the_socket)->connect_introduced(introducer, remote_client_identity,  is_host, connect_data_size, connect_data);
 }
 
-void torque_socket_introduce(torque_socket_handle the_socket, torque_connection_id a, torque_connection_id b, unsigned connection_token)
+void torque_socket_introduce(torque_socket_handle the_socket, torque_connection_id initiator, torque_connection_id host)
 {
-	 ((core::net::torque_socket *) the_socket)->introduce_connection(a, b, connection_token);
+	 ((core::net::torque_socket *) the_socket)->introduce_connection(initiator, host);
 }
 
 void torque_socket_accept_challenge(torque_socket_handle the_socket, torque_connection_id pending_connection)

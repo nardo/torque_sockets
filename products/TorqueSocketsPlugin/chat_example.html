@@ -5,11 +5,71 @@
 </head>
 <body>
 <object type="application/x-torque-socket" id="plugin" width="0" height="0"> </object>
+<form name="bind_section" onSubmit="return false">
+	Bind TorqueSocket to address <input type="text" id="bind_address" name="bind_address"/><br/>
+	With challenge response <input type="text" id="challenge_response" name="challenge_response"/><br/>
+	<input type="button" name="bind_button0" onclick="bind(0)" value="Bind"/>
+</form>
+
+<form style="display:none;" name="connection_section" id="connection_section">
+	Listening for connections...<br/>
+	Connect to address: <input type="text" name="connect_address"/>
+	With request_data:<input type="text" name="request_data"/> 
+	<input type="button" name="connect_button" onclick="connect()" value="Connect!"><br/>
+	Connect introduced via connection <input type="text" name="introducer"/>
+	to remote <input type="text" name="remote_connection_id"/>
+	with data <input type="text" name="introduced_connection_data"/> 
+	as <input type="button" name="connect_introduced_as_initiator_button" onclick="connect_introduced_as_initiator()" value="Initiator"/>
+	or <input type="button" name="connect_introduced_as_host_button" onclick="connect_introduced_as_host()" value="Host"/><br/>
+	or introduce connections -- host: <input type="text" name="introduced_host"/>
+	initiator: <input type="text" name="introduced_initiator"/> <input type="button" name="introduce_button" onclick="introduce()" value="Introduce"/>
+</form>
+
+<div/>
+<form style="display:none;" name="chat_section" id = "chat_section", onSubmit="return say()">
+	Say <input type="text" id = "chat_text" name = "chat_text"/>
+	<input type="button" name="say_button" onclick="say()" value="Send"/>
+</form>
+<div/>
+
+<form name="output" id="output"></form>
+
 <script type="text/javascript">
 
 var socket;
 var plugin;
 var connection = 0;
+var introduced_connection = 0;
+var doc_str = window.location.href;
+var doc_index = doc_str.substr( doc_str.lastIndexOf("?") + 1);
+
+if(doc_index == "1")
+{
+	document.bind_section.bind_address.value = "localhost:28000";
+	document.bind_section.challenge_response.value = "I'm the initiator";
+	document.connection_section.connect_address.value = "localhost:28002";
+	document.connection_section.request_data.value = "initiator wants to connect";
+	document.connection_section.introducer.value = "1";
+	document.connection_section.remote_connection_id.value = "2";
+	document.connection_section.introduced_connection_data.value = "initiator to host";
+}
+else if(doc_index == "2")
+{
+	document.bind_section.bind_address.value = "localhost:28001";
+	document.bind_section.challenge_response.value = "I'm the host";
+	document.connection_section.connect_address.value = "localhost:28002";
+	document.connection_section.request_data.value = "host wants to connect";
+	document.connection_section.introducer.value = "1";
+	document.connection_section.remote_connection_id.value = "1";
+	document.connection_section.introduced_connection_data.value = "host to initiator";
+}
+else if(doc_index == "3")
+{
+	document.bind_section.bind_address.value = "localhost:28002";
+	document.bind_section.challenge_response.value = "I'm the introducer";
+	document.connection_section.introduced_host.value = "2";
+	document.connection_section.introduced_initiator.value = "1";
+}
 
 function clear_output()
 {
@@ -18,7 +78,7 @@ function clear_output()
 
 function output(str)
 {
-	document.output.innerHTML += str + "<br/>";
+	document.output.innerHTML += "" + doc_index + ": " + str + "<br/>";
 }
 
 function on_challenge_response(the_connection, key, message)
@@ -37,8 +97,7 @@ function on_connect_request(the_connection, key, message)
 function on_established(the_connection)
 {
 	output("Connection " + the_connection + " established.");
-	document.chat_section.say_button.disabled = false;
-	document.chat_section.chat_text.disabled = false;
+	document.chat_section.style.display = 'block';
 }
 
 function on_close(the_connection, reason)
@@ -60,7 +119,7 @@ function on_packet_delivery_notify(the_connection, send_sequence, delivery_statu
 	output("Packet " + send_sequence + " on connection " + the_connection + result);
 }
 
-function bind()
+function bind(instance_type)
 {
 	if(document.bind_section.bind_address.value == '')
 	{
@@ -76,9 +135,53 @@ function bind()
 	socket.on_close = on_close;
 	socket.on_packet = on_packet;
 	socket.on_packet_delivery_notify = on_packet_delivery_notify;
-	socket.bind(document.bind_section.bind_address.value);
+	var success = socket.bind(document.bind_section.bind_address.value);
+	
+	if(success)
+		output("Socket successfully bound to: " + document.bind_section.bind_address.value);
+	else
+		output("bind failure to address: " + document.bind_section.bind_address.value);
 	socket.set_challenge_response(document.bind_section.challenge_response.value);
-	document.connection_section.innerHTML = "Connect to address: <input type=\"text\" name=\"connect_address\"/><br/>With request_data:<input type=\"text\" name=\"request_data\"/><br/><input type=\"button\" name=\"connect_button\" onclick=\"connect()\" value=\"Connect!\">";
+	document.connection_section.style.display = 'block';
+
+//var url_string = window.location;
+//var index_string = str.substring(url_string.lastIndexOf("&") + 1, 10000); 
+//output("Setup index = " + index_string);
+}
+
+function connect_introduced_as_host()
+{
+	var introducer = parseInt(document.connection_section.introducer.value);
+	var remote_connection_id = parseInt(document.connection_section.remote_connection_id.value);
+	var data = document.connection_section.introduced_connection_data.value;
+	
+	introduced_connection = socket.connect_introduced(introducer, remote_connection_id, true, data, "");
+
+	document.connection_section.connect_introduced_as_host_button.disabled = true;
+	document.connection_section.connect_introduced_as_initiator_button.disabled = true;
+	output("Connecting as host to remote " + remote_connection_id + " on host " + introducer + " with data " + data);
+}
+
+function connect_introduced_as_initiator()
+{
+	var introducer = parseInt(document.connection_section.introducer.value);
+	var remote_connection_id = parseInt(document.connection_section.remote_connection_id.value);
+	var data = document.connection_section.introduced_connection_data.value;
+	
+	introduced_connection = socket.connect_introduced(introducer, remote_connection_id, false, data, "");
+
+	document.connection_section.connect_introduced_as_host_button.disabled = true;
+	document.connection_section.connect_introduced_as_initiator_button.disabled = true;
+	output("Connecting as initiator to remote " + remote_connection_id + " on host " + introducer + " with data " + data);
+}
+
+function introduce()
+{
+	var initiator = parseInt(document.connection_section.introduced_initiator.value);
+	var host = parseInt(document.connection_section.introduced_host.value);
+	
+	output("Introducing connection between initiator " + initiator + " and host " + host);
+	socket.introduce(initiator, host);
 }
 
 function connect()
@@ -99,23 +202,9 @@ function say()
 {
 	var seq = socket.send_to(connection, document.chat_section.chat_text.value);
 	output("Sent message: " + document.chat_section.chat_text.value + ", seq = " + seq);
+	return false;
 }
 
 </script>
-<form name="bind_section">
-	Bind TorqueSocket to address <input type="text" id="bind_address" name="bind_address"/><br/>
-	With challenge response <input type="text" id="challenge_response" name="challenge_response"/><br/>
-	<input type="button" name="bind_button" onclick="bind()" value="Bind"/>
-</form>
-
-<form name="connection_section" id="connection_section">
-</form>
-
-<form name="chat_section" id = "chat_section">
-	Say <input type="text" disabled = true id = "chat_text" name = "chat_text"/>
-	<input type="button" disabled = true name="say_button" onclick="say()" value="Send"/>
-</form>
-
-<form name="output" id="output"></form>
 </body>
 </html>

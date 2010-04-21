@@ -29,13 +29,13 @@ class torque_socket_instance : public scriptable_object
 public:
 	torque_socket_instance()
 	{
-		_socket = 0;
+		logprintf("torque_socket_instance constructor");
+		_socket = torque_socket_create(true, background_socket_notify, this);
 	}
 	
 	~torque_socket_instance()
 	{
-		if(_socket)
-			torque_socket_destroy(_socket);
+		torque_socket_destroy(_socket);
 	}
 	
 	static void background_socket_notify(void *the_socket_instance)
@@ -52,9 +52,6 @@ public:
 	
 	void pump()
 	{
-		if(!_socket)
-			return;
-		
 		// pump the socket's event queue and generate events to post back from the plugin.
 		torque_socket_event *event;
 		empty_type void_return_value;
@@ -104,21 +101,16 @@ public:
 	
 	bool bind(core::string bind_address)
 	{
-		if(_socket)
-		{
-			torque_socket_destroy(_socket);
-		}
-		logprintf("torque_socket_instance constructor");
 		core::net::address the_addr(bind_address.c_str(), false, 0);
 		sockaddr addr;
 		the_addr.to_sockaddr(&addr);
-		_socket = torque_socket_create(&addr, background_socket_notify, this);
+		bind_result r = torque_socket_bind(_socket, &addr);
+		logprintf("Bind? %d", r == bind_success);
+		return r == bind_success;
 	}
 
 	void set_key_pair(core::string the_key)
 	{
-		if(!_socket)
-			return;
 		const char *str = the_key.c_str();
 		//byte_buffer_ptr key_buffer = buffer_decode(str, strlen(str));
 		
@@ -127,15 +119,11 @@ public:
 	
 	void set_challenge_response(core::string the_response)
 	{
-		if(!_socket)
-			return;
 		torque_socket_set_challenge_response(_socket, the_response.len(), (core::uint8*)the_response.c_str());		
 	}
 	
 	int connect(core::string url, core::string connect_data, core::string protocol_settings)
 	{
-		if(!_socket)
-			return 0;
 		core::net::address connect_address(url.c_str(), false, 0);
 		sockaddr addr;
 		connect_address.to_sockaddr(&addr);
@@ -144,31 +132,22 @@ public:
 	
 	int connect_introduced (int introducer, int remote_client_connection_id, bool is_host, core::string connect_data_or_challenge_response, core::string protocol_settings)
 	{
-		if(!_socket)
-			return 0;
-		
-		return 0;
+		return torque_socket_connect_introduced(_socket, introducer, remote_client_connection_id, is_host, connect_data_or_challenge_response.len(), (core::uint8 *) connect_data_or_challenge_response.c_str());
 	}
 	
-	int introduce(int initiator_connection, int host_connection)
+	void introduce(int initiator_connection, int host_connection)
 	{
-		if(!_socket)
-			return 0;
-		return 0;
+		torque_socket_introduce(_socket, initiator_connection, host_connection);
 	}
 	
 	void accept_challenge(int pending_connection)
 	{
 		logprintf("accept_challenge %d", pending_connection);
-		if(!_socket)
-			return;
 		torque_socket_accept_challenge(_socket, pending_connection);
 	}
 	
 	void accept_connection(int pending_connection)
 	{
-		if(!_socket)
-			return;
 		logprintf("accept_connection %d", pending_connection);
 		torque_socket_accept_connection(_socket, pending_connection);
 		/*
@@ -183,17 +162,12 @@ public:
 	
 	void close(int connection_id, core::string reason)
 	{
-		if(!_socket)
-			return;
 		logprintf("close connection %d", connection_id);
 		torque_socket_close_connection(_socket, connection_id, reason.len(), (core::uint8*) reason.c_str());
 	}
 	
 	int send_to(int connection_id, core::string packet_data)
 	{
-		if(!_socket)
-			return 0;
-		
 		return torque_socket_send_to_connection(_socket, connection_id, packet_data.len(), (core::uint8*) packet_data.c_str());
 	}
 

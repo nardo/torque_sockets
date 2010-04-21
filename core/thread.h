@@ -151,8 +151,12 @@ public:
 	/// run function called when thread is started.
 	virtual uint32 run()
 	{
-		_thread_running = false;
 		return 0;
+	}
+	
+	bool is_running()
+	{
+		return _thread_running;
 	}
 
 	/// starts the thread's main run function.
@@ -178,13 +182,17 @@ protected:
 	HANDLE _thread;
 	static DWORD WINAPI thread_proc( LPVOID lp_parameter )
 	{
-		return ((thread *) lp_parameter)->run();
+		DWORD ret = ((thread *) lp_parameter)->run();
+		 ((thread *) lp_parameter)->_thread_running = false;
+		 return ret;
 	}
 #else
 	pthread_t _thread;
 	static void *thread_proc(void *lp_parameter)
 	{
-		return (void *) ((thread *) lp_parameter)->run();
+		void *ret = (void *) ((thread *) lp_parameter)->run();
+		((thread *) lp_parameter)->_thread_running = false;
+		return ret;
 	}
 #endif
 };

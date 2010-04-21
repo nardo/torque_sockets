@@ -28,6 +28,16 @@ enum torque_socket_event_type
 	torque_socket_packet_event_type,
 };
 
+enum bind_result
+{
+	bind_success,
+	address_in_use, ///< A process on this computer is already bound to this address.
+	address_invalid, ///< The specified address is not valid for this computer
+	initialization_failure,
+	socket_allocation_failure,
+	generic_failure,
+};
+
 struct torque_socket_event
 {
 	unsigned event_type;
@@ -44,9 +54,11 @@ struct torque_socket_event
 	struct sockaddr source_address;
 };
 
-torque_socket_handle torque_socket_create(struct sockaddr*, void (*socket_notify)(void *), void *socket_notify_data); ///< Create a torque socket and bind it to the specified socket address interface.
+torque_socket_handle torque_socket_create(bool background_thread, void (*socket_notify)(void *), void *socket_notify_data); ///< Creates an unbound torque socket.  If background_thread is true, the socket will be created with a background socket process thread.  Periodically socket_notify will be called _from_the_background_thread_ to signal that processing is necessary.
 
 void torque_socket_destroy(torque_socket_handle); ///< Close the specified socket; any open connections on this socket will be closed automatically.
+
+bind_result torque_socket_bind(torque_socket_handle the_socket, struct sockaddr *bound_interface_address); ///< Binds the socket to the specified socket address interface.
 
 void torque_socket_allow_incoming_connections(torque_socket_handle, int allowed); ///< Sets whether or not this connection accepts incoming connections; if not, all incoming connection challenges and requests will be silently ignored.  FUTURE: add a list of domain referrers that are allowed to refer a client to this domain.
 
@@ -62,9 +74,9 @@ int torque_socket_send_to(torque_socket_handle, struct sockaddr* remote_host, un
 
 torque_connection_id torque_socket_connect(torque_socket_handle, struct sockaddr* remote_host, unsigned connect_data_size, unsigned char *connect_data); ///< open a connection to the remote host
 
-torque_connection_id torque_socket_connect_introduced(torque_socket_handle socket, torque_connection_id introducer, unsigned remote_client_identity, unsigned connection_token, unsigned connect_data_size, unsigned char *connect_data); ///< Connect to a client connected to the host at middle_man.
+torque_connection_id torque_socket_connect_introduced(torque_socket_handle socket, torque_connection_id introducer, torque_connection_id remote_client_identity, int is_host, unsigned connect_data_size, unsigned char *connect_data); ///< Connect to a client connected to the host at middle_man.
 
-void torque_socket_introduce(torque_socket_handle, torque_connection_id, torque_connection_id, unsigned connection_token); ///< This is called on the middleman of an introduced connection and will allow this host to broker a connection start between the remote hosts at either connection point.
+void torque_socket_introduce(torque_socket_handle, torque_connection_id initiator, torque_connection_id host); ///< This is called on the middleman of an introduced connection and will allow this host to broker a connection start between the remote hosts at either connection point.
 
 void torque_socket_accept_challenge(torque_socket_handle, torque_connection_id pending_connection); ///< Accept the challenge response from the host.
 

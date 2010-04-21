@@ -982,14 +982,27 @@ public:
 		return new_connection->_connection_index;
 	}
 	
-	/// This is called on the middleman of an introduced connection and will allow this host to broker a connection start between the remote hosts at either connection point.
-	void introduce_connection(torque_connection_id connection_a, torque_connection_id connection_b, unsigned connection_token)
+	struct introduction_record
 	{
-		
+		torque_connection_id initiator;
+		torque_connection_id host;
+		time introduction_time;
+	};
+	
+	/// This is called on the middleman of an introduced connection and will allow this host to broker a connection start between the remote hosts at either connection point.
+	void introduce_connection(torque_connection_id initiator, torque_connection_id host)
+	{
+		if(_find_connection(initiator) && _find_connection(host))
+		{
+			introduction_record r;
+			r.initiator = initiator;
+			r.host = host;
+			r.introduction_time = time::get_current();
+		}
 	}
 	
 	/// Connect to a client connected to the host at middle_man.
-	torque_connection_id connect_introduced(torque_connection_id introducer, unsigned remote_client_identity, unsigned connection_token, uint32 connect_data_size, uint8 *connect_data)
+	torque_connection_id connect_introduced(torque_connection_id introducer, torque_connection_id remote_client_identity, int is_host, uint32 connect_data_size, uint8 *connect_data)
 	{
 		/*/// Connects to a remote host that is also connecting to this torque_connection (negotiated by a third party)
 		 void connect_arranged(torque_socket *connection_torque_socket, const array<address> &possible_addresses, nonce &my_nonce, nonce &remote_nonce, byte_buffer_ptr shared_secret, bool is_initiator)
@@ -1157,6 +1170,20 @@ public:
 			return 0;
 	}	
 	
+	bind_result bind(const address &bind_address)
+	{
+		time block_timeout = 0;
+		if(_thread_socket)
+			block_timeout = 500;
+		
+		bind_result the_result = _socket.bind(bind_address, !_thread_socket, block_timeout);
+		
+		logprintf("Bind result = %d", the_result);
+		if(_thread_socket && (the_result == bind_success) && !_packet_thread.is_running())
+			_packet_thread.start();
+		return the_result;
+	}
+	
 	~torque_socket()
 	{
 		// gracefully close all the connections on this torque_socket:
@@ -1165,7 +1192,7 @@ public:
 	}
 	
 	/// @param bind_address Local network address to bind this torque_socket to.
-	torque_socket(const address &bind_address, bool thread_socket = false, void (*socket_notify_fn)(void *) = 0, void *socket_notify_data = 0) : _puzzle_manager(_random_generator, &_allocator), _event_queue_allocator(&_allocator), _packet_thread(this)
+	torque_socket(bool thread_socket = false, void (*socket_notify_fn)(void *) = 0, void *socket_notify_data = 0) : _puzzle_manager(_random_generator, &_allocator), _event_queue_allocator(&_allocator), _packet_thread(this)
 	{
 		_next_connection_index = 1;
 		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
@@ -1182,10 +1209,7 @@ public:
 		_event_ready_user_data = socket_notify_data;
 		_thread_socket = thread_socket;
 		_received_packet_list = 0;
-		time block_timeout = 0;
-		if(thread_socket)
-			block_timeout = 500;
-		udp_socket::bind_result res = _socket.bind(bind_address, !thread_socket, block_timeout);
+
 		// Supply our own (small) unique private key for the time being.
 		_private_key = new asymmetric_key(16, _random_generator);
 		_challenge_response = new byte_buffer();
@@ -1193,8 +1217,6 @@ public:
 		_pending_connections = 0;
 		_connection_list = 0;
 
-		if(_thread_socket)
-			_packet_thread.start();
 	}
 		
 	mutex _packet_queue_mutex;
