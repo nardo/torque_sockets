@@ -265,7 +265,7 @@ template<class T, class return_type, class arg0, class arg1, class arg2> struct 
 		_signature.argument_types = _arg_types;
 		_signature.argument_types[0] = get_global_type_record<arg0>();
 		_signature.argument_types[1] = get_global_type_record<arg1>();
-		_signature.argument_types[2] = get_global_type_record<arg1>();
+		_signature.argument_types[2] = get_global_type_record<arg2>();
 		_signature.return_type = get_global_type_record<return_type>();
 	}
 	void dispatch(void *object, void **arguments, void *return_data_ptr)
@@ -288,8 +288,8 @@ template<class T, class return_type, class arg0, class arg1, class arg2, class a
 		_signature.argument_types = _arg_types;
 		_signature.argument_types[0] = get_global_type_record<arg0>();
 		_signature.argument_types[1] = get_global_type_record<arg1>();
-		_signature.argument_types[2] = get_global_type_record<arg1>();
-		_signature.argument_types[3] = get_global_type_record<arg1>();
+		_signature.argument_types[2] = get_global_type_record<arg2>();
+		_signature.argument_types[3] = get_global_type_record<arg3>();
 		_signature.return_type = get_global_type_record<return_type>();
 	}
 	void dispatch(void *object, void **arguments, void *return_data_ptr)
@@ -312,9 +312,9 @@ template<class T, class return_type, class arg0, class arg1, class arg2, class a
 		_signature.argument_types = _arg_types;
 		_signature.argument_types[0] = get_global_type_record<arg0>();
 		_signature.argument_types[1] = get_global_type_record<arg1>();
-		_signature.argument_types[2] = get_global_type_record<arg1>();
-		_signature.argument_types[3] = get_global_type_record<arg1>();
-		_signature.argument_types[4] = get_global_type_record<arg1>();
+		_signature.argument_types[2] = get_global_type_record<arg2>();
+		_signature.argument_types[3] = get_global_type_record<arg3>();
+		_signature.argument_types[4] = get_global_type_record<arg4>();
 		_signature.return_type = get_global_type_record<return_type>();
 	}
 	void dispatch(void *object, void **arguments, void *return_data_ptr)
