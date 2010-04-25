@@ -1022,6 +1022,9 @@ protected:
 		for(;;)
 		{
 			udp_socket::recv_from_result result = stream.recv_from(_socket, &addr);
+			if(result == udp_socket::invalid_socket)
+				return;
+			
 			if(result == udp_socket::packet_received)
 			{
 				stream.set_bit_position(stream.get_stream_bit_size());

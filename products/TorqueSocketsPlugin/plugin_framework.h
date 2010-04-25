@@ -130,9 +130,9 @@ public:
 	static NPObject *_allocate(NPP npp, NPClass *the_class)
 	{
 		scriptable_class *ci = (scriptable_class *) the_class;
-		logprintf("_allocate %s", ci->_type_rep->name.c_str());
 		core::uint32 instance_size = ci->_instance_type->size;
 		scriptable_object *instance = (scriptable_object *) NPNFuncs.memalloc(instance_size);
+		logprintf("_allocate %s, %08x", ci->_type_rep->name.c_str(), instance);
 		ci->_instance_type->construct_object(instance);
 		instance->_plugin_instance = npp;
 		instance->_class = the_class;

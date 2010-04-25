@@ -137,7 +137,9 @@ public:
 	enum recv_from_result
 	{
 		packet_received,
-		no_incoming_packets_available,
+		would_block_or_timeout,
+		invalid_socket,
+		unknown_error,
 	};
 
 	recv_from_result recv_from(address *sender_address, byte *buffer, uint32 buffer_size, uint32 *incoming_packet_size)
@@ -145,9 +147,19 @@ public:
 		SOCKADDR sender_sockaddr;
 		socklen_t addr_len = sizeof(sender_sockaddr);
 		int32 bytes_read = recvfrom(_socket, (char *) buffer, buffer_size, 0, &sender_sockaddr, &addr_len);
-		
+			logprintf("recv_from result = %d", errno);
 		if(bytes_read == SOCKET_ERROR)
-			return no_incoming_packets_available;
+		{
+			switch(errno)
+			{
+				case EAGAIN:
+					return would_block_or_timeout;
+				case EBADF:
+					return invalid_socket;
+				default:
+					return unknown_error;
+			}
+		}
 		*incoming_packet_size = uint32(bytes_read);
 
 		if(sender_address)
