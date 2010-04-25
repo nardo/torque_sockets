@@ -201,7 +201,12 @@ function connect()
 function say()
 {
 	var seq = socket.send_to(connection, document.chat_section.chat_text.value);
-	output("Sent message: " + document.chat_section.chat_text.value + ", seq = " + seq);
+	output("Sent to " + connection + ": " + document.chat_section.chat_text.value + ", seq = " + seq);
+	if(introduced_connection)
+	{
+		var seq = socket.send_to(introduced_connection, "to introduced " + document.chat_section.chat_text.value);
+		output("Sent to " + introduced_connection + ": " + document.chat_section.chat_text.value + ", seq = " + seq);	
+	}
 	return false;
 }
 
