@@ -40,6 +40,7 @@ public:
 	
 	static void background_socket_notify(void *the_socket_instance)
 	{
+		logprintf("back-call %d", net::time::get_current().get_milliseconds() % 1000);
 		torque_socket_instance *inst = (torque_socket_instance *) the_socket_instance;
 		NPNFuncs.pluginthreadasynccall(inst->get_plugin_instance(), main_thread_socket_notify, the_socket_instance);
 	}
@@ -52,6 +53,8 @@ public:
 	
 	void pump()
 	{
+		logprintf("pump %d", net::time::get_current().get_milliseconds() % 1000);
+
 		// pump the socket's event queue and generate events to post back from the plugin.
 		torque_socket_event *event;
 		empty_type void_return_value;
@@ -160,7 +163,7 @@ public:
 		logprintf("Returned: \"%s\"", return_value.c_str());*/
 	}
 	
-	void close(int connection_id, core::string reason)
+	void close_connection(int connection_id, core::string reason)
 	{
 		logprintf("close connection %d", connection_id);
 		torque_socket_close_connection(_socket, connection_id, reason.len(), (core::uint8*) reason.c_str());
@@ -188,7 +191,7 @@ public:
 		tnl_method(db, torque_socket_instance, introduce);
 		tnl_method(db, torque_socket_instance, accept_challenge);
 		tnl_method(db, torque_socket_instance, accept_connection);
-		tnl_method(db, torque_socket_instance, close);
+		tnl_method(db, torque_socket_instance, close_connection);
 		tnl_method(db, torque_socket_instance, send_to);
 		tnl_end_class(db);
 	}

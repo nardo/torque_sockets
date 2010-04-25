@@ -84,7 +84,7 @@ interface TorqueSocket {
 	int introduce(in int initiator_connection, in int host_connection);
 	accept_challenge(in int pending_connection);
 	accept_connection(in int pending_connection);
-	close(in int connection_id, in optional ByteBuffer reason);
+	close_connection(in int connection_id, in optional ByteBuffer reason);
 	unsigned long send_to(in int connection_id, ByteBuffer packet_data);
 
 	attribute Function on_challenge_response(in int pending_connection, in DOMString public_key, in ByteBuffer challenge_response);
