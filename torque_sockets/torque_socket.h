@@ -99,6 +99,167 @@ protected:
 		return _process_start_time;
 	}
 	
+	void _send_introduction_request(pending_connection *the_connection)
+	{
+		torque_connection *introducing_connection = _find_connection(the_connection->_introducer);
+		if(!introducing_connection)
+			return;
+		TorqueLogMessageFormatted(LogNettorque_socket, ("Sending Introduction Request to %s", introducing_connection->get_address().to_string().c_str()));
+		packet_stream out;
+		core::write(out, uint8(introduced_connection_request_packet));
+		core::write(out, introducing_connection->get_initiator_nonce());
+		core::write(out, uint32(the_connection->_remote_client_id));
+		core::write(out, uint8(the_connection->get_type() == pending_connection::introduced_connection_initiator));
+		out.send_to(_socket, introducing_connection->get_address());		
+	}
+	
+	void _handle_introduction_request(const address &addr, bit_stream &stream)
+	{
+		nonce requestor_nonce;
+		uint32 remote_id;
+		uint8 is_initiator;
+		
+		core::read(stream, requestor_nonce);
+		core::read(stream, remote_id);
+		core::read(stream, is_initiator);
+		// TODO - validate/encrypt introduction requests
+		// TODO - add self-determined addresses for each party to the introduction request.
+		// TODO - refactor introductions as indexes off is_host
+		torque_connection *requesting_connection = _find_connection(addr);
+		logprintf("received introduction request: %d to %d (%d)", requesting_connection ? requesting_connection->get_connection_index() : 0, remote_id, is_initiator);
+		if(!requesting_connection || requesting_connection->get_initiator_nonce() != requestor_nonce)
+			return;
+		
+		uint32 initiating_connection, hosting_connection;
+		if(is_initiator)
+		{
+			initiating_connection = requesting_connection->get_connection_index();
+			hosting_connection = remote_id;
+		}
+		else
+		{
+			initiating_connection = remote_id;
+			hosting_connection = requesting_connection->get_connection_index();
+		}
+		
+		logprintf("received introduced connection request: %d(initiator) %d(host), from %s", initiating_connection, hosting_connection, is_initiator ? "initiator" : "host");
+		
+		for(uint32 i = 0; i < _introductions.size(); i++)
+		{
+			introduction_record &intro = _introductions[i];
+			if(intro.initiator == initiating_connection && intro.host == hosting_connection)
+			{
+				logprintf("found introduction record");
+				if(is_initiator)
+					intro.initiator_request_received = true;
+				else
+					intro.host_request_received = true;
+				if(intro.initiator_request_received && intro.host_request_received)
+				{
+					if(!intro.initial_intro_sent)
+					{
+						_send_introduction(intro.initiator, intro.host, intro.initiator_nonce, intro.host_nonce);
+						_send_introduction(intro.host, intro.initiator, intro.initiator_nonce, intro.host_nonce);
+					}
+					else
+					{
+						if(is_initiator)
+							_send_introduction(intro.initiator, intro.host, intro.initiator_nonce, intro.host_nonce);
+						else
+							_send_introduction(intro.host, intro.initiator, intro.initiator_nonce, intro.host_nonce);
+					}
+				}
+			}
+		}
+	}
+	
+	void _send_introduction(torque_connection_id intro_target, torque_connection_id remote_host, nonce &initiator_nonce, nonce &host_nonce)
+	{
+		torque_connection *connection = _find_connection(intro_target);
+		torque_connection *remote = _find_connection(remote_host);
+		if(!connection || !remote)
+			return;
+		
+		TorqueLogMessageFormatted(LogNettorque_socket, ("Sending introduction to %s, %d", connection->get_address().to_string().c_str(), remote_host));
+		packet_stream out;
+		core::write(out, uint8(connection_introduction_packet));
+		core::write(out, connection->get_initiator_nonce());
+		core::write(out, uint32(remote_host));
+		core::write(out, remote->get_address());
+		core::write(out, initiator_nonce);
+		core::write(out, host_nonce);
+		
+		out.send_to(_socket, connection->get_address());
+	}
+
+	void _handle_introduction(const address &the_address, bit_stream &packet_stream)
+	{
+		torque_connection *introducer = _find_connection(the_address);
+		nonce introducer_nonce;
+		uint32 remote_id;
+		address remote_address;
+		nonce initiator_nonce, host_nonce;
+		
+		core::read(packet_stream, introducer_nonce);
+		
+		if(introducer->get_initiator_nonce() != introducer_nonce)
+			return;
+		
+		core::read(packet_stream, remote_id);
+		core::read(packet_stream, remote_address);
+		core::read(packet_stream, initiator_nonce);
+		core::read(packet_stream, host_nonce);
+		for(pending_connection *walk = _pending_connections; walk; walk = walk->_next)
+		{
+			if(walk->_introducer == introducer->get_connection_index() && walk->_remote_client_id == remote_id && walk->get_state() == pending_connection::requesting_introduction)
+			{
+				walk->_initiator_nonce = initiator_nonce;
+				walk->_host_nonce = host_nonce;
+				walk->_possible_addresses.push_back(remote_address);
+				walk->set_state(pending_connection::sending_punch_packets);
+				walk->_state_send_retry_count = punch_retry_count;
+				walk->_state_send_retry_interval = introduced_connection_connect_timeout;
+				walk->_state_last_send_time = get_process_start_time();
+				_send_punch(walk);
+				return;
+			}
+		}
+	}
+	
+	void _send_punch(pending_connection *the_connection)
+	{
+		for(uint32 i = 0; i < the_connection->_possible_addresses.size(); i++)
+		{
+			TorqueLogMessageFormatted(LogNettorque_socket, ("Sending punch packet to %s", the_connection->_possible_addresses[i].to_string().c_str()));
+			packet_stream out;
+			core::write(out, uint8(punch_packet));
+			core::write(out, the_connection->get_initiator_nonce());
+			core::write(out, the_connection->get_host_nonce());
+			out.send_to(_socket, the_connection->_possible_addresses[i]);			
+		}
+	}
+	
+	void _handle_punch(const address &the_address, bit_stream &packet_stream)
+	{
+		nonce initiator_nonce, host_nonce;
+		core::read(packet_stream, initiator_nonce);
+		core::read(packet_stream, host_nonce);
+		
+		pending_connection *the_connection;
+		for(pending_connection *walk = _pending_connections; walk; walk = walk->_next)
+		{
+			if(walk->get_initiator_nonce() == initiator_nonce && walk->get_host_nonce() == host_nonce && walk->get_state() == pending_connection::sending_punch_packets && walk->get_type() == pending_connection::introduced_connection_initiator)
+			{
+				walk->set_state(pending_connection::requesting_challenge_response);
+				walk->_address = the_address;
+				walk->_state_send_retry_count = challenge_retry_count;
+				walk->_state_send_retry_interval = challenge_retry_time;
+				walk->_state_last_send_time = get_process_start_time();
+				_send_challenge_request(walk);
+			}
+		}
+	}
+		
 	/// Sends a connect challenge request on behalf of the connection to the remote host.
 	void _send_challenge_request(pending_connection *the_connection)
 	{
@@ -106,6 +267,7 @@ protected:
 		packet_stream out;
 		core::write(out, uint8(connect_challenge_request_packet));
 		core::write(out, the_connection->get_initiator_nonce());
+		core::write(out, the_connection->get_host_nonce());
 		out.send_to(_socket, the_connection->get_address());
 	}
 	
@@ -117,21 +279,21 @@ protected:
 		if(!_allow_connections)
 			return;
 		
-		nonce initiator_nonce;
+		nonce initiator_nonce, host_nonce;
 		core::read(stream, initiator_nonce);
 
 		// In the case of an introduced connection we will already have a pending connenection for this address.  If so, validate that the nonce is correct.
-		pending_connection* conn = _find_pending_connection(addr);
-		if(conn)
+		pending_connection *conn;
+		for(conn = _pending_connections; conn; conn = conn->_next)
 		{
-			if(initiator_nonce != conn->get_initiator_nonce())
-				return;
-			if(conn->get_type() == pending_connection::introduced_connection_host && conn->get_state() == pending_connection::sending_punch_packets)
+			if(conn->get_state() == pending_connection::sending_punch_packets && conn->get_type() == pending_connection::introduced_connection_host && initiator_nonce == conn->get_initiator_nonce() && host_nonce == conn->get_host_nonce())
 			{
+				conn->_address = addr;
 				conn->set_state(pending_connection::awaiting_connect_request);
 				conn->_state_send_retry_count = 0;
 				conn->_state_send_retry_interval = introduced_connection_connect_timeout;
 				conn->_state_last_send_time = get_process_start_time();
+				break;
 			}
 		}
 		_send_connect_challenge_response(addr, initiator_nonce);
@@ -574,10 +736,10 @@ protected:
 						_handle_disconnect(the_address, packet_stream);
 						break;
 					case introduced_connection_request_packet:
-						_handle_introduced_connection_request(the_address, packet_stream);
+						_handle_introduction_request(the_address, packet_stream);
 						break;
 					case connection_introduction_packet:
-						_handle_connection_introduction(the_address, packet_stream);
+						_handle_introduction(the_address, packet_stream);
 						break;
 					case punch_packet:
 						_handle_punch(the_address, packet_stream);
@@ -586,31 +748,6 @@ protected:
 			}
 		}
 	}
-	void _handle_introduced_connection_request(const address &the_address, bit_stream &packet_stream)
-	{
-
-	}
-
-	void _handle_connection_introduction(const address &the_address, bit_stream &packet_stream)
-	{
-
-	}
-
-	void _handle_punch(const address &the_address, bit_stream &packet_stream)
-	{
-
-	}
-
-	void _send_introduction_request(pending_connection *the_connection)
-	{
-
-	}
-
-	void _send_punch(pending_connection *the_connection)
-	{
-
-	}
-
 protected:
 	/// Structure used to track packets that read by the background packet reader or are delayed in sending for simulating a high-latency connection.  The packet_record is allocated as sizeof(packet_record) + packet_size;
 	struct packet_record
@@ -984,42 +1121,61 @@ public:
 	
 	struct introduction_record
 	{
+		nonce initiator_nonce, host_nonce;
+		
 		torque_connection_id initiator;
 		torque_connection_id host;
+		bool initiator_request_received;
+		bool host_request_received;
+		bool initial_intro_sent;
 		time introduction_time;
 	};
+	
+	array<introduction_record> _introductions;
 	
 	/// This is called on the middleman of an introduced connection and will allow this host to broker a connection start between the remote hosts at either connection point.
 	void introduce_connection(torque_connection_id initiator, torque_connection_id host)
 	{
 		if(_find_connection(initiator) && _find_connection(host))
 		{
+			logprintf("introducing connections %d(initiator) to %d(host)", initiator, host);
 			introduction_record r;
+			r.initiator_nonce = _random_generator.random_nonce();
+			r.host_nonce = _random_generator.random_nonce();
 			r.initiator = initiator;
 			r.host = host;
+			r.initiator_request_received = false;
+			r.host_request_received = false;
+			r.initial_intro_sent = false;
 			r.introduction_time = time::get_current();
+			_introductions.push_back(r);
 		}
 	}
 	
 	/// Connect to a client connected to the host at middle_man.
 	torque_connection_id connect_introduced(torque_connection_id introducer, torque_connection_id remote_client_identity, int is_host, uint32 connect_data_size, uint8 *connect_data)
 	{
-		/*/// Connects to a remote host that is also connecting to this torque_connection (negotiated by a third party)
-		 void connect_arranged(torque_socket *connection_torque_socket, const array<address> &possible_addresses, nonce &my_nonce, nonce &remote_nonce, byte_buffer_ptr shared_secret, bool is_initiator)
-		 {
-		 _connection_parameters._possible_addresses = possible_addresses;
-		 _connection_parameters._is_initiator = is_initiator;
-		 _connection_parameters._is_arranged = true;
-		 _connection_parameters._nonce = my_nonce;
-		 _connection_parameters._server_nonce = remote_nonce;
-		 _connection_parameters._arranged_secret = shared_secret;
-		 
-		 set_torque_socket(connection_torque_socket);
-		 _torque_socket->start_arranged_connection(this);
-		 }*/
+		torque_connection *introducing_connection = _find_connection(introducer);
 		
+		if(!introducing_connection)
+			return invalid_torque_connection;
 		
+		uint32 initial_send_sequence = _random_generator.random_integer();
+		
+		pending_connection *new_connection = new pending_connection(is_host ? pending_connection::introduced_connection_host : pending_connection::introduced_connection_initiator, _random_generator.random_nonce(), initial_send_sequence, _next_connection_index++);
+		
+		new_connection->_introducer = introducer;
+		new_connection->_remote_client_id = remote_client_identity;
+		new_connection->_packet_data = new byte_buffer(connect_data, connect_data_size);
+		new_connection->_state_send_retry_count = challenge_retry_count;
+		new_connection->_state_send_retry_interval = challenge_retry_time;
+		new_connection->_state_last_send_time = get_process_start_time();
+		
+		_add_pending_connection(new_connection);
+		_send_introduction_request(new_connection);
+		return new_connection->_connection_index;
 	}
+	
 	void accept_connection_challenge(torque_connection_id the_connection)
 	{
 		pending_connection *conn = _find_pending_connection(the_connection);

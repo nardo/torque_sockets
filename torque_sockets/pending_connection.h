@@ -8,9 +8,7 @@ public:
 	enum pending_connection_state {
 		
 		requesting_introduction, ///< Requesting the address and shared secret for connection to an introduced initiator or host
-		sending_punch_packets, ///< The state of a pending introduced connection when both sides haven't heard from the other yet
-		awaiting_initiator_challenge, ///< The introduced host moves into this state after receiving punch confirmation.
-		
+		sending_punch_packets, ///< The state of a pending introduced connection after receiving an introduction from the introducer; when the initiator receives a punch it requests a challenge response; the host stays in punch state until it receives a challenge request.
 		requesting_challenge_response, ///< This initiator is sending challenge requests, awaiting the response.  An introdced initiator will move into this state after punch confirmation.
 		awaiting_local_challenge_accept, ///< This pending connection is awaiting either an accept_connection_challenge or a disconnect call to the socket for this connection.  A pending connection initiator will be in this state after receiving a challenge response from the host.
 		
@@ -68,6 +66,8 @@ public:
 		_connection_index = connection_index;
 		_initiator_nonce = initiator_nonce;
 		_initial_send_sequence = initial_send_sequence;
+		_introducer = 0;
+		_remote_client_id = 0;
 		_next = 0;
 	}
 	
@@ -119,7 +119,9 @@ public:
 	uint32 _initial_send_sequence;
 	uint32 _initial_recv_sequence;
 	byte_buffer_ptr _shared_secret; ///< The shared secret key
-
+	torque_connection_id _introducer; ///< The remote host that will be introducing this connection
+	torque_connection_id _remote_client_id; ///< The connection id to the introduced party on the _introducer
+	
 	address _address; ///< address of the remote host
 	pending_connection_type _type; ///< the type of this pending connection
 	pending_connection_state _state; ///< the current state of this pending connection

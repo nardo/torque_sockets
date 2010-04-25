@@ -45,6 +45,7 @@ public:
 	{
 		nonce the_nonce;
 		random_buffer((uint8 *) &the_nonce, sizeof(the_nonce));
+		return the_nonce;
 	}
 	
 	uint32 random_in_range(uint32 range_start, uint32 range_end)

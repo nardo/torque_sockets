@@ -51,6 +51,7 @@ int torque_socket_send_to(torque_socket_handle the_socket, struct sockaddr* remo
 {
 	core::net::address a(*remote_host);
 	core::net::udp_socket::send_to_result r = ((core::net::torque_socket *) the_socket)->send_to(a, data_size, data);
+	return r;
 }
 
 torque_connection_id torque_socket_connect(torque_socket_handle the_socket, struct sockaddr* remote_host, unsigned connect_data_size, unsigned char *connect_data)
