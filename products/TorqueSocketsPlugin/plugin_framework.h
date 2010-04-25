@@ -298,8 +298,8 @@ bool void_from_np_variant(empty_type *dest, NPVariant *src, context *)
 
 bool int32_from_np_variant(core::int32 *dest, NPVariant *src, context *)
 {
-	logprintf("np_variant_to_int32");
 	*dest = NPVARIANT_TO_INT32(*src);
+	logprintf("np_variant_to_int32 = %d", *dest);
 	return true;
 }
 
