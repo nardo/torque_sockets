@@ -572,6 +572,7 @@ protected:
 		torque_connection *the_connection = new torque_connection(pending->get_initiator_nonce(), pending->get_initial_send_sequence(), pending->_connection_index, true);
 		the_connection->set_initial_recv_sequence(recv_sequence);
 		the_connection->set_address(pending->get_address());
+		the_connection->set_shared_secret(pending->get_shared_secret());
 		the_connection->_host_nonce = pending->_host_nonce;
 		the_connection->set_torque_socket(this);
 		_remove_pending_connection(pending); // remove the pending connection
@@ -1234,7 +1235,6 @@ public:
 	void _disconnect(torque_connection_id connection_id, uint32 reason_code, uint8 *disconnect_data, uint32 disconnect_data_size)
 	{
 		assert(disconnect_data_size <= torque_sockets_max_status_datagram_size);
-		
 		// see if it's a connected instance
 		torque_connection *connection = _find_connection(connection_id);
 		if(connection)
@@ -1250,7 +1250,6 @@ public:
 			core::write(out, reason_code);
 			core::write(out, disconnect_data_size);
 			out.write_bytes(disconnect_data, disconnect_data_size);
-			
 			symmetric_cipher the_cipher(connection->get_shared_secret());
 			bit_stream_hash_and_encrypt(out, torque_connection::message_signature_bytes, encrypt_pos, &the_cipher);
 			
@@ -1346,8 +1345,11 @@ public:
 	~torque_socket()
 	{
 		// gracefully close all the connections on this torque_socket:
+		logprintf("Disconnecting connections.");
 		while(_connection_list)
 			_disconnect(_connection_list->get_connection_index(), reason_self_disconnect, 0, 0);
+		logprintf("Done.");
+
 	}
 	
 	/// @param bind_address Local network address to bind this torque_socket to.

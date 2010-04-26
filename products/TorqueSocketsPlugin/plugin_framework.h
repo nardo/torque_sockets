@@ -142,7 +142,8 @@ public:
 	
 	static void _deallocate(NPObject *object)
 	{
-		logprintf("_deallocate");
+		scriptable_class *ci = (scriptable_class *) object->_class;
+		logprintf("_deallocate %s", ci->_type_rep->name.c_str());
 		get_type_rep(object)->type->destroy_object(object);
 		NPNFuncs.memfree(object);
 		logprintf("_deallocate_done");
@@ -312,20 +313,21 @@ bool bool_from_np_variant(bool *dest, NPVariant *src, context *)
 
 bool double_from_np_variant(core::float64 *dest, NPVariant *src, context *)
 {
-	logprintf("np_variant_to_double");
 	*dest = NPVARIANT_TO_DOUBLE(*src);
+	logprintf("np_variant_to_double %g", *dest);
 	return true;
 }
 
 bool string_from_np_variant(core::string *dest, NPVariant *src, context *)
 {
-	logprintf("np_variant_to_string");
 	if(NPVARIANT_IS_STRING(*src))
 	{		
 		dest->set(src->value.stringValue.utf8characters, src->value.stringValue.utf8length);
+		logprintf("np_variant_to_string - %s", dest->c_str());
 		return true;
 	}
 	dest->set("");
+	logprintf("np_variant_to_string - invalid!");
 	return false;
 }
 
