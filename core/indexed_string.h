@@ -112,10 +112,10 @@ class indexed_string
 			totally_equal,
 		};
 		
-		static char8 _tolower(char8 c)
-		{
-			return (c < 'A' || c > 'Z') ? c : c - 'A' + 'a';
-		}
+	//	static inline char8 _tolower(char8 c)
+	//	{
+	//		return (c < 'A' || c > 'Z') ? c : c - 'A' + 'a';
+	//	}
 		
 		static string_compare_result _compare_strings(const char8 *buffer, uint32 buffer_len, const char8 *stored_string)
 		{
@@ -129,7 +129,7 @@ class indexed_string
 				if(c1 == c2)
 					continue;
 				// they don't match, see if they match in the case insenitive way
-				if(_tolower(c1) != _tolower(c2))
+				if(tolower(c1) != tolower(c2))
 					return not_at_all_equal;
 				result = equal_in_the_case_insensitive_way;
 			}
@@ -144,7 +144,7 @@ class indexed_string
 			uint32 result = 0;
 			while(buffer_len--)
 			{
-				char8 c = _tolower(*buffer++);
+				char8 c = tolower(*buffer++);
 				result = ((result << 4) | (result >> 28)) ^ c;
 			}
 			return result;

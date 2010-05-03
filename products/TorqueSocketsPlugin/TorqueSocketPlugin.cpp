@@ -15,7 +15,26 @@ namespace core
 };
 
 #include "torque_sockets/torque_sockets_c_implementation.h"
-#include "plugin_framework.h"
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+#include "plugin_framework/npapi.h"
+#include "plugin_framework/npupp.h"
+#include "plugin_framework/npapi.h"
+#include "plugin_framework/npupp.h"
+
+//#include <map>
+//#include <string>
+//#include <string.h>
+//#include <stdio.h>
+
+#ifndef WIN32
+#define OSCALL
+#endif
+
+#include "plugin_framework/plugin_framework.h"
 
 class torque_socket_instance : public scriptable_object
 {

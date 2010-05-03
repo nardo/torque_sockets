@@ -1,22 +1,5 @@
 // Pepper plugin framework class
 // (C) GarageGames.  This code is released under the MIT license.
-#ifdef WIN32
-#include <windows.h>
-#endif
-
-#include "npapi.h"
-#include "npupp.h"
-#include "npapi.h"
-#include "npupp.h"
-
-#include <map>
-#include <string>
-#include <string.h>
-#include <stdio.h>
-
-#ifndef WIN32
-#define OSCALL
-#endif
 
 static NPNetscapeFuncs NPNFuncs;
 class scriptable_class;

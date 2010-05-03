@@ -1,4 +1,4 @@
-#include "stdio.h"
+#include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/time.h>
@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <stdarg.h>
 
 typedef __uint8_t		sa_family_t;
 struct  hostent {

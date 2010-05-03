@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 #include <CoreServices/CoreServices.h>
 
