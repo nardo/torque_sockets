@@ -1,11 +1,12 @@
 // Pepper plugin framework class
 // (C) GarageGames.  This code is released under the MIT license.
 
-static NPNetscapeFuncs NPNFuncs;
+NPNetscapeFuncs* browser;
 class scriptable_class;
 class plugin;
 
-extern void plugin_main();
+extern void plugin_initialize();
+extern void plugin_shutdown();
 using namespace core;
 
 static type_database &global_type_database()
@@ -26,15 +27,15 @@ struct NPObjectRef
 	~NPObjectRef()
 	{
 		if(obj)
-			NPNFuncs.releaseobject(obj);
+			browser->releaseobject(obj);
 	}
 	void operator=(NPObject *the_object)
 	{
 		if(obj)
-			NPNFuncs.releaseobject(obj);
+			browser->releaseobject(obj);
 		obj = the_object;
 		if(obj)
-			NPNFuncs.retainobject(obj);
+			browser->retainobject(obj);
 	}
 	operator NPObject*()
 	{
@@ -52,6 +53,10 @@ public:
 		return _plugin_instance;
 	}
 	
+	virtual void init(NPMIMEType pluginType, core::int16 argc, char* argn[], char* argv[])
+	{
+	}
+	
 	void _call_function(NPObject *function, function_type_signature *calling_signature, void *return_value, void **arguments)
 	{
 		NPVariant np_args[function_call_record::max_arguments];
@@ -61,9 +66,9 @@ public:
 		type_database &db = global_type_database();
 		for(core::uint32 i = 0; i < calling_signature->argument_count; i++)
 			db.type_convert(np_args + i, variant_type, arguments[i], calling_signature->argument_types[i]);
-		NPNFuncs.invokeDefault(_plugin_instance, function, np_args, calling_signature->argument_count, &np_return_value);
+		browser->invokeDefault(_plugin_instance, function, np_args, calling_signature->argument_count, &np_return_value);
 		db.type_convert(return_value, calling_signature->return_type, &np_return_value, variant_type);
-		NPNFuncs.releasevariantvalue(&np_return_value);
+		browser->releasevariantvalue(&np_return_value);
 	}
 	template<class return_type> void call_function(NPObjectRef &func, return_type *return_value)
 	{
@@ -112,14 +117,17 @@ public:
 	
 	static NPObject *_allocate(NPP npp, NPClass *the_class)
 	{
+		logprintf("GOT TO ALLOCATE");
 		scriptable_class *ci = (scriptable_class *) the_class;
 		core::uint32 instance_size = ci->_instance_type->size;
-		scriptable_object *instance = (scriptable_object *) NPNFuncs.memalloc(instance_size);
-		logprintf("_allocate %s, %08x", ci->_type_rep->name.c_str(), instance);
+		scriptable_object *instance = (scriptable_object *) browser->memalloc(instance_size);
+		logprintf("_allocate %s, %08x, %d", ci->_type_rep->name.c_str(), instance, ci->_instance_type->size);
 		ci->_instance_type->construct_object(instance);
 		instance->_plugin_instance = npp;
-		instance->_class = the_class;
-		instance->referenceCount = 1;
+		logprintf("obj = %08x, plugin_instance = %08x (%d)", instance, instance->_plugin_instance, offsetof(scriptable_object, _plugin_instance));
+
+		//instance->_class = the_class;
+		//instance->referenceCount = 0;
 		return instance;
 	}
 	
@@ -128,7 +136,7 @@ public:
 		scriptable_class *ci = (scriptable_class *) object->_class;
 		logprintf("_deallocate %s", ci->_type_rep->name.c_str());
 		get_type_rep(object)->type->destroy_object(object);
-		NPNFuncs.memfree(object);
+		browser->memfree(object);
 		logprintf("_deallocate_done");
 	}
 	
@@ -138,10 +146,11 @@ public:
 	
 	static bool _has_method(NPObject *object, NPIdentifier name)
 	{
-		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
+		logprintf("_plugin_instance = %08x", ((scriptable_object *) object)->_plugin_instance);
+		NPUTF8 *text = browser->utf8fromidentifier(name);
 		logprintf("_has_method %s", text);
 		
-		NPNFuncs.memfree(text);
+		browser->memfree(text);
 		
 		scriptable_class *cls = (scriptable_class *) object->_class;
 		return bool(cls->_methods.find(name));
@@ -149,9 +158,11 @@ public:
 	
 	static bool _invoke(NPObject* object, NPIdentifier name, const NPVariant* args, uint32_t arg_count, NPVariant* result)
 	{
-		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
+		logprintf("_plugin_instance = %08x", ((scriptable_object *) object)->_plugin_instance);
+		NPUTF8 *text = browser->utf8fromidentifier(name);
 		logprintf("_invoke %s", text);
-		NPNFuncs.memfree(text);
+		browser->memfree(text);
+		scriptable_object *so = static_cast<scriptable_object *>(object);
 
 		scriptable_class *cls = (scriptable_class *) object->_class;
 		function_record **method = cls->_methods.find(name).value();
@@ -165,12 +176,14 @@ public:
 		
 		type_database &db = global_type_database();
 		function_call_storage storage(sig);
+		logprintf("1_plugin_instance = %08x", ((scriptable_object *) object)->_plugin_instance);
 		
 		for(core::uint32 i = 0; i < arg_count; i++)
 		{
 			db.type_convert(storage._args[i], sig->argument_types[i], &args[i], get_global_type_record<NPVariant>());
 		}
-		the_method->dispatch(object, storage._args, storage._return_value);
+		logprintf("object = %08x", so);
+		the_method->dispatch(so, storage._args, storage._return_value);
 		db.type_convert(result, get_global_type_record<NPVariant>(), storage._return_value, sig->return_type);
 		return true;
 	}
@@ -182,9 +195,10 @@ public:
 	
 	static bool _has_property(NPObject* object, NPIdentifier name)
 	{
-		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
+		logprintf("_plugin_instance = %08x", ((scriptable_object *) object)->_plugin_instance);
+		NPUTF8 *text = browser->utf8fromidentifier(name);
 		logprintf("_has_property %s", text);
-		NPNFuncs.memfree(text);
+		browser->memfree(text);
 
 		scriptable_class *cls = (scriptable_class *) object->_class;
 		type_database::field_rep **field = cls->_fields.find(name).value();
@@ -193,29 +207,30 @@ public:
 
 	static bool _get_property(NPObject* object, NPIdentifier name, NPVariant* result)
 	{
-		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
+		NPUTF8 *text = browser->utf8fromidentifier(name);
 		logprintf("_get_property %s", text);
-		NPNFuncs.memfree(text);
+		browser->memfree(text);
+		scriptable_object *so = static_cast<scriptable_object *> (object);
 		
 		scriptable_class *cls = (scriptable_class *) object->_class;
 		type_database::field_rep **field = cls->_fields.find(name).value();
 		if(!field)
 			return false;
-		global_type_database().type_convert(result, get_global_type_record<NPVariant>(), ((core::uint8*)object) + (*field)->offset, (*field)->type);
+		global_type_database().type_convert(result, get_global_type_record<NPVariant>(), ((core::uint8*)so) + (*field)->offset, (*field)->type);
 		return true;
 	}
 	
 	static bool _set_property(NPObject* object, NPIdentifier name, const NPVariant* value)
 	{
-		NPUTF8 *text = NPNFuncs.utf8fromidentifier(name);
+		NPUTF8 *text = browser->utf8fromidentifier(name);
 		logprintf("_set_property %s", text);
-		NPNFuncs.memfree(text);
-		
+		browser->memfree(text);
+		scriptable_object *so = static_cast<scriptable_object*>(object);
 		scriptable_class *cls = (scriptable_class *) object->_class;
 		type_database::field_rep **field = cls->_fields.find(name).value();
 		if(!field)
 			return false;
-		global_type_database().type_convert( ((core::uint8*)object) + (*field)->offset, (*field)->type, value, get_global_type_record<NPVariant>());
+		global_type_database().type_convert( ((core::uint8*)so) + (*field)->offset, (*field)->type, value, get_global_type_record<NPVariant>());
 		return true;
 	}
 
@@ -261,14 +276,14 @@ public:
 		{
 			indexed_string name = *(p.key());
 			type_database::field_rep *field = p.value();
-			NPIdentifier ident = NPNFuncs.getstringidentifier(name.c_str());
+			NPIdentifier ident = browser->getstringidentifier(name.c_str());
 			_fields.insert(ident, field);
 		}
 		for(hash_table_flat<indexed_string, function_record *>::pointer p = _type_rep->method_table.first(); p; ++p)
 		{
 			indexed_string name = *(p.key());
 			function_record *method = *(p.value());
-			NPIdentifier ident = NPNFuncs.getstringidentifier(name.c_str());
+			NPIdentifier ident = browser->getstringidentifier(name.c_str());
 			_methods.insert(ident, method);			
 		}
 	}
@@ -304,8 +319,12 @@ bool double_from_np_variant(core::float64 *dest, NPVariant *src, context *)
 bool string_from_np_variant(core::string *dest, NPVariant *src, context *)
 {
 	if(NPVARIANT_IS_STRING(*src))
-	{		
+	{
+#ifdef __native_client__
+		dest->set(src->value.stringValue.UTF8Characters, src->value.stringValue.UTF8Length);
+#else
 		dest->set(src->value.stringValue.utf8characters, src->value.stringValue.utf8length);
+#endif
 		logprintf("np_variant_to_string - %s", dest->c_str());
 		return true;
 	}
@@ -440,12 +459,12 @@ public:
 	NPObject *create_object(NPP instance, type_record *class_type)
 	{
 		scriptable_class *the_class = 0;
-		logprintf("Creating object instance of class %08x", class_type);
 		for(core::uint32 i = 0; i < _classes.size(); i++)
 			if(_classes[i]->_instance_type == class_type)
 				the_class = _classes[i];
+		logprintf("Creating object instance of class %08x, sc = %08x, inst = %08x", class_type, the_class, instance);
 		assert(the_class); // the class was not added to this plugin
-		return NPNFuncs.createobject(instance, the_class);
+		return browser->createobject(instance, the_class);
 	}
 };
 
@@ -464,7 +483,7 @@ public:
 	{
 		logprintf("~plugin_wrapper()");
 		if(_scriptable_object)
-			NPNFuncs.releaseobject(_scriptable_object);
+			browser->releaseobject(_scriptable_object);
 		//logprintf("~plugin_wrapper_fin()");
 	}
 	
@@ -474,7 +493,7 @@ public:
 			_scriptable_object = global_plugin.create_object(instance, global_plugin.get_plugin_class());
 
 		if(_scriptable_object)
-			NPNFuncs.retainobject(_scriptable_object);
+			browser->retainobject(_scriptable_object);
 		
 		return _scriptable_object;
 	}
@@ -484,7 +503,10 @@ public:
 NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc, char* argn[], char* argv[], NPSavedData* saved)
 {
 	logprintf("NPP_New");
-	instance->pdata = new plugin_wrapper;
+	//instance->pdata = new plugin_wrapper;
+	NPObject *obj = global_plugin.create_object(instance, global_plugin.get_plugin_class());
+	browser->retainobject(obj);
+	instance->pdata = obj;
 	if(!instance->pdata)
 		return NPERR_OUT_OF_MEMORY_ERROR;
 	return NPERR_NO_ERROR;
@@ -496,7 +518,8 @@ NPError NPP_Destroy(NPP instance, NPSavedData** save)
 	logprintf("NPP_Destroy");
 	if(!instance)
 		return NPERR_INVALID_INSTANCE_ERROR;
-	delete (plugin_wrapper *) instance->pdata;
+	browser->releaseobject((NPObject *) instance->pdata);
+	//delete (plugin_wrapper *) instance->pdata;
 	instance->pdata = NULL;
 	return NPERR_NO_ERROR;
 }
@@ -508,7 +531,9 @@ NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value)
 		if(!instance)
 			return NPERR_INVALID_INSTANCE_ERROR;
 		logprintf("NPPGetValue");
-		*((NPObject**) value) = (NPObject *) ((plugin_wrapper *) instance->pdata)->get_scriptable_object(instance);
+		browser->retainobject((NPObject *) instance->pdata);
+		*((NPObject**) value) = (NPObject *) instance->pdata;
+		//*((NPObject**) value) = (NPObject *) ((plugin_wrapper *) instance->pdata)->get_scriptable_object(instance);
 		return NPERR_NO_ERROR;
 	}
 	
@@ -571,59 +596,7 @@ NPError NPP_SetValue(NPP instance, NPNVariable variable, void *value)
 extern "C" {
 #endif
 
-
-#ifdef XP_UNIX
-NPError NP_Initialize(NPNetscapeFuncs *pFuncs, NPPluginFuncs* outFuncs)
-#else
-NPError NP_Initialize(NPNetscapeFuncs *pFuncs)
-#endif
-{
-	logprintf("NP_Initialize");
-	if (pFuncs == NULL)
-	{
-		logprintf("NPERR_INVALID_FUNCTABLE_ERROR");
-		return NPERR_INVALID_FUNCTABLE_ERROR;
-	}
-	
-	if ((pFuncs->version >> 8) > NP_VERSION_MAJOR)
-	{
-		logprintf("NPERR_INCOMPATIBLE_VERSION_ERROR");
-		return NPERR_INCOMPATIBLE_VERSION_ERROR;
-	}
-	
-	logprintf("I am version %i, and host is version %i", NP_VERSION_MINOR, (int)((char)pFuncs->version));
-	
-	// Safari sets the pfuncs size to 0
-	if (pFuncs->size == 0)
-		pFuncs->size = sizeof(NPNetscapeFuncs);
-	if (pFuncs->size < sizeof (NPNetscapeFuncs))
-	{
-		logprintf("Too Small, %i vs %lu", pFuncs->size, sizeof(NPNetscapeFuncs));
-		return NPERR_INVALID_FUNCTABLE_ERROR;
-	}
-	
-	NPNFuncs = *pFuncs;
-	plugin_main();
-
-#ifndef XP_MACOSX
-	NP_GetEntryPoints(outFuncs);
-#endif
-	
-	logprintf("Sweet Success");
-	
-	return NPERR_NO_ERROR;
-}
-	
-NPError NP_Shutdown()
-{
-	logprintf("NP_Shutdown");
-	return NPERR_NO_ERROR;
-}	
-
-char* NP_GetMIMEDescription()
-{
-	return "application/x-hello-world::Hello World Plugin";
-}
+NPNetscapeFuncs NPNFuncs;
 
 NPError NP_GetEntryPoints(NPPluginFuncs* pFuncs)
 {
@@ -659,6 +632,61 @@ NPError NP_GetEntryPoints(NPPluginFuncs* pFuncs)
 	pFuncs->javaClass     = NULL;
 	
 	return NPERR_NO_ERROR;
+}
+	
+#if defined(XP_UNIX)// && !defined(XP_MACOSX) 
+NPError NP_Initialize(NPNetscapeFuncs *pFuncs, NPPluginFuncs* outFuncs)
+#else
+NPError NP_Initialize(NPNetscapeFuncs *pFuncs)
+#endif
+{
+	logprintf("NP_Initialize");
+	if (pFuncs == NULL)
+	{
+		logprintf("NPERR_INVALID_FUNCTABLE_ERROR");
+		return NPERR_INVALID_FUNCTABLE_ERROR;
+	}
+	
+	if ((pFuncs->version >> 8) > NP_VERSION_MAJOR)
+	{
+		logprintf("NPERR_INCOMPATIBLE_VERSION_ERROR");
+		return NPERR_INCOMPATIBLE_VERSION_ERROR;
+	}
+	
+	logprintf("I am version %i, and host is version %i", NP_VERSION_MINOR, (int)((char)pFuncs->version));
+	
+	// Safari sets the pfuncs size to 0
+	if (pFuncs->size == 0)
+		pFuncs->size = sizeof(NPNetscapeFuncs);
+	if (pFuncs->size < sizeof (NPNetscapeFuncs))
+	{
+		logprintf("Too Small, %i vs %lu", pFuncs->size, sizeof(NPNetscapeFuncs));
+		return NPERR_INVALID_FUNCTABLE_ERROR;
+	}
+	
+	NPNFuncs = *pFuncs;
+	browser = &NPNFuncs;
+	
+#if defined(XP_UNIX) && !defined(XP_MACOSX)
+	NP_GetEntryPoints(outFuncs);
+#endif
+	plugin_initialize();
+
+	logprintf("Sweet Success");
+	
+	return NPERR_NO_ERROR;
+}
+	
+NPError NP_Shutdown()
+{
+	logprintf("NP_Shutdown");
+	plugin_shutdown();
+	return NPERR_NO_ERROR;
+}	
+
+char* NP_GetMIMEDescription()
+{
+	return "application/x-hello-world::Hello World Plugin";
 }
 
 NPError NP_GetValue(void*, NPPVariable variable, void* value)

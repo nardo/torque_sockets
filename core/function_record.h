@@ -88,7 +88,7 @@ template<class T, class return_type> struct function_record_decl<return_type (T:
 		T *ptr = (T*) object;
 		return_type *dest = (return_type *) return_data_ptr;
 		func_ptr f = _func;
-		
+		logprintf("dispatching func on %08x", object);
 		*dest = (ptr->*_func)();
 	}	
 };

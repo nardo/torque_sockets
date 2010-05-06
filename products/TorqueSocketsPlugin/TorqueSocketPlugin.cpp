@@ -61,7 +61,7 @@ public:
 	{
 		logprintf("back-call %d", net::time::get_current().get_milliseconds() % 1000);
 		torque_socket_instance *inst = (torque_socket_instance *) the_socket_instance;
-		NPNFuncs.pluginthreadasynccall(inst->get_plugin_instance(), main_thread_socket_notify, the_socket_instance);
+		browser->pluginthreadasynccall(inst->get_plugin_instance(), main_thread_socket_notify, the_socket_instance);
 	}
 									
 	static void main_thread_socket_notify(void *the_socket_instance)
@@ -223,8 +223,13 @@ public:
 	{
 		logprintf("torque_socket_plugin constructor");
 	}
+	~torque_socket_plugin()
+	{
+		logprintf("torque_socket_plugin destructor");
+	}
 	NPObject *create_torque_socket()
 	{
+		logprintf("create_torque_socket called. %08x, %08x\n", this, get_plugin_instance());
 		NPObject* object = global_plugin.create_object(get_plugin_instance(), core::get_global_type_record<torque_socket_instance>());
 		return object;
 	}
@@ -236,7 +241,7 @@ public:
 	}
 };
 
-void plugin_main()
+void plugin_initialize()
 {
 	ltc_mp = ltm_desc;
 	torque_socket_instance::register_class(global_type_database());
@@ -246,3 +251,7 @@ void plugin_main()
 	global_plugin.set_plugin_class(get_global_type_record<torque_socket_plugin>());
 }
 
+void plugin_shutdown()
+{
+
+}

@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#define XP_UNIX
+
 typedef __uint8_t		sa_family_t;
 struct  hostent {
 	char    *h_name;        /* official name of host */
