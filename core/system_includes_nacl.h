@@ -61,7 +61,8 @@ int bind(int, const struct sockaddr *, socklen_t) { return 0; }
 int getsockname(int, struct sockaddr * __restrict, socklen_t * __restrict) { return 0; }
 int	getsockopt(int, int, int, void * __restrict, socklen_t * __restrict) { return 0; }
 int	setsockopt(int, int, int, const void *, socklen_t) { return 0; }
-ssize_t	recvfrom(int, void *, size_t, int, struct sockaddr * __restrict, socklen_t * __restrict) { return 0; }
+ssize_t	recvfrom(int, void *, size_t, int, struct sockaddr * __restrict, socklen_t * __restrict)
+{ errno = EAGAIN; return -1; }
 ssize_t	sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t) { return 0; }
 int	socket(int, int, int) { return 0; }
 __uint32_t	htonl(__uint32_t) { return 0; }
@@ -83,6 +84,18 @@ typedef int SOCKET;
 #include <queue>
 #endif
 
+inline int pthread_cancel(pthread_t thread)
+{
+	return 0;
+}
+
+extern "C" {
+	
+int kill(pid_t pid, int sig)
+{
+	return 0;
+}
+};
 
 
 

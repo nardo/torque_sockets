@@ -57,6 +57,15 @@ public:
 	{
 	}
 	
+	virtual void set_window(NPWindow *window)
+	{
+	}
+	
+	virtual core::int16 handle_event(void *event)
+	{
+		return 0;
+	}
+	
 	void _call_function(NPObject *function, function_type_signature *calling_signature, void *return_value, void **arguments)
 	{
 		NPVariant np_args[function_call_record::max_arguments];
@@ -470,43 +479,17 @@ public:
 
 plugin global_plugin;
 
-class plugin_wrapper
-{
-	NPObject *_scriptable_object;
-public:
-	plugin_wrapper()
-	{
-		logprintf("plugin_wrapper()");
-		_scriptable_object = 0;
-	}
-	~plugin_wrapper()
-	{
-		logprintf("~plugin_wrapper()");
-		if(_scriptable_object)
-			browser->releaseobject(_scriptable_object);
-		//logprintf("~plugin_wrapper_fin()");
-	}
-	
-	NPObject *get_scriptable_object(NPP instance)
-	{
-		if(!_scriptable_object)
-			_scriptable_object = global_plugin.create_object(instance, global_plugin.get_plugin_class());
-
-		if(_scriptable_object)
-			browser->retainobject(_scriptable_object);
-		
-		return _scriptable_object;
-	}
-};
-
 // Called to create a new instance of the plugin
 NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc, char* argn[], char* argv[], NPSavedData* saved)
 {
 	logprintf("NPP_New");
-	//instance->pdata = new plugin_wrapper;
 	NPObject *obj = global_plugin.create_object(instance, global_plugin.get_plugin_class());
 	browser->retainobject(obj);
 	instance->pdata = obj;
+
+	scriptable_object *o = static_cast<scriptable_object *>(obj);
+	o->init(pluginType, argc, argn, argv);
+	
 	if(!instance->pdata)
 		return NPERR_OUT_OF_MEMORY_ERROR;
 	return NPERR_NO_ERROR;
@@ -519,7 +502,6 @@ NPError NPP_Destroy(NPP instance, NPSavedData** save)
 	if(!instance)
 		return NPERR_INVALID_INSTANCE_ERROR;
 	browser->releaseobject((NPObject *) instance->pdata);
-	//delete (plugin_wrapper *) instance->pdata;
 	instance->pdata = NULL;
 	return NPERR_NO_ERROR;
 }
@@ -533,7 +515,6 @@ NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value)
 		logprintf("NPPGetValue");
 		browser->retainobject((NPObject *) instance->pdata);
 		*((NPObject**) value) = (NPObject *) instance->pdata;
-		//*((NPObject**) value) = (NPObject *) ((plugin_wrapper *) instance->pdata)->get_scriptable_object(instance);
 		return NPERR_NO_ERROR;
 	}
 	
@@ -543,6 +524,11 @@ NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value)
 // Called to update a plugin instances's NPWindow
 NPError NPP_SetWindow(NPP instance, NPWindow* window)
 {
+	NPObject *obj = (NPObject *) instance->pdata;
+	scriptable_object *o = static_cast<scriptable_object *>(obj);
+	logprintf("NPPSetWindow");
+
+	o->set_window(window);
 	return NPERR_NO_ERROR;
 }
 
@@ -579,7 +565,10 @@ void NPP_Print(NPP instance, NPPrint* platformPrint)
 
 int16_t NPP_HandleEvent(NPP instance, void* event)
 {
-	return 0;
+	NPObject *obj = (NPObject *) instance->pdata;
+	scriptable_object *o = static_cast<scriptable_object *>(obj);
+	
+	return o->handle_event(event);
 }
 
 void NPP_URLNotify(NPP instance, const char* url, NPReason reason, void* notifyData)
@@ -691,6 +680,7 @@ char* NP_GetMIMEDescription()
 
 NPError NP_GetValue(void*, NPPVariable variable, void* value)
 {
+	logprintf("NP_GetValue %d", variable);
 	if (variable == NPPVpluginNameString)
 	{
 		const char** val = (const char**)value;
