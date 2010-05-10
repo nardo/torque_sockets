@@ -363,18 +363,10 @@ protected:
 		byte_buffer_ptr response_data;
 		core::read(stream, response_data);
 
-		torque_socket_event *event = _allocate_queued_event();
-		event->event_type = torque_connection_challenge_response_event_type;
+		torque_socket_event *event = _event_queue.post_event(torque_connection_challenge_response_event_type, conn->_connection_index);
+		_event_queue.set_event_key(event, conn->_public_key->get_public_key()->get_buffer(), conn->_public_key->get_public_key()->get_buffer_size());
+		_event_queue.set_event_data(event, response_data->get_buffer(), response_data->get_buffer_size());
 
-		event->public_key_size = conn->_public_key->get_public_key()->get_buffer_size();
-		event->public_key = _allocate_queue_data(event->public_key_size);
-		memcpy(event->public_key, conn->_public_key->get_public_key()->get_buffer(), event->public_key_size);
-
-		event->connection = conn->_connection_index;
-		event->data_size = response_data->get_buffer_size();
-		event->data = _allocate_queue_data(event->data_size);
-		
-		memcpy(event->data, response_data->get_buffer(), event->data_size);
 		conn->set_state(pending_connection::awaiting_local_challenge_accept);
 		conn->_state_send_retry_count = 0;
 		conn->_state_send_retry_interval = introduction_timeout;
@@ -502,20 +494,9 @@ protected:
 
 		_add_pending_connection(pending);
 
-		torque_socket_event *event;
-		event = _allocate_queued_event();
-		
-		event->event_type = torque_connection_requested_event_type;
-
-		event->public_key_size = public_key->get_public_key()->get_buffer_size();
-		event->public_key = _allocate_queue_data(event->public_key_size);
-		
-		memcpy(event->public_key, public_key->get_public_key()->get_buffer(), event->public_key_size);
-
-		event->connection = pending->_connection_index;
-		event->data_size = connect_request_data->get_buffer_size();
-		event->data = _allocate_queue_data(event->data_size);
-		memcpy(event->data, connect_request_data->get_buffer(), event->data_size);
+		torque_socket_event *event = _event_queue.post_event(torque_connection_requested_event_type, pending->_connection_index);
+		_event_queue.set_event_key(event, public_key->get_public_key()->get_buffer(), public_key->get_public_key()->get_buffer_size());
+		_event_queue.set_event_data(event, connect_request_data->get_buffer(), connect_request_data->get_buffer_size());
 	}
 	
 	/// Sends a connect accept packet to acknowledge the successful acceptance of a connect request.
@@ -580,7 +561,7 @@ protected:
 		_add_connection(the_connection); // first, add it as a regular connection
 		TorqueLogMessageFormatted(LogNettorque_socket, ("Received Connect Accept - connection established."));
 
-		_post_connection_event(the_connection->get_connection_index(), torque_connection_established_event_type, 0);
+		_event_queue.post_event(torque_connection_established_event_type, the_connection->get_connection_index());
 	}
 	
 	/// Sends a connect rejection to a valid connect request in response to possible error conditions (server full, wrong password, etc).
@@ -616,8 +597,7 @@ protected:
 		
 		TorqueLogMessageFormatted(LogNettorque_socket, ("Received Connect Reject - reason %d", reason));
 
-		// if the reason is a bad puzzle solution, try once more with a
-		// new nonce.
+		// if the reason is a bad puzzle solution, try once more with a new nonce.
 		if(reason == reason_failed_puzzle && !pending->_puzzle_retried)
 		{
 			pending->_puzzle_retried = true;
@@ -632,7 +612,7 @@ protected:
 		}
 		byte_buffer_ptr null;
 
-		_post_connection_event(pending->_connection_index, torque_connection_disconnected_event_type, null);
+		_event_queue.post_event(torque_connection_disconnected_event_type, pending->_connection_index);
 		_remove_pending_connection(pending);
 	}
 	
@@ -663,8 +643,9 @@ protected:
 			if(disconnect_data_size > torque_sockets_max_status_datagram_size)
 				disconnect_data_size = torque_sockets_max_status_datagram_size;
 			stream.read_bytes(disconnect_data, disconnect_data_size);
-			byte_buffer_ptr disconnect_data_buffer = new byte_buffer(disconnect_data, disconnect_data_size);
-			_post_connection_event(conn->get_connection_index(), torque_connection_disconnected_event_type, disconnect_data_buffer);
+			torque_socket_event *event = _event_queue.post_event(torque_connection_disconnected_event_type, conn->get_connection_index());
+			_event_queue.set_event_data(event, disconnect_data, disconnect_data_size);
+
 			_remove_connection(conn);
 		}
 		else
@@ -674,7 +655,7 @@ protected:
 				return;
 			if(pending->get_initiator_nonce() != initiator_nonce || pending->get_host_nonce() != host_nonce)
 				return;
-			_post_connection_event(conn->get_connection_index(), torque_connection_disconnected_event_type, 0);
+			_event_queue.post_event(torque_connection_disconnected_event_type, conn->get_connection_index());
 			_remove_pending_connection(pending);
 		}
 	}
@@ -682,10 +663,9 @@ protected:
 	/// Handles all packets that don't fall into the category of torque_connection handshake or game data.
 	void _handle_info_packet(const address &address, uint8 packet_type, bit_stream &stream)
 	{
-		torque_socket_event *event = _allocate_queued_event();
-		event->event_type = torque_socket_packet_event_type;
+		torque_socket_event *event = _event_queue.post_event(torque_socket_packet_event_type);
 		event->data_size = stream.get_stream_byte_size();
-		event->data = (uint8 *) _allocate_queue_data(event->data_size);
+		event->data = (uint8 *) _event_queue.allocate_queue_data(event->data_size);
 		memcpy(event->data, stream.get_buffer(), event->data_size);
 		address.to_sockaddr(&event->source_address);
 	}
@@ -760,58 +740,6 @@ protected:
 		uint8 packet_data[1]; ///< Packet data.
 	};
 	
-	struct event_queue_entry {
-		torque_socket_event *event;
-		event_queue_entry *next_event;
-	};
-	
-	torque_socket_event *_allocate_queued_event()
-	{
-		torque_socket_event *ret = (torque_socket_event *) _event_queue_allocator.allocate(sizeof(torque_socket_event));
-		event_queue_entry *entry = (event_queue_entry *) _event_queue_allocator.allocate(sizeof(event_queue_entry));
-		
-		entry->event = ret;
-		
-		ret->data = 0;
-		ret->public_key = 0;
-		ret->data_size = 0;
-		ret->public_key_size = 0;
-		
-		entry->next_event = 0;
-		if(_event_queue_tail)
-		{
-			_event_queue_tail->next_event = entry;
-			_event_queue_tail = entry;
-		}
-		else
-			_event_queue_head = _event_queue_tail = entry;
-		return entry->event;
-	}
-	
-	uint8 *_allocate_queue_data(uint32 data_size)
-	{
-		return (uint8 *) _event_queue_allocator.allocate(data_size);
-	}
-	
-	torque_socket_event *_post_connection_event(torque_connection_id conn, uint32 event_type, byte_buffer_ptr data)
-	{
-		torque_socket_event *event = _allocate_queued_event();
-		event->event_type = event_type;
-		event->connection = conn;
-		if(data)
-		{
-			event->data_size = data->get_buffer_size();
-			event->data = _allocate_queue_data(event->data_size);
-			memcpy(event->data, data->get_buffer(), event->data_size);
-		}
-		else
-		{
-			event->data_size = 0;
-			event->data = 0;
-		}
-		return event;
-	}
-	
 	/// Checks all connections on this torque_socket for packet sends, and for timeouts and all valid and pending connections.
 	void process_connections()
 	{
@@ -839,7 +767,7 @@ protected:
 					if(!pending->_state_send_retry_count)
 					{
 						// this pending connection request has timed out.
-						_post_connection_event(pending->_connection_index, torque_connection_timed_out_event_type, 0);
+						_event_queue.post_event(torque_connection_timed_out_event_type, pending->_connection_index);
 						*walk = pending->_next;
 						delete pending;
 					}
@@ -874,7 +802,7 @@ protected:
 
 				if(the_connection->check_timeout(get_process_start_time()))
 				{
-					_post_connection_event(the_connection->_connection_index, torque_connection_timed_out_event_type, 0);
+					_event_queue.post_event(torque_connection_timed_out_event_type, the_connection->_connection_index);
 					_remove_connection(the_connection);
 				}
 			}
@@ -1107,6 +1035,8 @@ public:
 	/// open a connection to the remote host
 	torque_connection_id connect(const address &remote_host, uint8 *connect_data, uint32 connect_data_size)
 	{
+		logprintf("socket->connect\n%s", net::buffer_encode_base_16(connect_data, connect_data_size)->get_buffer());
+		
 		_disconnect_existing_connection(remote_host);
 		uint32 initial_send_sequence = _random_generator.random_integer();
 		
@@ -1220,7 +1150,7 @@ public:
 		
 		_remove_pending_connection(pending);
 		_add_connection(new_connection);
-		_post_connection_event(new_connection->_connection_index, torque_connection_established_event_type, 0);
+		_event_queue.post_event(torque_connection_established_event_type, new_connection->_connection_index);
 		_send_connect_accept(new_connection);
 	}
 	
@@ -1299,31 +1229,24 @@ public:
 	torque_socket_event *get_next_event()
 	{
 		process_connections();
-		if(!_event_queue_head)
+		if(!_event_queue.has_event())
 		{
-			_event_queue_allocator.clear();
+			_event_queue.clear();
 			// if there's nothing in the event queue, see if a new packet's come in.
 			packet_stream stream;
 			address source_address;
 			
 			while(_get_next_packet(stream, source_address))
 			{
-				logprintf("Got a packet: %s.", stream.to_string().c_str());
+				//logprintf("Got a packet: %s.", stream.to_string().c_str());
 				_process_start_time = time::get_current();
 				_process_packet(source_address, stream);
-				if(_event_queue_head)
+				if(_event_queue.has_event())
 					break;
 			}
 		}
-		if(_event_queue_head)
-		{
-			torque_socket_event *ret = _event_queue_head->event;
-			_event_queue_head = _event_queue_head->next_event;
-			logprintf("returning event of type %d", ret->event_type);
-			if(!_event_queue_head)
-				_event_queue_tail = 0;
-			return ret;
-		}
+		if(_event_queue.has_event())
+			return _event_queue.dequeue();
 		else
 			return 0;
 	}	
@@ -1353,7 +1276,7 @@ public:
 	}
 	
 	/// @param bind_address Local network address to bind this torque_socket to.
-	torque_socket(bool thread_socket = false, void (*socket_notify_fn)(void *) = 0, void *socket_notify_data = 0) : _puzzle_manager(_random_generator, &_allocator), _event_queue_allocator(&_allocator), _packet_thread(this)
+	torque_socket(bool thread_socket = false, void (*socket_notify_fn)(void *) = 0, void *socket_notify_data = 0) : _puzzle_manager(_random_generator, &_allocator), _event_queue(&_allocator), _packet_thread(this)
 	{
 		_next_connection_index = 1;
 		_random_generator.random_buffer(_random_hash_data, sizeof(_random_hash_data));
@@ -1374,12 +1297,12 @@ public:
 		// Supply our own (small) unique private key for the time being.
 		_private_key = new asymmetric_key(16, _random_generator);
 		_challenge_response = new byte_buffer();
-		_event_queue_head = _event_queue_tail = 0;
 		_pending_connections = 0;
 		_connection_list = 0;
-
 	}
-		
+	
+	socket_event_queue _event_queue;
+	
 	mutex _packet_queue_mutex;
 	packet_record *_received_packet_list;
 	bool _thread_socket;
@@ -1408,9 +1331,6 @@ public:
 	uint8  _random_hash_data[12]; ///< Data that gets hashed with connect challenge requests to prevent connection spoofing.
 	bool _allow_connections; ///< Set if this torque_socket allows connections from remote instances.
 	
-	event_queue_entry *_event_queue_tail;
-	event_queue_entry *_event_queue_head;
-	page_allocator<16> _event_queue_allocator;
 	hash_table_flat<uint32, torque_connection *> _connection_index_table;
 
 	packet_record *_send_packet_list; ///< List of delayed packets pending to send.

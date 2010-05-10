@@ -71,6 +71,25 @@ template<class empty> struct function_record_decl : function_record
 	function_record_decl() {}
 };
 
+template<class T> struct function_record_decl<void (T::*)()> : function_record
+{
+	typedef void (T::*func_ptr)();
+	func_ptr _func;
+	
+	function_record_decl(func_ptr f)
+	{
+		_func = f;
+		_signature.class_type = get_global_type_record<T>();
+		_signature.argument_count = 0;
+		_signature.argument_types = 0;
+		_signature.return_type = get_global_type_record<empty_type>();
+	}
+	void dispatch(void *object, void **arguments, void *return_data_ptr)
+	{
+		( ((T*)object)->*_func) ();
+	}	
+};
+
 template<class T, class return_type> struct function_record_decl<return_type (T::*)()> : function_record
 {
 	typedef return_type (T::*func_ptr)();
@@ -155,7 +174,7 @@ template<class T, class arg0, class arg1, class arg2> struct function_record_dec
 	}
 	void dispatch(void *object, void **arguments, void *return_data_ptr)
 	{
-		((T*)object)->*_func (*( (arg0 *)arguments[0]), *( (arg1 *)arguments[1]), *( (arg2 *)arguments[2]));
+		(((T*)object)->*_func) (*( (arg0 *)arguments[0]), *( (arg1 *)arguments[1]), *( (arg2 *)arguments[2]));
 	}	
 };
 

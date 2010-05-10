@@ -79,6 +79,20 @@ public:
 		db.type_convert(return_value, calling_signature->return_type, &np_return_value, variant_type);
 		browser->releasevariantvalue(&np_return_value);
 	}
+	void _call_method(NPObject *object, NPIdentifier name, function_type_signature *calling_signature, void *return_value, void **arguments)
+	{
+		NPVariant np_args[function_call_record::max_arguments];
+		NPVariant np_return_value;
+		type_record *variant_type = get_global_type_record<NPVariant>();
+		
+		type_database &db = global_type_database();
+		for(core::uint32 i = 0; i < calling_signature->argument_count; i++)
+			db.type_convert(np_args + i, variant_type, arguments[i], calling_signature->argument_types[i]);
+		browser->invoke(_plugin_instance, object, name, np_args, calling_signature->argument_count, &np_return_value);
+		db.type_convert(return_value, calling_signature->return_type, &np_return_value, variant_type);
+		browser->releasevariantvalue(&np_return_value);
+	}
+	
 	template<class return_type> void call_function(NPObjectRef &func, return_type *return_value)
 	{
 		static function_call_record_decl<return_type> call_decl;
@@ -108,6 +122,45 @@ public:
 		args[1] = &arg1;
 		args[2] = &arg2;
 		_call_function(func, call_decl.get_signature(), return_value, args);
+	}
+	template<class return_type> void call_method(NPObjectRef &object, NPIdentifier method_name, return_type *return_value)
+	{
+		static function_call_record_decl<return_type> call_decl;
+		_call_method(object, method_name, call_decl.get_signature(), return_value, 0);
+	}
+	template<class return_type, class arg0_type> void call_method(NPObjectRef &object, NPIdentifier method_name, return_type *return_value, arg0_type &arg0 )
+	{
+		static function_call_record_decl<return_type,arg0_type> call_decl;
+		void *args[1];
+		args[0] = &arg0;
+		_call_method(object, method_name, call_decl.get_signature(), return_value, args);
+	}
+	template<class return_type, class arg0_type, class arg1_type> void call_method(NPObjectRef &object, NPIdentifier method_name, return_type *return_value, arg0_type &arg0, arg1_type &arg1 )
+	{
+		static function_call_record_decl<return_type,arg0_type,arg1_type> call_decl;
+		void *args[2];
+		args[0] = &arg0;
+		args[1] = &arg1;
+		_call_method(object, method_name, call_decl.get_signature(), return_value, args);
+	}
+	template<class return_type, class arg0_type, class arg1_type, class arg2_type> void call_method(NPObjectRef &object, NPIdentifier method_name, return_type *return_value, arg0_type &arg0, arg1_type &arg1, arg2_type &arg2 )
+	{
+		static function_call_record_decl<return_type,arg0_type,arg1_type,arg2_type> call_decl;
+		void *args[3];
+		args[0] = &arg0;
+		args[1] = &arg1;
+		args[2] = &arg2;
+		_call_method(object, method_name, call_decl.get_signature(), return_value, args);
+	}
+	template<class return_type, class arg0_type, class arg1_type, class arg2_type, class arg3_type> void call_method(NPObjectRef &object, NPIdentifier method_name, return_type *return_value, arg0_type &arg0, arg1_type &arg1, arg2_type &arg2, arg3_type &arg3 )
+	{
+		static function_call_record_decl<return_type,arg0_type,arg1_type,arg2_type,arg3_type> call_decl;
+		void *args[4];
+		args[0] = &arg0;
+		args[1] = &arg1;
+		args[2] = &arg2;
+		args[3] = &arg3;
+		_call_method(object, method_name, call_decl.get_signature(), return_value, args);
 	}
 };
 
@@ -167,7 +220,6 @@ public:
 	
 	static bool _invoke(NPObject* object, NPIdentifier name, const NPVariant* args, uint32_t arg_count, NPVariant* result)
 	{
-		logprintf("_plugin_instance = %08x", ((scriptable_object *) object)->_plugin_instance);
 		NPUTF8 *text = browser->utf8fromidentifier(name);
 		logprintf("_invoke %s", text);
 		browser->memfree(text);
@@ -185,13 +237,11 @@ public:
 		
 		type_database &db = global_type_database();
 		function_call_storage storage(sig);
-		logprintf("1_plugin_instance = %08x", ((scriptable_object *) object)->_plugin_instance);
 		
 		for(core::uint32 i = 0; i < arg_count; i++)
 		{
 			db.type_convert(storage._args[i], sig->argument_types[i], &args[i], get_global_type_record<NPVariant>());
 		}
-		logprintf("object = %08x", so);
 		the_method->dispatch(so, storage._args, storage._return_value);
 		db.type_convert(result, get_global_type_record<NPVariant>(), storage._return_value, sig->return_type);
 		return true;

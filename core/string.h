@@ -18,7 +18,7 @@ class string
 	string_record *_string_record;
 	void _dec_ref()
 	{
-		if(!--_string_record->ref_count)
+		if(!--_string_record->ref_count && _string_record != _get_null_string_record())
 			memory_deallocate(_string_record);
 	}
 public:
@@ -38,6 +38,21 @@ public:
 		_string_record->ref_count++;
 		set(string_data);
 	}
+	
+	string(const char *string_data, uint32 len)
+	{
+		_string_record = _get_null_string_record();
+		_string_record->ref_count++;
+		set(string_data, len);		
+	}
+	
+	string(const unsigned char *data, uint32 len)
+	{
+		_string_record = _get_null_string_record();
+		_string_record->ref_count++;
+		set(data, len);		
+	}
+	
 	string(const string &the_string)
 	{
 		_string_record = the_string._string_record;
@@ -66,6 +81,11 @@ public:
 		memcpy(_string_record->data, string_data, len);
 		_string_record->data[len] = 0;
 	}
+	void set(const unsigned char *string_data, uint32 len)
+	{
+		set((const char *) string_data, len);
+	}
+	
 	operator const char *()
 	{
 		return _string_record->data;
@@ -73,6 +93,10 @@ public:
 	const char *c_str()
 	{
 		return _string_record->data;
+	}
+	uint8 *data()
+	{
+		return (uint8 *) _string_record->data;
 	}
 	uint32 len()
 	{

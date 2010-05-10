@@ -20,7 +20,9 @@ struct  hostent {
 	char    **h_addr_list;  /* list of addresses from name server */
 #define h_addr  h_addr_list[0]  /* address, for backward compatiblity */
 };
-struct hostent	*gethostbyname(const char *);
+struct hostent	*gethostbyname(const char *) {
+	return 0;
+}
 
 struct sockaddr {
 	unsigned char sa_len;
@@ -41,7 +43,16 @@ struct sockaddr_in {
 	char sin_zero[8];
 };
 
-in_addr_t inet_addr(const char *);
+inline in_addr_t inet_addr(const char *addr_str) {
+	unsigned int a, b, c, d;
+	if(sscanf(addr_str, "%d.%d.%d.%d", &a, &b, &c, &d) == 4)
+	{
+		return (a << 24) | (b << 16) | (c << 8) | d;
+	}
+	else
+		return 0;
+}
+
 typedef	unsigned int socklen_t;
 
 #define	SOCK_DGRAM 2
@@ -65,8 +76,10 @@ ssize_t	recvfrom(int, void *, size_t, int, struct sockaddr * __restrict, socklen
 { errno = EAGAIN; return -1; }
 ssize_t	sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t) { return 0; }
 int	socket(int, int, int) { return 0; }
-__uint32_t	htonl(__uint32_t) { return 0; }
-__uint16_t	htons(__uint16_t) { return 0; }
+
+// NaCl is defined to be LSB first (little endian) and network byte order is MSB first
+inline __uint32_t	htonl(__uint32_t val) { return ((val >> 24) & 0xFF) | ((val >> 8) & 0xFF00) |  ((val << 8) & 0xFF0000) | ((val << 24) & 0xFF000000); }
+inline __uint16_t	htons(__uint16_t val) { return ((val >> 8) & 0xFF) | ((val << 8) & 0xFF00); }
 #define NO_IPX_SUPPORT
 typedef struct sockaddr_in SOCKADDR_IN;
 typedef struct sockaddr * PSOCKADDR;

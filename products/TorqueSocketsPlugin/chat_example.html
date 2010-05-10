@@ -135,6 +135,7 @@ function bind(instance_type)
 	socket.on_close = on_close;
 	socket.on_packet = on_packet;
 	socket.on_packet_delivery_notify = on_packet_delivery_notify;
+
 	var success = socket.bind(document.bind_section.bind_address.value);
 	
 	if(success)
@@ -200,11 +201,11 @@ function connect()
 
 function say()
 {
-	var seq = socket.send_to(connection, document.chat_section.chat_text.value);
+	var seq = socket.send_to_connection(connection, document.chat_section.chat_text.value);
 	output("Sent to " + connection + ": " + document.chat_section.chat_text.value + ", seq = " + seq);
 	if(introduced_connection)
 	{
-		var seq = socket.send_to(introduced_connection, "to introduced " + document.chat_section.chat_text.value);
+		var seq = socket.send_to_connection(introduced_connection, "to introduced " + document.chat_section.chat_text.value);
 		output("Sent to " + introduced_connection + ": " + document.chat_section.chat_text.value + ", seq = " + seq);	
 	}
 	return false;

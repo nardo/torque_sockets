@@ -12,5 +12,6 @@
 #include "packet_stream.h"
 #include "client_puzzle.h"
 #include "pending_connection.h"
+#include "socket_event_queue.h"
 #include "torque_socket.h"
 #include "torque_connection.h"

@@ -147,7 +147,7 @@ public:
 		SOCKADDR sender_sockaddr;
 		socklen_t addr_len = sizeof(sender_sockaddr);
 		int32 bytes_read = recvfrom(_socket, (char *) buffer, buffer_size, 0, &sender_sockaddr, &addr_len);
-			logprintf("recv_from result = %d", errno);
+		//logprintf("recv_from result = %d", errno);
 		if(bytes_read == SOCKET_ERROR)
 		{
 			switch(errno)

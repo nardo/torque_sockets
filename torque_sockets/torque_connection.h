@@ -62,12 +62,11 @@ protected:
 		
 		if(read_packet_header(bstream))
 		{
-			torque_socket_event *event = _torque_socket->_allocate_queued_event();
-			event->event_type = torque_connection_packet_event_type;
+			torque_socket_event *event = _torque_socket->_event_queue.post_event(torque_connection_packet_event_type);
 			event->packet_sequence = get_last_received_sequence();
 			event->connection = get_connection_index();
 			event->data_size = bstream.get_stream_byte_size() - bstream.get_byte_position();
-			event->data = _torque_socket->_allocate_queue_data(event->data_size);
+			event->data = _torque_socket->_event_queue.allocate_queue_data(event->data_size);
 			memcpy(event->data, bstream.get_buffer() + bstream.get_byte_position(), event->data_size);
 			return true;
 		}
@@ -290,7 +289,7 @@ protected:
 			bool packet_transmit_success = (pk_ack_mask[ack_mask_word] & (1 << ack_mask_bit)) != 0;
 			TorqueLogMessageFormatted(LogConnectionProtocol, ("Ack %d %d", notify_index, packet_transmit_success));
 			
-			torque_socket_event *event = _torque_socket->_post_connection_event(_connection_index, torque_connection_packet_notify_event_type, 0);
+			torque_socket_event *event = _torque_socket->_event_queue.post_event(torque_connection_packet_notify_event_type, _connection_index);
 			event->delivered = packet_transmit_success;
 			event->packet_sequence = notify_index;
 						

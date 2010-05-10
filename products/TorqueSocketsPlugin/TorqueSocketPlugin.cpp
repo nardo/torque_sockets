@@ -44,7 +44,9 @@ class torque_socket_instance : public scriptable_object
 	NPObjectRef on_established;
 	NPObjectRef on_close;
 	NPObjectRef on_packet;
+	NPObjectRef on_socket_packet;
 	NPObjectRef on_packet_delivery_notify;
+	NPObjectRef on_pong;
 public:
 	torque_socket_instance()
 	{
@@ -77,7 +79,7 @@ public:
 		// pump the socket's event queue and generate events to post back from the plugin.
 		torque_socket_event *event;
 		empty_type void_return_value;
-		string key, message;
+		string key, message, source_address;
 		
 		while((event = torque_socket_get_next_event(_socket)) != NULL)
 		{
@@ -86,12 +88,12 @@ public:
 			switch(event->event_type)
 			{
 				case torque_connection_challenge_response_event_type:
-					key.set((const char *) event->public_key, event->public_key_size);
+					key.set((const char *) event->key, event->key_size);
 					message.set((const char *) event->data, event->data_size);
 					call_function(on_challenge_response, &void_return_value, connection, key, message);
 					break;
 				case torque_connection_requested_event_type:
-					key.set((const char *) event->public_key, event->public_key_size);
+					key.set((const char *) event->key, event->key_size);
 					message.set((const char *) event->data, event->data_size);
 					call_function(on_connect_request, &void_return_value, connection, key, message);
 					break;
@@ -116,6 +118,9 @@ public:
 					call_function(on_packet_delivery_notify, &void_return_value, connection, sequence, event->delivered);
 					break;
 				case torque_socket_packet_event_type:
+					message.set((const char *) event->data, event->data_size);
+					source_address = net::address(event->source_address).to_string();
+					call_function(on_socket_packet, &void_return_value, source_address, message);
 					break;
 			}
 		}
@@ -172,14 +177,6 @@ public:
 	{
 		logprintf("accept_connection %d", pending_connection);
 		torque_socket_accept_connection(_socket, pending_connection);
-		/*
-		string return_value;
-		char buffer[100];
-		sprintf(buffer, "OMG%d!", pending_connection);
-		string arg(buffer);
-		logprintf("Calling on_established");
-		call_function(on_established, &return_value, arg);
-		logprintf("Returned: \"%s\"", return_value.c_str());*/
 	}
 	
 	void close_connection(int connection_id, core::string reason)
@@ -188,9 +185,25 @@ public:
 		torque_socket_close_connection(_socket, connection_id, reason.len(), (core::uint8*) reason.c_str());
 	}
 	
-	int send_to(int connection_id, core::string packet_data)
+	int send_to_connection(int connection_id, core::string packet_data)
 	{
 		return torque_socket_send_to_connection(_socket, connection_id, packet_data.len(), (core::uint8*) packet_data.c_str());
+	}
+
+	int send_to(core::string address_string, core::string packet_data)
+	{
+		core::net::address send_to_address(address_string.c_str(), false, 0);
+		sockaddr addr;
+		send_to_address.to_sockaddr(&addr);
+		
+		return torque_socket_send_to(_socket, &addr, packet_data.len(), (core::uint8*) packet_data.c_str());
+	}
+	
+	void ping(core::string message)
+	{
+		empty_type void_return_value;
+		logprintf("got ping - %s - issuing pong", message.c_str());
+		call_function(on_pong, &void_return_value, message);
 	}
 
 	static void register_class(core::type_database &db)
@@ -200,8 +213,10 @@ public:
 		tnl_slot(db, torque_socket_instance, on_connect_request, 0);
 		tnl_slot(db, torque_socket_instance, on_established, 0);
 		tnl_slot(db, torque_socket_instance, on_close, 0);
+		tnl_slot(db, torque_socket_instance, on_socket_packet, 0);		
 		tnl_slot(db, torque_socket_instance, on_packet, 0);
 		tnl_slot(db, torque_socket_instance, on_packet_delivery_notify, 0);
+		tnl_slot(db, torque_socket_instance, on_pong, 0);
 		tnl_method(db, torque_socket_instance, bind);
 		tnl_method(db, torque_socket_instance, set_key_pair);
 		tnl_method(db, torque_socket_instance, set_challenge_response);
@@ -211,7 +226,9 @@ public:
 		tnl_method(db, torque_socket_instance, accept_challenge);
 		tnl_method(db, torque_socket_instance, accept_connection);
 		tnl_method(db, torque_socket_instance, close_connection);
+		tnl_method(db, torque_socket_instance, send_to_connection);
 		tnl_method(db, torque_socket_instance, send_to);
+		tnl_method(db, torque_socket_instance, ping);
 		tnl_end_class(db);
 	}
 };
@@ -233,10 +250,15 @@ public:
 		NPObject* object = global_plugin.create_object(get_plugin_instance(), core::get_global_type_record<torque_socket_instance>());
 		return object;
 	}
+	void message(string the_message)
+	{
+		logprintf("msg: %s", the_message.c_str());
+	}
 	static void register_class(core::type_database &the_database)
 	{
 		tnl_begin_class(the_database, torque_socket_plugin, scriptable_object, true);
 		tnl_method(the_database, torque_socket_plugin, create_torque_socket);
+		tnl_method(the_database, torque_socket_plugin, message);
 		tnl_end_class(the_database);
 	}
 };
@@ -244,6 +266,7 @@ public:
 void plugin_initialize()
 {
 	ltc_mp = ltm_desc;
+	core::_log_prefix = "TSPlugin";
 	torque_socket_instance::register_class(global_type_database());
 	torque_socket_plugin::register_class(global_type_database());
 	global_plugin.add_class(get_global_type_record<torque_socket_instance>());

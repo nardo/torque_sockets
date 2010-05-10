@@ -85,14 +85,35 @@ void torque_socket_close_connection(torque_socket_handle the_socket, torque_conn
 	((core::net::torque_socket *) the_socket)->disconnect(connection_id, disconnect_data,  disconnect_data_size);
 }
 
-struct torque_socket_event *torque_socket_get_next_event(torque_socket_handle the_socket)
-{
-	return ((core::net::torque_socket *) the_socket)->get_next_event();
-}
-
 int torque_socket_send_to_connection(torque_socket_handle the_socket, torque_connection_id connection_id, unsigned datagram_size, unsigned char buffer[torque_sockets_max_datagram_size])
 {
 	unsigned sequence;
 	((core::net::torque_socket *) the_socket)->send_to_connection(connection_id, buffer, datagram_size, &sequence);
 	return sequence;
 }
+
+struct torque_socket_event *torque_socket_get_next_event(torque_socket_handle the_socket)
+{
+	return ((core::net::torque_socket *) the_socket)->get_next_event();
+}
+
+torque_socket_interface g_torque_socket_interface =
+{
+	torque_socket_create,
+	torque_socket_destroy,
+	torque_socket_bind,
+	torque_socket_allow_incoming_connections,
+	torque_socket_set_key_pair,
+	torque_socket_set_challenge_response,
+	torque_socket_write_entropy,
+	torque_socket_read_entropy,
+	torque_socket_send_to,
+	torque_socket_connect,
+	torque_socket_connect_introduced,
+	torque_socket_introduce,
+	torque_socket_accept_challenge,
+	torque_socket_accept_connection,
+	torque_socket_close_connection,
+	torque_socket_send_to_connection,
+	torque_socket_get_next_event,
+};
