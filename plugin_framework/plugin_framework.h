@@ -68,16 +68,17 @@ public:
 	
 	void _call_function(NPObject *function, function_type_signature *calling_signature, void *return_value, void **arguments)
 	{
+		type_database &db = global_type_database();
 		NPVariant np_args[function_call_record::max_arguments];
 		NPVariant np_return_value;
 		type_record *variant_type = get_global_type_record<NPVariant>();
 		
-		type_database &db = global_type_database();
 		for(core::uint32 i = 0; i < calling_signature->argument_count; i++)
 			db.type_convert(np_args + i, variant_type, arguments[i], calling_signature->argument_types[i]);
 		browser->invokeDefault(_plugin_instance, function, np_args, calling_signature->argument_count, &np_return_value);
 		db.type_convert(return_value, calling_signature->return_type, &np_return_value, variant_type);
 		browser->releasevariantvalue(&np_return_value);
+		db.get_context()->get_frame_allocator()->clear();
 	}
 	void _call_method(NPObject *object, NPIdentifier name, function_type_signature *calling_signature, void *return_value, void **arguments)
 	{
@@ -91,6 +92,7 @@ public:
 		browser->invoke(_plugin_instance, object, name, np_args, calling_signature->argument_count, &np_return_value);
 		db.type_convert(return_value, calling_signature->return_type, &np_return_value, variant_type);
 		browser->releasevariantvalue(&np_return_value);
+		db.get_context()->get_frame_allocator()->clear();
 	}
 	
 	template<class return_type> void call_function(NPObjectRef &func, return_type *return_value)
@@ -379,12 +381,22 @@ bool string_from_np_variant(core::string *dest, NPVariant *src, context *)
 {
 	if(NPVARIANT_IS_STRING(*src))
 	{
+		core::uint8 *src_p;
+		core::uint32 len;
 #ifdef __native_client__
-		dest->set(src->value.stringValue.UTF8Characters, src->value.stringValue.UTF8Length);
+		src_p = (core::uint8 *) src->value.stringValue.UTF8Characters;
+		len = src->value.stringValue.UTF8Length;
 #else
-		dest->set(src->value.stringValue.utf8characters, src->value.stringValue.utf8length);
+		src_p = (core::uint8 *) src->value.stringValue.utf8characters;
+		len = src->value.stringValue.utf8length;
 #endif
-		logprintf("np_variant_to_string - %s", dest->c_str());
+		if(len >= 4 && !strncmp((const char *) src_p, "BIN:", 4))
+		{
+			byte_buffer_ptr p = net::buffer_decode_base_16(src_p + 4, len - 4);
+			dest->set(p->get_buffer(), p->get_buffer_size());
+		}
+		else
+			dest->set(src_p, len);
 		return true;
 	}
 	dest->set("");
@@ -444,10 +456,33 @@ bool np_variant_from_double(NPVariant *dest, core::float64 *src, context *)
 	return true;
 }
 
-bool np_variant_from_string(NPVariant *dest, core::string *src, context *)
+static bool string_has_binary(core::string *src)
+{
+	core::uint32 len = src->len();
+	const char *walk = src->c_str();
+	while(len--)
+	{
+		if(*walk++ < ' ')
+			return true;
+	}
+	return false;
+}
+
+bool np_variant_from_string(NPVariant *dest, core::string *src, context *the_context)
 {
 	logprintf("string_to_np_variant");
-	STRINGN_TO_NPVARIANT(src->c_str(), src->len(), *dest);
+	// check if there's some binary in this string
+	if(string_has_binary(src))
+	{
+		byte_buffer_ptr converted_str = net::buffer_encode_base_16(src->data(), src->len());
+		core::uint32 data_size = converted_str->get_buffer_size();
+		core::uint8 *data_ptr = (core::uint8 *) the_context->get_frame_allocator()->allocate(data_size + 4);
+		strcpy((char *) data_ptr, "BIN:");
+		memcpy(data_ptr + 4, converted_str->get_buffer(), data_size);
+		STRINGN_TO_NPVARIANT((NPUTF8 *) data_ptr, data_size + 4, *dest);
+	}
+	else
+		STRINGZ_TO_NPVARIANT((const NPUTF8 *) src->c_str(), *dest);
 	return true;
 }
 

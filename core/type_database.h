@@ -461,6 +461,10 @@ public:
 		_context = the_context;
 		_current_class = 0;
 	}
+	context *get_context()
+	{
+		return _context;
+	}
 private:
 	static_to_indexed_string_map _string_remapper;
 	hash_table_flat<indexed_string, function_record *> _function_table;
